@@ -3,6 +3,7 @@ import * as api from '../api';
 import { DEFAULT_PARAMS, uid, usePersistent, type Conversation, type GenParams, type OllamaState, type UiMessage } from '../store';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
+import { shortcut } from '../platform';
 import { Markdown, splitThinking } from '../components/Markdown';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
@@ -215,7 +216,7 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
       <aside className="sidebar">
         <div className="sidebar-head">
           <span className="sidebar-title">Chats</span>
-          <button className="icon-btn" onClick={createChat} title="New chat (⌘N)">
+          <button className="icon-btn" onClick={createChat} title={`New chat (${shortcut('N')})`}>
             <Plus size={16} />
           </button>
         </div>
@@ -343,7 +344,7 @@ function Messages(props: {
           <div className="logo-big"><Logo size={56} /></div>
           <h2>{props.hasModel ? 'Start a conversation' : 'Load a model to begin'}</h2>
           <p className="muted">
-            {props.hasModel ? 'Type a message below. Shift+Enter for a new line.' : 'Pick a model from the selector above, or press ⌘L.'}
+            {props.hasModel ? 'Type a message below. Shift+Enter for a new line.' : `Pick a model from the selector above, or press ${shortcut('L')}.`}
           </p>
         </div>
       </div>
@@ -409,7 +410,7 @@ function MessageView({ msg, live, busy, onRegenerate, onDelete, onEdit, onBranch
   const onContextMenu = (e: MouseEvent) => {
     const selection = window.getSelection()?.toString() ?? '';
     menu(e, [
-      selection && { label: 'Copy selection', icon: Copy, hint: '⌘C', onClick: () => copyText(selection) },
+      selection && { label: 'Copy selection', icon: Copy, hint: shortcut('C'), onClick: () => copyText(selection) },
       { label: msg.role === 'assistant' ? 'Copy response' : 'Copy message', icon: Copy, onClick: copy, disabled: !answer },
       thinking && { label: 'Copy thought process', icon: Brain, onClick: () => copyText(thinking) },
       'separator',

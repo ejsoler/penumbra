@@ -8,6 +8,7 @@ import { DeveloperView } from './views/DeveloperView';
 import { FolderOpen, MessageSquare, Telescope, Terminal } from './components/icons';
 import { ContextMenuProvider } from './components/ContextMenu';
 import { Logo } from './components/Logo';
+import { isElectron, isMac } from './platform';
 
 type View = 'chat' | 'models' | 'discover' | 'developer';
 
@@ -18,8 +19,6 @@ const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'discover', label: 'Discover', icon: Telescope },
 ];
 
-const isElectron = navigator.userAgent.includes('Electron');
-const isMac = navigator.userAgent.includes('Mac');
 
 export default function App() {
   const [view, setView] = usePersistent<View>('ollama-gui.view', 'chat');

@@ -2,7 +2,10 @@
   "name": "penumbra",
   "version": "0.1.0",
   "description": "A desktop app for Ollama, inspired by LM Studio",
-  "author": "Emmanuel J. Soler Mendez",
+  "author": {
+    "name": "Emmanuel J. Soler Mendez",
+    "email": "24614965+ejsoler@users.noreply.github.com"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -31,8 +34,11 @@
     "build": "tsc --noEmit && vite build",
     "start": "npm run build && electron .",
     "icons": "node build/make-icons.mjs",
-    "dist": "npm run build && electron-builder --mac dir",
-    "install-app": "npm run dist && node build/install-app.mjs"
+    "dist": "npm run build && electron-builder --publish never",
+    "install-app": "npm run build && electron-builder --mac dir --publish never && node build/install-app.mjs",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --publish never"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
@@ -70,14 +76,66 @@
       "category": "public.app-category.developer-tools",
       "target": [
         {
-          "target": "dir",
+          "target": "dmg",
           "arch": [
-            "arm64"
+            "arm64",
+            "x64"
           ]
         }
       ],
       "identity": null
     },
-    "copyright": "Copyright © 2026 Emmanuel J. Soler Mendez"
+    "copyright": "Copyright © 2026 Emmanuel J. Soler Mendez",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "dmg": {
+      "title": "${productName} ${version}"
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Penumbra",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Development",
+      "synopsis": "A desktop app for Ollama",
+      "maintainer": "Emmanuel J. Soler Mendez <24614965+ejsoler@users.noreply.github.com>",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "ejsoler",
+      "repo": "penumbra",
+      "releaseType": "draft"
+    }
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, ChevronDown, Cloud, Eject, Eye, Brain, Loader2, Search, Wrench } from './icons';
 import * as api from '../api';
 import type { OllamaState } from '../store';
+import { shortcut } from '../platform';
 
 interface Props {
   ollama: OllamaState;
@@ -83,7 +84,7 @@ export function ModelPicker({ ollama, value, onChange, keepAlive, numCtx }: Prop
           {loading && <span className="muted"> — loading…</span>}
         </span>
         {current && <span className="muted mono">{current.details.parameter_size}</span>}
-        {!value && <kbd>⌘L</kbd>}
+        {!value && <kbd>{shortcut('L')}</kbd>}
         <ChevronDown size={15} />
       </button>
       {value && loaded.has(value) && (

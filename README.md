@@ -38,9 +38,25 @@
 
 - [Ollama](https://ollama.com/download) installed and running (`ollama serve`)
 - [Node.js](https://nodejs.org) 22 or newer
-- macOS (Apple Silicon) is the tested platform. The app is Electron, so Windows and Linux should work in dev mode.
+- macOS, Windows, or Linux
 
-## Getting started
+## Download
+
+Get the latest installer from [Releases](https://github.com/ejsoler/penumbra/releases):
+
+| Platform | File |
+| --- | --- |
+| macOS (Apple Silicon / Intel) | `Penumbra-<version>-mac-arm64.dmg` / `-mac-x64.dmg` |
+| Windows | `Penumbra-Setup-<version>-x64.exe` (or `-arm64.exe`) |
+| Linux | `Penumbra-<version>-linux-x86_64.AppImage`, or `.deb` for Debian/Ubuntu |
+
+The builds aren't code-signed yet, so your OS will warn you the first time:
+
+- **macOS:** right-click the app → **Open** → **Open**. On recent macOS versions: System Settings → Privacy & Security → **Open Anyway**.
+- **Windows:** on the SmartScreen prompt, click **More info** → **Run anyway**.
+- **Linux (AppImage):** `chmod +x Penumbra-*.AppImage` and run it.
+
+## Build from source
 
 ```bash
 git clone https://github.com/ejsoler/penumbra.git
@@ -65,8 +81,9 @@ This builds `Penumbra.app`, signs it for local use, and copies it to `/Applicati
 | `npm run dev` | Browser-only version at http://localhost:5173 |
 | `npm run build` | Type-check and build the web assets to `dist/` |
 | `npm start` | Build, then run in Electron without hot reload |
-| `npm run dist` | Package `Penumbra.app` into `release/` |
-| `npm run install-app` | Package and copy to `/Applications` |
+| `npm run dist` | Package installers for the current OS into `release/` |
+| `npm run dist:mac` / `dist:win` / `dist:linux` | Package for a specific OS |
+| `npm run install-app` | macOS: package and copy `Penumbra.app` to `/Applications` |
 | `npm run icons` | Regenerate icons from `build/icon.svg` |
 
 ## Configuration

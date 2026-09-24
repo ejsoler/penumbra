@@ -25,6 +25,7 @@ function createWindow() {
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 14, y: 14 },
     icon: ICON, // Windows/Linux window icon
+    autoHideMenuBar: process.platform !== 'darwin', // Alt shows the menu on Windows/Linux
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
 

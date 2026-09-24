@@ -5,8 +5,8 @@ import { join } from 'node:path';
 
 const release = join(import.meta.dirname, '..', 'release');
 const outDir = readdirSync(release).find((d) => d.startsWith('mac'));
-const src = join(release, outDir, 'Ollama Studio.app');
-const dest = '/Applications/Ollama Studio.app';
+const src = join(release, outDir, 'Penumbra.app');
+const dest = '/Applications/Penumbra.app';
 if (!existsSync(src)) throw new Error(`Build not found at ${src}`);
 
 // Ad-hoc sign so Apple Silicon will launch the unsigned build.

@@ -1,16 +1,16 @@
 {
-  "name": "ollama-gui",
+  "name": "penumbra",
   "version": "0.1.0",
-  "description": "A desktop GUI for Ollama, inspired by LM Studio",
-  "author": "ejsoler",
+  "description": "A desktop app for Ollama, inspired by LM Studio",
+  "author": "Emmanuel J. Soler Mendez",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ejsoler/ollama-studio.git"
+    "url": "https://github.com/ejsoler/penumbra.git"
   },
-  "homepage": "https://github.com/ejsoler/ollama-studio#readme",
+  "homepage": "https://github.com/ejsoler/penumbra#readme",
   "bugs": {
-    "url": "https://github.com/ejsoler/ollama-studio/issues"
+    "url": "https://github.com/ejsoler/penumbra/issues"
   },
   "keywords": [
     "ollama",
@@ -51,10 +51,10 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.1"
   },
-  "productName": "Ollama Studio",
+  "productName": "Penumbra",
   "build": {
-    "appId": "com.ollamastudio.app",
-    "productName": "Ollama Studio",
+    "appId": "io.github.ejsoler.penumbra",
+    "productName": "Penumbra",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -78,6 +78,6 @@
       ],
       "identity": null
     },
-    "copyright": "Copyright \u00a9 2026 ejsoler"
+    "copyright": "Copyright © 2026 Emmanuel J. Soler Mendez"
   }
 }

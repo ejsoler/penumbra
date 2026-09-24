@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="build/icon.png" width="128" alt="Ollama Studio icon" />
+  <img src="build/icon.png" width="128" alt="Penumbra icon" />
 </p>
 
-<h1 align="center">Ollama Studio</h1>
+<h1 align="center">Penumbra</h1>
 
 <p align="center">
-  A desktop app for chatting with local models through <a href="https://ollama.com">Ollama</a>, with a layout inspired by LM Studio.
+  A desktop app for <a href="https://ollama.com">Ollama</a>. Chat with local models, manage them, and download new ones from the Ollama library or Hugging Face, with a layout inspired by LM Studio.
 </p>
 
 ---
@@ -43,8 +43,8 @@
 ## Getting started
 
 ```bash
-git clone https://github.com/ejsoler/ollama-studio.git
-cd ollama-studio
+git clone https://github.com/ejsoler/penumbra.git
+cd penumbra
 npm install
 npm run app
 ```
@@ -55,7 +55,7 @@ npm run app
 npm run install-app
 ```
 
-This builds `Ollama Studio.app`, signs it for local use, and copies it to `/Applications`. Run it again after you pull updates.
+This builds `Penumbra.app`, signs it for local use, and copies it to `/Applications`. Run it again after you pull updates.
 
 ### All scripts
 
@@ -65,7 +65,7 @@ This builds `Ollama Studio.app`, signs it for local use, and copies it to `/Appl
 | `npm run dev` | Browser-only version at http://localhost:5173 |
 | `npm run build` | Type-check and build the web assets to `dist/` |
 | `npm start` | Build, then run in Electron without hot reload |
-| `npm run dist` | Package `Ollama Studio.app` into `release/` |
+| `npm run dist` | Package `Penumbra.app` into `release/` |
 | `npm run install-app` | Package and copy to `/Applications` |
 | `npm run icons` | Regenerate icons from `build/icon.svg` |
 
@@ -99,4 +99,4 @@ Everything runs locally. The app talks only to your Ollama server, plus the Hugg
 
 [MIT](LICENSE)
 
-*Ollama Studio is an independent project. It is not affiliated with or endorsed by Ollama or LM Studio.*
+*Penumbra is an independent project. It is not affiliated with or endorsed by Ollama or LM Studio.*

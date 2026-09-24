@@ -1,8 +1,19 @@
 const { app, BrowserWindow, Menu, shell, session } = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
-app.setName('Ollama Studio');
+app.setName('Penumbra');
+
+// The app was called "Ollama Studio" before; carry chats and settings over on first launch.
+const legacyData = path.join(app.getPath('appData'), 'Ollama Studio');
+if (!fs.existsSync(app.getPath('userData')) && fs.existsSync(legacyData)) {
+  try {
+    fs.cpSync(legacyData, app.getPath('userData'), { recursive: true });
+  } catch (e) {
+    console.warn('Could not migrate data from Ollama Studio:', e);
+  }
+}
 
 function createWindow() {
   const win = new BrowserWindow({

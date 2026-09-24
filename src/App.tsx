@@ -37,7 +37,7 @@ export default function App() {
     <ContextMenuProvider>
     <div className={`app ${isElectron && isMac ? 'mac-inset' : ''}`}>
       <nav className="rail">
-        <div className="rail-logo" title="Ollama Studio"><Logo size={24} /></div>
+        <div className="rail-logo" title="Penumbra"><Logo size={24} /></div>
         {NAV.map(({ id, label, icon: Icon }) => (
           <button key={id} className={`rail-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)} title={label}>
             <Icon size={19} />

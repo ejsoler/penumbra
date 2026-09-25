@@ -8,6 +8,10 @@
   A desktop app for <a href="https://ollama.com">Ollama</a>. Chat with local models, manage them, and download new ones from the Ollama library or Hugging Face, with a layout inspired by LM Studio.
 </p>
 
+<p align="center">
+  <a href="https://ko-fi.com/O8O227N74P"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" /></a>
+</p>
+
 ---
 
 ## Features
@@ -111,6 +115,12 @@ build/            App icon source, icon generator, install script
 ## Privacy
 
 Everything runs locally. The app talks only to your Ollama server, plus the Hugging Face API when you browse the Hugging Face tab. Chats and settings are stored in the app's local storage on your machine.
+
+## Support
+
+If Penumbra is useful to you, you can support its development on Ko-fi:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/O8O227N74P)
 
 ## License
 

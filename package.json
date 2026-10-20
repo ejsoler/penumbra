@@ -136,6 +136,7 @@
       "owner": "ejsoler",
       "repo": "penumbra",
       "releaseType": "draft"
-    }
+    },
+    "afterPack": "build/after-pack.cjs"
   }
 }

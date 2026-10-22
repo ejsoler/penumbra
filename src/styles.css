@@ -327,3 +327,14 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 4px; }
 .download.done .progress > div { background: var(--green); }
 .download.error .progress > div { background: var(--red); }
 .error-text { color: var(--red); }
+
+/* interactive widgets */
+.widget { border: 1px solid var(--border-strong); border-radius: 12px; margin: 0 0 1em; overflow: hidden; background: var(--bg-side); }
+.widget-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; background: var(--bg-elev); border-bottom: 1px solid var(--border); color: var(--accent-strong); }
+.widget-title { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.widget-head .icon-btn.on { color: var(--accent-strong); background: var(--accent-bg); }
+.widget-frame { display: block; width: 100%; border: none; background: transparent; transition: height 0.15s ease; }
+.widget-building { display: flex; align-items: center; gap: 8px; padding: 18px 14px; color: var(--text-dim); font-size: 13px; }
+.widget.building { border-style: dashed; }
+.widget-code { margin: 0; max-height: 320px; overflow: auto; padding: 12px 14px; background: #0f1013; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 12px; white-space: pre; }
+.widget-error { padding: 8px 12px; font-size: 12.5px; color: #ffb3b3; background: rgba(242, 109, 109, 0.1); border-top: 1px solid rgba(242, 109, 109, 0.25); }

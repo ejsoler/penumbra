@@ -1,9 +1,13 @@
-import { memo, useState, type ReactNode } from 'react';
+import { createContext, memo, useContext, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { Check, Copy, FileDown } from './icons';
 import { copyText, downloadFile, useContextMenu } from './ContextMenu';
+import { Widget } from './Widget';
+
+/** Whether the message being rendered is still streaming (widgets wait until it's complete). */
+const LiveContext = createContext(false);
 
 function textOf(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
@@ -24,6 +28,8 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   const child = Array.isArray(children) ? children[0] : children;
   const className = (child as { props?: { className?: string } })?.props?.className ?? '';
   const lang = /language-(\S+)/.exec(className)?.[1] ?? 'text';
+  const live = useContext(LiveContext);
+  if (lang === 'widget') return <Widget code={textOf(children)} live={live} />;
   const copy = () => {
     copyText(textOf(children));
     setCopied(true);
@@ -52,8 +58,9 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   );
 }
 
-export const Markdown = memo(function Markdown({ text }: { text: string }) {
+export const Markdown = memo(function Markdown({ text, live = false }: { text: string; live?: boolean }) {
   return (
+    <LiveContext.Provider value={live}>
     <div className="md">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
@@ -66,6 +73,7 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
         {text}
       </ReactMarkdown>
     </div>
+    </LiveContext.Provider>
   );
 });
 

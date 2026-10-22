@@ -4,3 +4,4 @@ release/
 .claude/
 .DS_Store
 *.log
+src/widgets/vendor/

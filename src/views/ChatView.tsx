@@ -445,7 +445,7 @@ function MessageView({ msg, live, busy, onRegenerate, onDelete, onEdit, onBranch
         <div className="msg-body user-text">{msg.content}</div>
       ) : (
         <div className="msg-body">
-          {answer ? <Markdown text={answer} /> : live && !thinking ? <span className="typing"><i /><i /><i /></span> : null}
+          {answer ? <Markdown text={answer} live={live} /> : live && !thinking ? <span className="typing"><i /><i /><i /></span> : null}
           {live && answer && <span className="cursor" />}
         </div>
       )}
@@ -503,10 +503,15 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat }: {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 240) + 'px';
+    const fit = () => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 240) + 'px';
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
   }, [text]);
 
   useEffect(() => {

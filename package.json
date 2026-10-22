@@ -29,22 +29,25 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "vite",
-    "app": "node electron/dev.mjs",
-    "build": "tsc --noEmit && vite build",
+    "dev": "npm run vendor && vite",
+    "app": "npm run vendor && node electron/dev.mjs",
+    "build": "npm run vendor && tsc --noEmit && vite build",
     "start": "npm run build && electron .",
     "icons": "node build/make-icons.mjs",
     "dist": "npm run build && electron-builder --publish never",
     "install-app": "npm run build && electron-builder --mac dir --publish never && node build/install-app.mjs",
     "dist:mac": "npm run build && electron-builder --mac --publish never",
     "dist:win": "npm run build && electron-builder --win --publish never",
-    "dist:linux": "npm run build && electron-builder --linux --publish never"
+    "dist:linux": "npm run build && electron-builder --linux --publish never",
+    "vendor": "node build/vendor.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "chart.js": "^4.6.1",
+    "d3": "^7.9.0",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "highlight.js": "^11.12.0",
@@ -54,6 +57,7 @@
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
+    "three": "^0.186.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.1"
   },

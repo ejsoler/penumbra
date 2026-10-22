@@ -70,6 +70,11 @@ function createWindow() {
     if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
   });
 
+  // Interactive widgets are model-written iframes: never let a subframe navigate anywhere.
+  win.webContents.on('will-frame-navigate', (details) => {
+    if (!details.isMainFrame && !/^about:(srcdoc|blank)/.test(details.url)) details.preventDefault();
+  });
+
   // Open external links in the default browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -97,6 +102,14 @@ app.whenReady().then(() => {
     headers['Access-Control-Allow-Origin'] = ['*'];
     cb({ responseHeaders: headers });
   });
+  // Widgets (subframes) get no network access and no permissions, as a backstop to their CSP.
+  session.defaultSession.webRequest.onBeforeRequest((details, cb) => {
+    const fromSubframe = details.frame && details.frame.parent;
+    cb({ cancel: Boolean(fromSubframe) && !/^(data|blob|about):/.test(details.url) });
+  });
+  session.defaultSession.setPermissionRequestHandler((_wc, _permission, cb, details) => cb(details.isMainFrame));
+  session.defaultSession.setPermissionCheckHandler((_wc, _permission, _origin, details) => details.isMainFrame !== false);
+
   createWindow();
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow());
 });

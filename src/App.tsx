@@ -5,15 +5,17 @@ import { ModelsView } from './views/ModelsView';
 import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView } from './views/DeveloperView';
-import { FolderOpen, MessageSquare, Telescope, Terminal } from './components/icons';
+import { AgentsView } from './views/AgentsView';
+import { Bot, FolderOpen, MessageSquare, Telescope, Terminal } from './components/icons';
 import { ContextMenuProvider } from './components/ContextMenu';
 import { Logo } from './components/Logo';
 import { isElectron, isMac } from './platform';
 
-type View = 'chat' | 'models' | 'discover' | 'developer';
+type View = 'chat' | 'agents' | 'models' | 'discover' | 'developer';
 
 const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
+  { id: 'agents', label: 'Agents & Skills', icon: Bot },
   { id: 'developer', label: 'Developer', icon: Terminal },
   { id: 'models', label: 'My Models', icon: FolderOpen },
   { id: 'discover', label: 'Discover', icon: Telescope },
@@ -26,8 +28,13 @@ export default function App() {
   const dl = useDownloads(ollama.refresh);
   const [showBanner, setShowBanner] = useState(true);
   const [pendingModel, setPendingModel] = useState<string | null>(null);
+  const [pendingAgent, setPendingAgent] = useState<string | null>(null);
   const chatWith = (model: string) => {
     setPendingModel(model);
+    setView('chat');
+  };
+  const chatWithAgent = (agentId: string) => {
+    setPendingAgent(agentId);
     setView('chat');
   };
   const pulling = Object.values(dl.downloads).some((d) => d.state === 'downloading');
@@ -55,7 +62,16 @@ export default function App() {
           </div>
         )}
         <div className="content-inner">
-          {view === 'chat' && <ChatView ollama={ollama} pendingModel={pendingModel} onPendingHandled={() => setPendingModel(null)} />}
+          {view === 'chat' && (
+            <ChatView
+              ollama={ollama}
+              pendingModel={pendingModel}
+              pendingAgent={pendingAgent}
+              onPendingHandled={() => { setPendingModel(null); setPendingAgent(null); }}
+              onManageAgents={() => setView('agents')}
+            />
+          )}
+          {view === 'agents' && <AgentsView ollama={ollama} onChatWithAgent={chatWithAgent} />}
           {view === 'models' && <ModelsView ollama={ollama} onChatWith={chatWith} />}
           {view === 'discover' && <DiscoverView ollama={ollama} dl={dl} />}
           {view === 'developer' && <DeveloperView ollama={ollama} />}

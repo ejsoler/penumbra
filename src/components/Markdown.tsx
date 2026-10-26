@@ -1,6 +1,7 @@
 import { createContext, memo, useContext, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import rehypeHighlight from 'rehype-highlight';
 import { Check, Copy, FileDown } from './icons';
 import { copyText, downloadFile, useContextMenu } from './ContextMenu';
@@ -63,7 +64,7 @@ export const Markdown = memo(function Markdown({ text, live = false }: { text: s
     <LiveContext.Provider value={live}>
     <div className="md">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
         components={{
           pre: CodeBlock,

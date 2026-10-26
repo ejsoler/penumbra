@@ -114,16 +114,7 @@ export function isLocalHost(host: string): boolean {
   return /^(localhost|.*\.(localhost|local|internal|lan|home\.arpa))$/i.test(host) || /^[\d.]+$/.test(host) || host.includes(':');
 }
 
-// Tell the Electron main process what widgets may reach, as a backstop to each widget's CSP.
-declare global {
-  interface Window {
-    penumbraHost?: {
-      setWidgetNetwork: (policy: { mode: NetMode; hosts: string[]; block: string[] }) => void;
-      onWidgetRequest: (cb: (r: WidgetRequest) => void) => () => void;
-    };
-  }
-}
-
+// The Electron main process enforces this too, as a backstop to each widget's CSP (see syncHost).
 export interface WidgetRequest {
   frame: string;
   method: string;

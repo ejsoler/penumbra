@@ -3,6 +3,7 @@ const dns = require('dns').promises;
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
+const { registerSkills } = require('./skills.cjs');
 
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
 app.setName('Penumbra');
@@ -157,6 +158,7 @@ function logWidgetRequest(d, extra) {
 }
 
 app.whenReady().then(() => {
+  registerSkills();
   // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).
   if (process.platform === 'darwin') app.dock?.setIcon(ICON);
   const { webRequest } = session.defaultSession;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from './api';
+import type { Step } from './agents/engine';
 
 export interface UiMessage {
   id: string;
@@ -11,6 +12,10 @@ export interface UiMessage {
   error?: string;
   stopped?: boolean;
   stats?: { tokens: number; tps: number; ttft: number; promptTokens: number; seconds: number };
+  /** Tools the model called while writing this reply, in order. */
+  steps?: Step[];
+  /** The agent that wrote this reply. */
+  agentId?: string;
 }
 
 export interface Conversation {
@@ -22,6 +27,8 @@ export interface Conversation {
   updatedAt: number;
   /** Interactive answers (widgets). Missing means on, the default. */
   interactive?: boolean;
+  /** Replies come from this agent (its model, instructions, and skills) instead of the plain model. */
+  agentId?: string;
 }
 
 export const isInteractive = (c: Conversation | undefined) => c?.interactive !== false;

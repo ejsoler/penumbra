@@ -42,14 +42,28 @@ export interface ShowResponse {
   model_info?: Record<string, unknown>;
 }
 
+export interface ToolCall {
+  id?: string;
+  function: { name: string; arguments: Record<string, unknown> };
+}
+
+export interface ToolDefinition {
+  type: 'function';
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   images?: string[];
+  thinking?: string;
+  tool_calls?: ToolCall[];
+  /** For role "tool": which tool produced this result. */
+  tool_name?: string;
 }
 
 export interface ChatChunk {
-  message?: { role: string; content: string; thinking?: string };
+  message?: { role: string; content: string; thinking?: string; tool_calls?: ToolCall[] };
   done: boolean;
   done_reason?: string;
   total_duration?: number;
@@ -73,6 +87,7 @@ export interface ChatRequest {
   options?: Record<string, number>;
   think?: boolean;
   keep_alive?: string;
+  tools?: ToolDefinition[];
 }
 
 export function getHost(): string {

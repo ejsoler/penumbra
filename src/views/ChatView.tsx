@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import * as api from '../api';
 import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, type GenParams, type OllamaState, type UiMessage } from '../store';
-import { INTERACTIVE_MIN_CTX, WIDGET_PROMPT } from '../widgets/prompt';
+import { INTERACTIVE_MIN_CTX } from '../widgets/prompt';
+import { getAgent, useAgents, type Agent } from '../agents/agents';
+import { runAgent, type Step } from '../agents/engine';
+import { replySetup } from '../agents/setup';
 import { APPROVED_SITES, removeAlwaysAllowed, setNetMode, useNetSettings } from '../widgets/network';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
 import { shortcut } from '../platform';
 import { Markdown, splitThinking } from '../components/Markdown';
+import { Steps } from '../components/Steps';
 import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
-  ArrowUp, Brain, Check, ChevronRight, Copy, Download, Eraser, GitBranch, Globe, PanelRight, PanelRightClose, Paperclip, Pencil,
+  ArrowUp, Bot, Brain, Check, ChevronDown, ChevronRight, Copy, Download, Eraser, GitBranch, Globe, PanelRight, PanelRightClose, Paperclip, Pencil,
   Plus, RefreshCw, Sparkles, Square, Trash2, TriangleAlert, X,
 } from '../components/icons';
 
@@ -34,11 +38,14 @@ function toMarkdown(c: Conversation): string {
 
 const fileSlug = (s: string) => s.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'chat';
 
-export function ChatView({ ollama, pendingModel, onPendingHandled }: {
+export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled, onManageAgents }: {
   ollama: OllamaState;
   pendingModel: string | null;
+  pendingAgent: string | null;
   onPendingHandled: () => void;
+  onManageAgents: () => void;
 }) {
+  const agents = useAgents();
   const [conversations, setConversations] = usePersistent<Conversation[]>('ollama-gui.conversations', [newConversation()]);
   const [currentId, setCurrentId] = usePersistent<string>('ollama-gui.current', conversations[0]?.id ?? '');
   const [storedParams, setParams] = usePersistent<GenParams>('ollama-gui.params', DEFAULT_PARAMS);
@@ -54,7 +61,10 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
   const params = { ...DEFAULT_PARAMS, ...storedParams };
 
   const current = conversations.find((c) => c.id === currentId) ?? conversations[0];
-  const caps = ollama.capabilities[current?.model] ?? [];
+  const agent = agents.find((a) => a.id === current?.agentId);
+  // With an agent, the agent's model answers.
+  const activeModel = agent?.model || current?.model || '';
+  const caps = ollama.capabilities[activeModel] ?? [];
   const interactive = isInteractive(current);
   // Widgets are long; make sure the model has room for them.
   const numCtx = interactive ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx;
@@ -77,17 +87,19 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
   // The ref guards against StrictMode running this effect twice for one request.
   const handledRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!pendingModel) {
+    const key = pendingModel ?? (pendingAgent && `agent:${pendingAgent}`);
+    if (!key) {
       handledRef.current = null;
       return;
     }
-    if (handledRef.current === pendingModel) return;
-    handledRef.current = pendingModel;
-    const c = newConversation(pendingModel);
+    if (handledRef.current === key) return;
+    handledRef.current = key;
+    const pendingAgentObj = pendingAgent ? getAgent(pendingAgent) : undefined;
+    const c = { ...newConversation(pendingModel ?? pendingAgentObj?.model ?? current?.model), ...(pendingAgent ? { agentId: pendingAgent, title: `Chat with ${pendingAgentObj?.name ?? 'agent'}` } : {}) };
     setConversations((cs) => [c, ...cs]);
     setCurrentId(c.id);
     onPendingHandled();
-  }, [pendingModel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingModel, pendingAgent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Copies a chat, optionally only up to (and including) one message — i.e. a branch. */
   const duplicateChat = (source: Conversation, uptoMsgId?: string) => {
@@ -126,67 +138,60 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
   };
 
   const generate = async (conv: Conversation, history: UiMessage[]) => {
-    const assistant: UiMessage = { id: uid(), role: 'assistant', content: '', model: conv.model };
+    const agent = getAgent(conv.agentId);
+    const model = agent?.model || conv.model;
+    const assistant: UiMessage = { id: uid(), role: 'assistant', content: '', model, ...(agent ? { agentId: agent.id } : {}) };
     updateConv(conv.id, (c) => ({ ...c, messages: [...history, assistant], updatedAt: Date.now() }));
 
     const ac = new AbortController();
     abortRef.current = ac;
     setStreamingId(conv.id);
 
-    const system = [conv.systemPrompt.trim(), isInteractive(conv) ? WIDGET_PROMPT : ''].filter(Boolean).join('\n\n');
+    const modelCaps = ollama.capabilities[model] ?? [];
+    const { system, tools } = replySetup({
+      agent,
+      systemPrompt: conv.systemPrompt,
+      interactive: isInteractive(conv),
+      toolsSupported: modelCaps.includes('tools'),
+    });
     const messages: api.ChatMessage[] = [
       ...(system ? [{ role: 'system' as const, content: system }] : []),
       ...history.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content, ...(m.images?.length ? { images: m.images } : {}) })),
     ];
     const options: Record<string, number> = {
-      temperature: params.temperature,
+      temperature: agent?.temperature ?? params.temperature,
       top_p: params.top_p,
       top_k: params.top_k,
       min_p: params.min_p,
       repeat_penalty: params.repeat_penalty,
-      num_ctx: isInteractive(conv) ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx,
+      num_ctx: isInteractive(conv) || tools.length ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx,
       num_predict: params.num_predict,
     };
     if (params.seed >= 0) options.seed = params.seed;
 
-    const start = performance.now();
-    let ttft = 0;
+    const patch = (fn: (m: UiMessage) => UiMessage) => patchMessage(conv.id, assistant.id, fn);
     try {
-      const stream = api.chat(
-        {
-          model: conv.model,
-          messages,
-          options,
-          keep_alive: params.keep_alive,
-          ...(caps.includes('thinking') ? { think: params.think } : {}),
-        },
-        ac.signal,
-      );
-      for await (const chunk of stream) {
-        const piece = chunk.message?.content ?? '';
-        const thought = chunk.message?.thinking ?? '';
-        if ((piece || thought) && !ttft) ttft = (performance.now() - start) / 1000;
-        if (piece || thought) {
-          patchMessage(conv.id, assistant.id, (m) => ({ ...m, content: m.content + piece, thinking: (m.thinking ?? '') + thought }));
-        }
-        if (chunk.done) {
-          const tokens = chunk.eval_count ?? 0;
-          const evalSec = (chunk.eval_duration ?? 0) / 1e9;
-          patchMessage(conv.id, assistant.id, (m) => ({
-            ...m,
-            stats: {
-              tokens,
-              tps: evalSec ? tokens / evalSec : 0,
-              ttft,
-              promptTokens: chunk.prompt_eval_count ?? 0,
-              seconds: (performance.now() - start) / 1000,
-            },
-          }));
-        }
-      }
+      const result = await runAgent({
+        model,
+        messages,
+        tools,
+        options,
+        keepAlive: params.keep_alive,
+        ...(modelCaps.includes('thinking') ? { think: params.think } : {}),
+        signal: ac.signal,
+        onText: (piece) => patch((m) => ({ ...m, content: m.content + piece })),
+        onThinking: (piece) => patch((m) => ({ ...m, thinking: (m.thinking ?? '') + piece })),
+        onStep: (step) =>
+          patch((m) => {
+            const steps = m.steps ?? [];
+            const i = steps.findIndex((x) => x.id === step.id);
+            return { ...m, steps: i < 0 ? [...steps, step] : steps.map((x) => (x.id === step.id ? step : x)) };
+          }),
+      });
+      patch((m) => ({ ...m, stats: result.stats, ...(result.cutOff ? { error: 'Stopped after too many tool calls in a row.' } : {}) }));
     } catch (e) {
-      if (ac.signal.aborted) patchMessage(conv.id, assistant.id, (m) => ({ ...m, stopped: true }));
-      else patchMessage(conv.id, assistant.id, (m) => ({ ...m, error: (e as Error).message }));
+      if (ac.signal.aborted) patch((m) => ({ ...m, stopped: true }));
+      else patch((m) => ({ ...m, error: (e as Error).message }));
     } finally {
       setStreamingId(null);
       abortRef.current = null;
@@ -196,7 +201,7 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
 
   /** `interactive` forces the setting for this send (used right after the first-use notice). */
   const send = (text: string, images: string[], interactive?: boolean) => {
-    if (!current || !current.model || streamingId) return;
+    if (!current || !activeModel || streamingId) return;
     // The first time interactive answers would be used, explain them before sending.
     if (interactive === undefined && isInteractive(current) && !noticeSeen) {
       setPendingSend({ text, images });
@@ -305,13 +310,27 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
             modelSize={ollama.models.find((m) => m.name === current.model)?.details.parameter_size}
             onChange={(on) => updateConv(current.id, (c) => ({ ...c, interactive: on }))}
           />
-          <ModelPicker
-            ollama={ollama}
-            value={current.model}
-            keepAlive={params.keep_alive}
-            numCtx={numCtx}
-            onChange={(model) => updateConv(current.id, (c) => ({ ...c, model }))}
-          />
+          <div className="topbar-center">
+            <AgentPicker
+              agents={agents}
+              value={agent}
+              onChange={(agentId) => updateConv(current.id, (c) => ({ ...c, agentId }))}
+              onManage={onManageAgents}
+            />
+            {agent ? (
+              <div className="agent-model" title="This agent's model. Change it in the Agents tab.">
+                {agent.model || 'No model set'}
+              </div>
+            ) : (
+              <ModelPicker
+                ollama={ollama}
+                value={current.model}
+                keepAlive={params.keep_alive}
+                numCtx={numCtx}
+                onChange={(model) => updateConv(current.id, (c) => ({ ...c, model }))}
+              />
+            )}
+          </div>
           <button className="icon-btn topbar-right" onClick={() => setShowSettings(!showSettings)} title="Toggle settings panel">
             {showSettings ? <PanelRightClose size={17} /> : <PanelRight size={17} />}
           </button>
@@ -320,8 +339,9 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
         <WidgetActionsContext.Provider value={widgetActions}>
         <Messages
           messages={current.messages}
+          agents={agents}
           streaming={isStreaming}
-          hasModel={!!current.model}
+          hasModel={!!activeModel}
           onRegenerate={regenerate}
           onDelete={deleteMessage}
           onEdit={editAndResend}
@@ -330,7 +350,7 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
         </WidgetActionsContext.Provider>
 
         <Composer
-          disabled={!current.model}
+          disabled={!activeModel}
           streaming={isStreaming}
           vision={caps.includes('vision')}
           onSend={send}
@@ -366,6 +386,34 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
         />
       )}
     </>
+  );
+}
+
+function AgentPicker({ agents, value, onChange, onManage }: {
+  agents: Agent[];
+  value?: Agent;
+  onChange: (agentId: string | undefined) => void;
+  onManage: () => void;
+}) {
+  const menu = useContextMenu();
+  return (
+    <button
+      className={`agent-picker ${value ? 'on' : ''}`}
+      title={value ? `Replies come from the ${value.name} agent` : 'Pick an agent to answer in this chat'}
+      onClick={(e) =>
+        menu(e, [
+          { label: 'No agent (just the model)', icon: value ? undefined : Check, onClick: () => onChange(undefined) },
+          agents.length > 0 && 'separator',
+          ...agents.map((a) => ({ label: `${a.name}${a.model ? `  ·  ${a.model}` : ''}`, icon: a.id === value?.id ? Check : Bot, onClick: () => onChange(a.id) })),
+          'separator',
+          { label: 'Manage agents…', icon: Pencil, onClick: onManage },
+        ])
+      }
+    >
+      <Bot size={14} />
+      <span>{value ? value.name : 'No agent'}</span>
+      <ChevronDown size={13} />
+    </button>
   );
 }
 
@@ -426,6 +474,7 @@ function InteractiveNotice({ onChoose }: { onChoose: (keepOn: boolean) => void }
 
 function Messages(props: {
   messages: UiMessage[];
+  agents: Agent[];
   streaming: boolean;
   hasModel: boolean;
   onRegenerate: (id: string) => void;
@@ -470,6 +519,7 @@ function Messages(props: {
           <MessageView
             key={m.id}
             msg={m}
+            agentName={m.agentId ? props.agents.find((a) => a.id === m.agentId)?.name : undefined}
             live={streaming && i === messages.length - 1}
             busy={streaming}
             onRegenerate={() => props.onRegenerate(m.id)}
@@ -483,8 +533,9 @@ function Messages(props: {
   );
 }
 
-function MessageView({ msg, live, busy, onRegenerate, onDelete, onEdit, onBranch }: {
+function MessageView({ msg, agentName, live, busy, onRegenerate, onDelete, onEdit, onBranch }: {
   msg: UiMessage;
+  agentName?: string;
   live: boolean;
   busy: boolean;
   onRegenerate: () => void;
@@ -499,7 +550,10 @@ function MessageView({ msg, live, busy, onRegenerate, onDelete, onEdit, onBranch
   const inline = splitThinking(msg.content);
   const thinking = (msg.thinking || inline.thinking).trim();
   const answer = msg.thinking ? msg.content : inline.answer;
-  const stillThinking = live && !answer;
+  const stillThinking = live && !answer && !msg.steps?.some((s) => s.status === 'running');
+  // Step offsets index into msg.content, which is the answer unless reasoning was inline (<think>).
+  const interleave = !!msg.steps?.length && answer === msg.content;
+  const parts = interleave ? interleaved(answer, msg.steps!).length : 0;
 
   const copy = () => {
     navigator.clipboard.writeText(answer);
@@ -529,7 +583,9 @@ function MessageView({ msg, live, busy, onRegenerate, onDelete, onEdit, onBranch
 
   return (
     <div className={`msg ${msg.role}`} onContextMenu={onContextMenu}>
-      <div className="msg-role">{msg.role === 'user' ? 'You' : msg.model ?? 'Assistant'}</div>
+      <div className="msg-role">
+        {msg.role === 'user' ? 'You' : agentName ? <><Bot size={12} /> {agentName} <span className="muted">· {msg.model}</span></> : msg.model ?? 'Assistant'}
+      </div>
       {msg.images?.length ? (
         <div className="msg-images">
           {msg.images.map((b64, i) => (
@@ -538,6 +594,7 @@ function MessageView({ msg, live, busy, onRegenerate, onDelete, onEdit, onBranch
         </div>
       ) : null}
       {thinking && <Thinking text={thinking} active={stillThinking} />}
+      {msg.steps?.length && !interleave ? <Steps steps={msg.steps} /> : null}
       {editing ? (
         <div className="msg-edit">
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={Math.min(12, draft.split('\n').length + 1)} autoFocus />
@@ -550,7 +607,15 @@ function MessageView({ msg, live, busy, onRegenerate, onDelete, onEdit, onBranch
         <div className="msg-body user-text">{msg.content}</div>
       ) : (
         <div className="msg-body">
-          {answer ? <Markdown text={answer} live={live} /> : live && !thinking ? <span className="typing"><i /><i /><i /></span> : null}
+          {interleave ? (
+            interleaved(answer, msg.steps!).map((part, i) =>
+              typeof part === 'string' ? <Markdown key={i} text={part} live={live && i === parts - 1} /> : <Steps key={i} steps={part} />,
+            )
+          ) : answer ? (
+            <Markdown text={answer} live={live} />
+          ) : live && !thinking ? (
+            <span className="typing"><i /><i /><i /></span>
+          ) : null}
           {live && answer && <span className="cursor" />}
         </div>
       )}
@@ -578,6 +643,22 @@ function MessageView({ msg, live, busy, onRegenerate, onDelete, onEdit, onBranch
       )}
     </div>
   );
+}
+
+/** Splits a reply into text and the tool steps that ran between its parts. */
+function interleaved(text: string, steps: Step[]): (string | Step[])[] {
+  const out: (string | Step[])[] = [];
+  let pos = 0;
+  for (const s of steps) {
+    const at = Math.min(s.at ?? 0, text.length);
+    if (at > pos) out.push(text.slice(pos, at));
+    pos = Math.max(pos, at);
+    const last = out[out.length - 1];
+    if (Array.isArray(last)) last.push(s);
+    else out.push([s]);
+  }
+  if (pos < text.length) out.push(text.slice(pos));
+  return out;
 }
 
 function Thinking({ text, active }: { text: string; active: boolean }) {

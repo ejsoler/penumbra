@@ -24,6 +24,16 @@
 - Image attachments for vision models (drag & drop or paste)
 - Per-chat system prompt; chats are saved locally
 
+**Interactive answers** *(new in 0.2.0)*
+- The model can reply with small live apps right in the chat: calculators, charts, step-through diagrams, 3D views, quizzes
+- It decides on its own when an app helps more than text, and answers in plain text otherwise
+- Turn it on or off for each chat with the **Interactive** switch at the top (on by default)
+- Chart.js, D3, and Three.js are built in, so widgets work offline
+- Open a widget full screen, save it as a standalone `.html` file, or view and copy its code
+- Widgets can suggest follow-up questions; they go into your message box, and you decide whether to send them
+- If a widget breaks, **Ask model to fix** sends the error back to the model for a corrected version
+- Works best with 7B+ models. Interactive chats use at least a 16K context
+
 **Models**
 - Model picker (<kbd>⌘L</kbd>) that loads the model into memory, with capability badges (vision, tools, reasoning)
 - *My Models*: see what's loaded and how much VRAM it uses, load/eject/delete, and inspect architecture, template, and modelfile
@@ -107,7 +117,8 @@ src/
   hf.ts           Hugging Face Hub search + GGUF quant listing
   downloads.ts    Download queue with pause/resume
   store.ts        Persistent state and Ollama polling
-  components/     Model picker, Markdown renderer, context menu, icons
+  components/     Model picker, Markdown renderer, widget frame, context menu, icons
+  widgets/        Widget sandbox document, system prompt, bundled chart/3D libraries
   views/          Chat, My Models, Discover, Hugging Face, Developer
 build/            App icon source, icon generator, install script
 ```
@@ -115,6 +126,8 @@ build/            App icon source, icon generator, install script
 ## Privacy
 
 Everything runs locally. The app talks only to your Ollama server, plus the Hugging Face API when you browse the Hugging Face tab. Chats and settings are stored in the app's local storage on your machine.
+
+Interactive widgets are code written by the model, so Penumbra treats them as untrusted. Each one runs in a sandboxed frame with no network access and no access to your chats, files, or Ollama. It can only resize itself, report errors, and suggest a follow-up question that you choose whether to send.
 
 ## Support
 
@@ -125,5 +138,7 @@ If Penumbra is useful to you, you can support its development on Ko-fi:
 ## License
 
 [MIT](LICENSE)
+
+Interactive answers bundle [Chart.js](https://www.chartjs.org) (MIT), [D3](https://d3js.org) (ISC), and [Three.js](https://threejs.org) (MIT).
 
 *Penumbra is an independent project. It is not affiliated with or endorsed by Ollama or LM Studio.*

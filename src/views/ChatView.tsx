@@ -224,15 +224,18 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
   const deleteMessage = (msgId: string) =>
     current && updateConv(current.id, (c) => ({ ...c, messages: c.messages.filter((m) => m.id !== msgId) }));
 
-  const widgetActions: WidgetActions = {
+  // Stable between renders, so widgets in earlier messages don't re-render on every streamed token.
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  const widgetActions = useMemo<WidgetActions>(() => ({
     ask: (text) => setComposerFill((f) => ({ text, n: (f?.n ?? 0) + 1 })),
     fix: (title, error) =>
-      send(
+      sendRef.current(
         `The "${title}" widget shows this error:\n\n${error}\n\nPlease find the cause and reply with the complete corrected \`\`\`widget block.`,
         [],
       ),
     busy: !!streamingId,
-  };
+  }), [streamingId]);
 
   if (!current) return null;
   const isStreaming = streamingId === current.id;

@@ -1,19 +1,23 @@
 // Builds the HTML document an interactive widget runs in. Widgets are written by a model, so they
 // are untrusted: they run in an iframe with sandbox="allow-scripts" (opaque origin, so no access to
-// the app, its storage, or Ollama) under a CSP that blocks all network access. Libraries are inlined.
+// the app, its storage, or Ollama) under a CSP that allows only the sites it was granted (see
+// network.ts). Bundled libraries are inlined, so widgets that use them work offline.
 
-/** No network of any kind; only inline code, styles, and data: images. */
-export const WIDGET_CSP = [
-  "default-src 'none'",
-  "script-src 'unsafe-inline' 'unsafe-eval'",
-  "style-src 'unsafe-inline'",
-  'img-src data: blob:',
-  'font-src data:',
-  'media-src data: blob:',
-  "connect-src 'none'",
-  "form-action 'none'",
-  "base-uri 'none'",
-].join('; ');
+/** The widget's CSP: inline code plus https access to `hosts` ('all' = any https site, [] = offline). */
+export function widgetCsp(hosts: string[] | 'all' = []): string {
+  const net = hosts === 'all' ? ' https:' : hosts.map((h) => ` https://${h}`).join('');
+  return [
+    "default-src 'none'",
+    `script-src 'unsafe-inline' 'unsafe-eval'${net}`,
+    `style-src 'unsafe-inline'${net}`,
+    `img-src data: blob:${net}`,
+    `font-src data:${net}`,
+    `media-src data: blob:${net}`,
+    `connect-src${net || " 'none'"}`,
+    "form-action 'none'",
+    "base-uri 'none'",
+  ].join('; ');
+}
 
 type Lib = 'chart' | 'd3' | 'three';
 
@@ -43,6 +47,16 @@ const BRIDGE = `(() => {
   const report = (msg) => post({ type: 'error', message: String(msg).slice(0, 2000) });
   addEventListener('error', (e) => report(e.message || 'Error'));
   addEventListener('unhandledrejection', (e) => report((e.reason && e.reason.message) || e.reason));
+  // Errors a widget catches and logs still count, so the user can ask the model to fix them.
+  const consoleError = console.error.bind(console);
+  console.error = (...args) => {
+    consoleError(...args);
+    report(args.map((a) => (a && a.message) || String(a)).join(' '));
+  };
+  // A request to a site the widget wasn't granted: let the app offer to allow it.
+  addEventListener('securitypolicyviolation', (e) => {
+    if (/^https?:/.test(e.blockedURI)) post({ type: 'blocked', url: e.blockedURI.slice(0, 500) });
+  });
   const size = () => {
     const b = document.body;
     if (!b) return;
@@ -114,7 +128,7 @@ const STANDALONE_CSS = `html { background: var(--bg); } body { max-width: 960px;
 
 const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-export async function buildWidgetDocument(code: string, { standalone = false } = {}): Promise<string> {
+export async function buildWidgetDocument(code: string, { standalone = false, hosts = [] as string[] | 'all' } = {}): Promise<string> {
   const used = usedLibraries(code);
   const libs = await Promise.all(used.map(loadLib));
   if (used.includes('chart')) libs.push(CHART_DEFAULTS);
@@ -122,7 +136,7 @@ export async function buildWidgetDocument(code: string, { standalone = false } =
   return `<!doctype html>
 <html><head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="${WIDGET_CSP}">
+<meta http-equiv="Content-Security-Policy" content="${widgetCsp(hosts)}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${standalone ? `<title>${escapeHtml(widgetTitle(code))}</title>` : ''}
 <style>${BASE_CSS}${standalone ? STANDALONE_CSS : ''}</style>

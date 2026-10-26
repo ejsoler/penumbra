@@ -1,5 +1,7 @@
-const { app, BrowserWindow, Menu, shell, session } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, shell, session } = require('electron');
+const dns = require('dns').promises;
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
 
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
@@ -26,7 +28,7 @@ function createWindow() {
     trafficLightPosition: { x: 14, y: 14 },
     icon: ICON, // Windows/Linux window icon
     autoHideMenuBar: process.platform !== 'darwin', // Alt shows the menu on Windows/Linux
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(__dirname, 'preload.cjs') },
   });
 
   if (process.env.VITE_DEV_SERVER_URL) win.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -82,30 +84,119 @@ function createWindow() {
   });
 }
 
+// ---- Widget network policy -------------------------------------------------------------------
+// Widgets are model-written iframes. Their CSP limits which sites they reach; this is the backstop,
+// and it adds rules a CSP can't express: GET only (so nothing is uploaded), no cookies, no local
+// network, and short URLs. The app's own frame is never affected.
+
+const WIDGET_REFERER = 'https://github.com/ejsoler/penumbra';
+
+/** Set by the app (see src/widgets/network.ts). Until then, widgets get no network at all. */
+let widgetNet = { mode: 'ask', hosts: [], block: [] };
+
+ipcMain.on('widget-net:set', (e, policy) => {
+  if (e.senderFrame !== e.sender.mainFrame || !policy || typeof policy !== 'object') return;
+  const list = (v) => (Array.isArray(v) ? v.filter((h) => typeof h === 'string').map((h) => h.toLowerCase()) : []);
+  widgetNet = { mode: policy.mode === 'all' ? 'all' : 'ask', hosts: list(policy.hosts), block: list(policy.block) };
+});
+
+const isWidgetRequest = (d) => Boolean(d.webContents) && d.resourceType !== 'mainFrame' && (!d.frame || Boolean(d.frame.parent));
+
+const privateNets = new net.BlockList();
+for (const [a, p] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16], ['224.0.0.0', 3]]) {
+  privateNets.addSubnet(a, p, 'ipv4');
+}
+for (const [a, p] of [['::', 127], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]]) privateNets.addSubnet(a, p, 'ipv6');
+const isPrivateIp = (ip) => {
+  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip)?.[1];
+  if (v4) return privateNets.check(v4, 'ipv4');
+  return privateNets.check(ip, net.isIP(ip) === 6 ? 'ipv6' : 'ipv4');
+};
+
+const dnsCache = new Map();
+async function resolvesToPrivate(host) {
+  const hit = dnsCache.get(host);
+  if (hit && Date.now() - hit.at < 60_000) return hit.private;
+  let result = false;
+  try {
+    result = (await dns.lookup(host, { all: true })).some((a) => isPrivateIp(a.address));
+  } catch {
+    /* unresolvable: the request will fail on its own */
+  }
+  dnsCache.set(host, { at: Date.now(), private: result });
+  return result;
+}
+
+const hostMatches = (host, pattern) => (pattern.startsWith('*.') ? host.endsWith(pattern.slice(1)) : host === pattern);
+
+/** Why a widget request is blocked, or null if it may go ahead. */
+async function widgetBlockReason(d) {
+  if (/^(data|blob|about):/.test(d.url)) return null;
+  let url;
+  try {
+    url = new URL(d.url);
+  } catch {
+    return 'invalid address';
+  }
+  if (url.protocol !== 'https:') return 'only https sites are allowed';
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(d.method)) return `${d.method} requests are blocked: widgets can download, not send`;
+  if (d.uploadData && d.uploadData.length) return 'sending data is blocked';
+  if (d.url.length > 2048) return 'address too long';
+  const host = url.hostname.toLowerCase();
+  if (host.startsWith('[') || net.isIP(host)) return 'IP addresses are blocked';
+  if (/^(localhost|.*\.(localhost|local|internal|lan|home\.arpa))$/.test(host) || widgetNet.block.includes(host)) return 'this computer and the local network are blocked';
+  if (widgetNet.mode !== 'all' && !widgetNet.hosts.some((p) => hostMatches(host, p))) return 'site not allowed for widgets';
+  if (await resolvesToPrivate(host)) return 'this site points to the local network';
+  return null;
+}
+
+/** Reports a widget request to the app, which shows it in that widget's network log. */
+function logWidgetRequest(d, extra) {
+  if (d.method === 'OPTIONS' || !d.webContents || d.webContents.isDestroyed()) return;
+  d.webContents.send('widget-net:request', { frame: d.frame?.name ?? '', method: d.method, url: d.url.slice(0, 2048), ...extra });
+}
+
 app.whenReady().then(() => {
   // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).
   if (process.platform === 'darwin') app.dock?.setIcon(ICON);
-  // Ollama checks the Origin header; file:// pages send "null", so present as localhost.
-  session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ['http://127.0.0.1:*/*', 'http://localhost:*/*'] },
-    (details, cb) => {
-      if (details.requestHeaders.Origin === 'null' || !details.requestHeaders.Origin) {
-        details.requestHeaders.Origin = 'http://localhost';
-      }
-      cb({ requestHeaders: details.requestHeaders });
-    },
-  );
-  // file:// pages send Origin "null"; make sure Hugging Face API responses are readable.
-  session.defaultSession.webRequest.onHeadersReceived({ urls: ['https://huggingface.co/api/*'] }, (details, cb) => {
+  const { webRequest } = session.defaultSession;
+  // A session has one listener per event, so each handler below covers both the app and widgets.
+  webRequest.onBeforeRequest((details, cb) => {
+    if (!isWidgetRequest(details)) return cb({});
+    widgetBlockReason(details).then((blocked) => {
+      if (blocked) logWidgetRequest(details, { blocked });
+      cb({ cancel: Boolean(blocked) });
+    });
+  });
+  webRequest.onBeforeSendHeaders((details, cb) => {
+    const headers = details.requestHeaders;
+    if (isWidgetRequest(details)) {
+      // Widgets never send cookies. They identify as Penumbra, not the chat: some public services
+      // (like OpenStreetMap's tile servers) require a Referer that names the app.
+      for (const k of Object.keys(headers)) if (/^(cookie|referer|authorization)$/i.test(k)) delete headers[k];
+      headers.Referer = WIDGET_REFERER;
+    } else if (/^http:\/\/(127\.0\.0\.1|localhost):/.test(details.url) && (headers.Origin === 'null' || !headers.Origin)) {
+      // Ollama checks the Origin header; file:// pages send "null", so present as localhost.
+      headers.Origin = 'http://localhost';
+    }
+    cb({ requestHeaders: headers });
+  });
+  webRequest.onHeadersReceived((details, cb) => {
     const headers = { ...details.responseHeaders };
-    for (const k of Object.keys(headers)) if (k.toLowerCase() === 'access-control-allow-origin') delete headers[k];
-    headers['Access-Control-Allow-Origin'] = ['*'];
+    if (isWidgetRequest(details)) {
+      for (const k of Object.keys(headers)) if (/^set-cookie$/i.test(k)) delete headers[k];
+    } else if (details.url.startsWith('https://huggingface.co/api/')) {
+      // file:// pages send Origin "null"; make sure Hugging Face API responses are readable.
+      for (const k of Object.keys(headers)) if (k.toLowerCase() === 'access-control-allow-origin') delete headers[k];
+      headers['Access-Control-Allow-Origin'] = ['*'];
+    }
     cb({ responseHeaders: headers });
   });
-  // Widgets (subframes) get no network access and no permissions, as a backstop to their CSP.
-  session.defaultSession.webRequest.onBeforeRequest((details, cb) => {
-    const fromSubframe = details.frame && details.frame.parent;
-    cb({ cancel: Boolean(fromSubframe) && !/^(data|blob|about):/.test(details.url) });
+  webRequest.onCompleted((details) => isWidgetRequest(details) && logWidgetRequest(details, { status: details.statusCode }));
+  webRequest.onErrorOccurred((details) => {
+    if (!isWidgetRequest(details) || details.error === 'net::ERR_BLOCKED_BY_CLIENT') return; // already logged as blocked
+    // ERR_ABORTED is the widget cancelling its own request (maps do this for tiles they no longer need).
+    logWidgetRequest(details, details.error === 'net::ERR_ABORTED' ? { cancelled: true } : { failed: details.error });
   });
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, cb, details) => cb(details.isMainFrame));
   session.defaultSession.setPermissionCheckHandler((_wc, _permission, _origin, details) => details.isMainFrame !== false);

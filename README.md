@@ -29,6 +29,7 @@
 - It decides on its own when an app helps more than text, and answers in plain text otherwise
 - Turn it on or off for each chat with the **Interactive** switch at the top (on by default)
 - Chart.js, D3, and Three.js are built in, so widgets work offline
+- Widgets can use the internet for maps and live public data (weather, earthquakes, exchange rates, Wikipedia). Approved sites work right away; any other site asks you first. A **Whole internet** option is in the settings panel
 - Open a widget full screen, save it as a standalone `.html` file, or view and copy its code
 - Widgets can suggest follow-up questions; they go into your message box, and you decide whether to send them
 - If a widget breaks, **Ask model to fix** sends the error back to the model for a corrected version
@@ -128,6 +129,8 @@ build/            App icon source, icon generator, install script
 Everything runs locally. The app talks only to your Ollama server, plus the Hugging Face API when you browse the Hugging Face tab. Chats and settings are stored in the app's local storage on your machine.
 
 Interactive widgets are code written by the model, so Penumbra treats them as untrusted. Each one runs in a sandboxed frame with no network access and no access to your chats, files, or Ollama. It can only resize itself, report errors, and suggest a follow-up question that you choose whether to send.
+
+Widgets can download from a list of approved sites (map tiles, script CDNs, and keyless public data). Any other site needs your OK for that widget, unless you turn on **Whole internet** in the settings panel. In every mode, widgets can only make https GET requests: they can't upload or post data, send cookies, or reach your computer, local network, or Ollama. Each widget's network log shows every request it made.
 
 ## Support
 

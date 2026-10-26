@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import * as api from '../api';
 import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, type GenParams, type OllamaState, type UiMessage } from '../store';
 import { INTERACTIVE_MIN_CTX, WIDGET_PROMPT } from '../widgets/prompt';
+import { APPROVED_SITES, removeAlwaysAllowed, setNetMode, useNetSettings } from '../widgets/network';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
 import { shortcut } from '../platform';
@@ -9,8 +10,8 @@ import { Markdown, splitThinking } from '../components/Markdown';
 import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
-  ArrowUp, Brain, Check, ChevronRight, Copy, Download, Eraser, GitBranch, PanelRight, PanelRightClose, Paperclip, Pencil,
-  Plus, RefreshCw, Sparkles, Square, Trash2, X,
+  ArrowUp, Brain, Check, ChevronRight, Copy, Download, Eraser, GitBranch, Globe, PanelRight, PanelRightClose, Paperclip, Pencil,
+  Plus, RefreshCw, Sparkles, Square, Trash2, TriangleAlert, X,
 } from '../components/icons';
 
 const newConversation = (model = ''): Conversation => ({
@@ -408,7 +409,8 @@ function InteractiveNotice({ onChoose }: { onChoose: (keepOn: boolean) => void }
           The model can reply with small apps, like charts, calculators, diagrams, and 3D views, that run right in the chat.
         </p>
         <ul>
-          <li><b>They run in a sandbox.</b> A widget can't read your chats or files, reach the internet, or talk to Ollama.</li>
+          <li><b>They run in a sandbox.</b> A widget can't read your chats or files or talk to Ollama.</li>
+          <li><b>Internet is limited.</b> Widgets can download from approved sites like maps and weather data. Any other site asks you first, and widgets can never upload or post.</li>
           <li><b>The model writes the code,</b> so widgets can have mistakes. Numbers in them may be examples, not real data.</li>
           <li><b>Replies take longer</b> and use more of the model's context. Larger models (7B+) do this much better.</li>
         </ul>
@@ -753,6 +755,8 @@ function SettingsPanel({ params, setParams, systemPrompt, setSystemPrompt, think
           </div>
         </section>
 
+        <WidgetInternet />
+
         <section>
           <h4>Sampling</h4>
           <Slider label="Temperature" value={params.temperature} min={0} max={2} step={0.05} onChange={(temperature) => setParams({ temperature })} />
@@ -784,6 +788,68 @@ function SettingsPanel({ params, setParams, systemPrompt, setSystemPrompt, think
         <button className="btn sm ghost" onClick={() => setParams(DEFAULT_PARAMS)}>Reset to defaults</button>
       </div>
     </aside>
+  );
+}
+
+function WidgetInternet() {
+  const net = useNetSettings();
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [showList, setShowList] = useState(false);
+  return (
+    <section>
+      <h4>Widget Internet</h4>
+      <label className="field">
+        <span>Access</span>
+        <select value={net.mode} onChange={(e) => (e.target.value === 'all' ? setConfirmAll(true) : setNetMode('ask'))}>
+          <option value="ask">Approved sites, ask for others</option>
+          <option value="all">Whole internet</option>
+        </select>
+      </label>
+      {net.mode === 'all' ? (
+        <p className="net-note warn"><TriangleAlert size={12} /> Widgets can reach any https site without asking.</p>
+      ) : (
+        <p className="net-note muted">
+          Maps, CDNs, and public data work right away.{' '}
+          <button className="link-btn" onClick={() => setShowList(!showList)}>{showList ? 'Hide list' : 'See list'}</button>
+        </p>
+      )}
+      {showList && net.mode === 'ask' && (
+        <div className="net-list">
+          {APPROVED_SITES.map((g) => (
+            <div key={g.group}><b>{g.group}</b><div className="mono">{g.hosts.join(', ')}</div></div>
+          ))}
+        </div>
+      )}
+      {net.alwaysAllow.length > 0 && (
+        <div className="net-list">
+          <b>Always allowed by you</b>
+          {net.alwaysAllow.map((h) => (
+            <div key={h} className="row net-allowed">
+              <span className="mono flex">{h}</span>
+              <button className="icon-btn sm" title={`Stop always allowing ${h}`} onClick={() => removeAlwaysAllowed(h)}><X size={12} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      {confirmAll && (
+        <div className="modal-backdrop">
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="net-all-title">
+            <div className="modal-icon warn"><Globe size={22} /></div>
+            <h3 id="net-all-title">Let widgets reach the whole internet?</h3>
+            <p>Widgets are code written by the model. With this on, any widget can load from any https website without asking you.</p>
+            <ul>
+              <li><b>A widget could send small pieces of your conversation to a website</b> inside a web address. This is most likely if you paste text or documents you don't trust, since they can trick the model.</li>
+              <li><b>Still blocked:</b> uploads and posts, cookies, your computer and local network, and Ollama.</li>
+              <li>You can see every request in each widget's network log.</li>
+            </ul>
+            <div className="modal-actions">
+              <button className="btn primary" autoFocus onClick={() => setConfirmAll(false)}>Keep approved sites only</button>
+              <button className="btn danger" onClick={() => { setNetMode('all'); setConfirmAll(false); }}>Allow whole internet</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

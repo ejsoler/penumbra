@@ -337,7 +337,14 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 4px; }
 .widget-building { display: flex; align-items: center; gap: 8px; padding: 18px 14px; color: var(--text-dim); font-size: 13px; }
 .widget.building { border-style: dashed; }
 .widget-code { margin: 0; max-height: 320px; overflow: auto; padding: 12px 14px; background: #0f1013; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 12px; white-space: pre; }
-.widget-error { padding: 8px 12px; font-size: 12.5px; color: #ffb3b3; background: rgba(242, 109, 109, 0.1); border-top: 1px solid rgba(242, 109, 109, 0.25); }
+.widget-error { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; font-size: 12.5px; color: #ffb3b3; background: rgba(242, 109, 109, 0.1); border-top: 1px solid rgba(242, 109, 109, 0.25); }
+.widget-error-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.widget-error .btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; }
+.widget.placeholder { border-style: dashed; }
+.widget-overlay { position: fixed; inset: 0; z-index: 150; background: rgba(0, 0, 0, 0.6); display: flex; padding: 28px; animation: ctx-in 0.12s ease-out; }
+.widget.full { flex: 1; display: flex; flex-direction: column; margin: 0; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6); }
+.widget.full .widget-frame { flex: 1; min-height: 0; }
+.widget.full .widget-code { max-height: 40%; }
 
 /* interactive answers switch (chat top bar) */
 .ia-wrap { position: absolute; left: 12px; display: flex; align-items: center; gap: 8px; }

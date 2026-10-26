@@ -38,6 +38,7 @@ Always write the complete \`\`\`widget block in the same reply. Never describe o
 - Keep it compact: about 300 to 600 pixels tall, with modest font sizes (headings up to about 20px). Give SVG diagrams a max-width (about 560px) and center them, and keep every element inside the widget's edges.
 - Chart.js: put each canvas in a wrapper with a fixed height, for example <div style="position:relative;height:280px"><canvas id="c"></canvas></div>, and set options { responsive: true, maintainAspectRatio: false }. Theme colors are already applied.
 - alert(), prompt(), confirm(), and popups are blocked. Show results in the page.
+- To offer a follow-up question, add a button that calls window.penumbra.ask("question text"). It puts the text in the user's message box; the user decides whether to send it. Use this only for natural next questions, at most three.
 
 ## Quality
 - Every control must work. Compute results in JavaScript and render an initial state immediately.

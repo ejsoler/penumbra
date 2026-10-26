@@ -6,6 +6,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
 import { shortcut } from '../platform';
 import { Markdown, splitThinking } from '../components/Markdown';
+import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
   ArrowUp, Brain, Check, ChevronRight, Copy, Download, Eraser, GitBranch, PanelRight, PanelRightClose, Paperclip, Pencil,
@@ -46,6 +47,8 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [noticeSeen, setNoticeSeen] = usePersistent('ollama-gui.interactiveNoticeSeen', false);
   const [pendingSend, setPendingSend] = useState<{ text: string; images: string[] } | null>(null);
+  // Text a widget asked to put in the message box; `n` makes repeats of the same text count.
+  const [composerFill, setComposerFill] = useState<{ text: string; n: number } | null>(null);
   const menu = useContextMenu();
   const params = { ...DEFAULT_PARAMS, ...storedParams };
 
@@ -221,6 +224,16 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
   const deleteMessage = (msgId: string) =>
     current && updateConv(current.id, (c) => ({ ...c, messages: c.messages.filter((m) => m.id !== msgId) }));
 
+  const widgetActions: WidgetActions = {
+    ask: (text) => setComposerFill((f) => ({ text, n: (f?.n ?? 0) + 1 })),
+    fix: (title, error) =>
+      send(
+        `The "${title}" widget shows this error:\n\n${error}\n\nPlease find the cause and reply with the complete corrected \`\`\`widget block.`,
+        [],
+      ),
+    busy: !!streamingId,
+  };
+
   if (!current) return null;
   const isStreaming = streamingId === current.id;
 
@@ -300,6 +313,7 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
           </button>
         </header>
 
+        <WidgetActionsContext.Provider value={widgetActions}>
         <Messages
           messages={current.messages}
           streaming={isStreaming}
@@ -309,6 +323,7 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
           onEdit={editAndResend}
           onBranch={(id) => duplicateChat(current, id)}
         />
+        </WidgetActionsContext.Provider>
 
         <Composer
           disabled={!current.model}
@@ -317,6 +332,7 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
           onSend={send}
           onStop={() => abortRef.current?.abort()}
           onNewChat={createChat}
+          fill={composerFill}
         />
       </main>
 
@@ -573,13 +589,14 @@ function Thinking({ text, active }: { text: string; active: boolean }) {
   );
 }
 
-function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat }: {
+function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill }: {
   disabled: boolean;
   streaming: boolean;
   vision: boolean;
   onSend: (text: string, images: string[]) => void;
   onStop: () => void;
   onNewChat: () => void;
+  fill: { text: string; n: number } | null;
 }) {
   const [text, setText] = useState('');
   const [images, setImages] = useState<string[]>([]);
@@ -597,6 +614,17 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat }: {
     window.addEventListener('resize', fit);
     return () => window.removeEventListener('resize', fit);
   }, [text]);
+
+  // A widget's follow-up question lands here for the user to review, edit, or send.
+  useEffect(() => {
+    if (!fill) return;
+    setText(fill.text);
+    const ta = taRef.current;
+    if (ta) {
+      ta.focus();
+      requestAnimationFrame(() => ta.setSelectionRange(ta.value.length, ta.value.length));
+    }
+  }, [fill?.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

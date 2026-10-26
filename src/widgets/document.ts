@@ -109,7 +109,12 @@ function sanitize(code: string): { head: string; body: string } {
   return { head: doc.head.innerHTML, body: doc.body.innerHTML };
 }
 
-export async function buildWidgetDocument(code: string): Promise<string> {
+/** Saved widgets open in a browser on their own, so they get a title and a solid page background. */
+const STANDALONE_CSS = `html { background: var(--bg); } body { max-width: 960px; margin: 24px auto; }`;
+
+const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+export async function buildWidgetDocument(code: string, { standalone = false } = {}): Promise<string> {
   const used = usedLibraries(code);
   const libs = await Promise.all(used.map(loadLib));
   if (used.includes('chart')) libs.push(CHART_DEFAULTS);
@@ -119,7 +124,8 @@ export async function buildWidgetDocument(code: string): Promise<string> {
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${WIDGET_CSP}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<style>${BASE_CSS}</style>
+${standalone ? `<title>${escapeHtml(widgetTitle(code))}</title>` : ''}
+<style>${BASE_CSS}${standalone ? STANDALONE_CSS : ''}</style>
 <script>${BRIDGE}</script>
 ${libs.map((src) => `<script>${escapeScript(src)}</script>`).join('\n')}
 ${head}

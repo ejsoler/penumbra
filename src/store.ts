@@ -20,7 +20,11 @@ export interface Conversation {
   systemPrompt: string;
   messages: UiMessage[];
   updatedAt: number;
+  /** Interactive answers (widgets). Missing means on, the default. */
+  interactive?: boolean;
 }
+
+export const isInteractive = (c: Conversation | undefined) => c?.interactive !== false;
 
 export interface GenParams {
   temperature: number;

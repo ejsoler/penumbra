@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import * as api from '../api';
-import { DEFAULT_PARAMS, uid, usePersistent, type Conversation, type GenParams, type OllamaState, type UiMessage } from '../store';
+import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, type GenParams, type OllamaState, type UiMessage } from '../store';
+import { INTERACTIVE_MIN_CTX, WIDGET_PROMPT } from '../widgets/prompt';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
 import { shortcut } from '../platform';
@@ -8,7 +9,7 @@ import { Markdown, splitThinking } from '../components/Markdown';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
   ArrowUp, Brain, Check, ChevronRight, Copy, Download, Eraser, GitBranch, PanelRight, PanelRightClose, Paperclip, Pencil,
-  Plus, RefreshCw, Square, Trash2, X,
+  Plus, RefreshCw, Sparkles, Square, Trash2, X,
 } from '../components/icons';
 
 const newConversation = (model = ''): Conversation => ({
@@ -43,11 +44,16 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [noticeSeen, setNoticeSeen] = usePersistent('ollama-gui.interactiveNoticeSeen', false);
+  const [pendingSend, setPendingSend] = useState<{ text: string; images: string[] } | null>(null);
   const menu = useContextMenu();
   const params = { ...DEFAULT_PARAMS, ...storedParams };
 
   const current = conversations.find((c) => c.id === currentId) ?? conversations[0];
   const caps = ollama.capabilities[current?.model] ?? [];
+  const interactive = isInteractive(current);
+  // Widgets are long; make sure the model has room for them.
+  const numCtx = interactive ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx;
 
   const sorted = useMemo(() => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt), [conversations]);
 
@@ -123,8 +129,9 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
     abortRef.current = ac;
     setStreamingId(conv.id);
 
+    const system = [conv.systemPrompt.trim(), isInteractive(conv) ? WIDGET_PROMPT : ''].filter(Boolean).join('\n\n');
     const messages: api.ChatMessage[] = [
-      ...(conv.systemPrompt.trim() ? [{ role: 'system' as const, content: conv.systemPrompt }] : []),
+      ...(system ? [{ role: 'system' as const, content: system }] : []),
       ...history.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content, ...(m.images?.length ? { images: m.images } : {}) })),
     ];
     const options: Record<string, number> = {
@@ -133,7 +140,7 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
       top_k: params.top_k,
       min_p: params.min_p,
       repeat_penalty: params.repeat_penalty,
-      num_ctx: params.num_ctx,
+      num_ctx: isInteractive(conv) ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx,
       num_predict: params.num_predict,
     };
     if (params.seed >= 0) options.seed = params.seed;
@@ -183,12 +190,18 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
     }
   };
 
-  const send = (text: string, images: string[]) => {
+  /** `interactive` forces the setting for this send (used right after the first-use notice). */
+  const send = (text: string, images: string[], interactive?: boolean) => {
     if (!current || !current.model || streamingId) return;
+    // The first time interactive answers would be used, explain them before sending.
+    if (interactive === undefined && isInteractive(current) && !noticeSeen) {
+      setPendingSend({ text, images });
+      return;
+    }
     const user: UiMessage = { id: uid(), role: 'user', content: text, ...(images.length ? { images } : {}) };
     const title = current.messages.length === 0 ? text.slice(0, 48) || 'Image' : current.title;
-    const conv = { ...current, title };
-    updateConv(current.id, (c) => ({ ...c, title }));
+    const conv = { ...current, title, ...(interactive !== undefined ? { interactive } : {}) };
+    updateConv(current.id, (c) => ({ ...c, title, ...(interactive !== undefined ? { interactive } : {}) }));
     generate(conv, [...current.messages, user]);
   };
 
@@ -270,11 +283,16 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
 
       <main className="chat">
         <header className="topbar">
+          <InteractiveSwitch
+            on={interactive}
+            modelSize={ollama.models.find((m) => m.name === current.model)?.details.parameter_size}
+            onChange={(on) => updateConv(current.id, (c) => ({ ...c, interactive: on }))}
+          />
           <ModelPicker
             ollama={ollama}
             value={current.model}
             keepAlive={params.keep_alive}
-            numCtx={params.num_ctx}
+            numCtx={numCtx}
             onChange={(model) => updateConv(current.id, (c) => ({ ...c, model }))}
           />
           <button className="icon-btn topbar-right" onClick={() => setShowSettings(!showSettings)} title="Toggle settings panel">
@@ -313,9 +331,75 @@ export function ChatView({ ollama, pendingModel, onPendingHandled }: {
             const s = [...current.messages].reverse().find((m) => m.stats)?.stats;
             return s ? s.promptTokens + s.tokens : 0;
           })()}
+          contextLimit={numCtx}
+        />
+      )}
+
+      {pendingSend && (
+        <InteractiveNotice
+          onChoose={(keepOn) => {
+            const { text, images } = pendingSend;
+            setPendingSend(null);
+            setNoticeSeen(true);
+            send(text, images, keepOn);
+          }}
         />
       )}
     </>
+  );
+}
+
+/** Parses Ollama's parameter_size ("7.6B", "350M") into billions. */
+function billions(size?: string): number | null {
+  const m = /^([\d.]+)\s*([BM])$/i.exec(size ?? '');
+  if (!m) return null;
+  return parseFloat(m[1]) / (m[2].toUpperCase() === 'M' ? 1000 : 1);
+}
+
+function InteractiveSwitch({ on, modelSize, onChange }: { on: boolean; modelSize?: string; onChange: (on: boolean) => void }) {
+  const b = billions(modelSize);
+  const small = on && b !== null && b < 7;
+  return (
+    <div className="ia-wrap">
+      <button
+        className={`ia-switch ${on ? 'on' : ''}`}
+        role="switch"
+        aria-checked={on}
+        onClick={() => onChange(!on)}
+        title={on
+          ? 'Interactive answers are ON: the model can reply with live charts, calculators, and diagrams. Click to turn off for this chat.'
+          : 'Interactive answers are OFF: replies are text only. Click to turn on for this chat.'}
+      >
+        <Sparkles size={14} />
+        <span className="ia-label">Interactive</span>
+        <span className="ia-track"><span className="ia-thumb" /></span>
+      </button>
+      {small && <span className="ia-hint" title="Small models often write broken widgets. 7B or larger works best.">best with 7B+</span>}
+    </div>
+  );
+}
+
+function InteractiveNotice({ onChoose }: { onChoose: (keepOn: boolean) => void }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="ia-notice-title">
+        <div className="modal-icon"><Sparkles size={22} /></div>
+        <h3 id="ia-notice-title">Interactive answers are on</h3>
+        <p>
+          The model can reply with small apps, like charts, calculators, diagrams, and 3D views, that run right in the chat.
+        </p>
+        <ul>
+          <li><b>They run in a sandbox.</b> A widget can't read your chats or files, reach the internet, or talk to Ollama.</li>
+          <li><b>The model writes the code,</b> so widgets can have mistakes. Numbers in them may be examples, not real data.</li>
+          <li><b>Replies take longer</b> and use more of the model's context. Larger models (7B+) do this much better.</li>
+        </ul>
+        <p className="muted small">You can turn this on or off for each chat with the <b>Interactive</b> switch at the top.</p>
+        <div className="modal-actions">
+          <button className="btn" onClick={() => onChoose(false)}>Turn off for this chat</button>
+          <button className="btn primary" autoFocus onClick={() => onChoose(true)}>Keep it on</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -606,15 +690,16 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat }: {
   );
 }
 
-function SettingsPanel({ params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens }: {
+function SettingsPanel({ params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens, contextLimit }: {
   params: GenParams;
   setParams: (p: Partial<GenParams>) => void;
   systemPrompt: string;
   setSystemPrompt: (s: string) => void;
   thinkingSupported: boolean;
   contextTokens: number;
+  contextLimit: number;
 }) {
-  const ctxUsed = Math.min(100, (contextTokens / params.num_ctx) * 100);
+  const ctxUsed = Math.min(100, (contextTokens / contextLimit) * 100);
   return (
     <aside className="settings">
       <div className="settings-scroll">
@@ -633,7 +718,7 @@ function SettingsPanel({ params, setParams, systemPrompt, setSystemPrompt, think
           <h4>Context</h4>
           <div className="ctx-meter">
             <div className="ctx-bar"><div style={{ width: `${ctxUsed}%` }} /></div>
-            <span className="muted mono">{contextTokens.toLocaleString()} / {params.num_ctx.toLocaleString()} tokens</span>
+            <span className="muted mono">{contextTokens.toLocaleString()} / {contextLimit.toLocaleString()} tokens</span>
           </div>
         </section>
 

@@ -37,6 +37,9 @@ function WidgetFrame({ code, title }: { code: string; title: string }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [copied, setCopied] = useState(false);
   const menu = useContextMenu();
+  // Runaway-growth guard: a widget whose height keeps climbing (a layout feedback loop) gets frozen.
+  const growth = useRef({ count: 0, since: 0, frozen: false });
+  const heightRef = useRef(MIN_HEIGHT * 2);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +58,19 @@ function WidgetFrame({ code, title }: { code: string; title: string }) {
       if (e.source !== frameRef.current?.contentWindow || !e.data || e.data.__penumbra !== 1) return;
       const msg = e.data as { type: string; height?: number; message?: string };
       if (msg.type === 'resize' && typeof msg.height === 'number' && Number.isFinite(msg.height)) {
-        setHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, msg.height)));
+        const g = growth.current;
+        if (g.frozen) return;
+        const next = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, msg.height));
+        if (next > heightRef.current) {
+          const now = performance.now();
+          if (now - g.since > 3000) Object.assign(g, { count: 0, since: now });
+          if (++g.count > 25) {
+            g.frozen = true;
+            return;
+          }
+        }
+        heightRef.current = next;
+        setHeight(next);
       } else if (msg.type === 'error' && typeof msg.message === 'string') {
         setError(msg.message);
       }
@@ -71,6 +86,7 @@ function WidgetFrame({ code, title }: { code: string; title: string }) {
   };
   const reload = () => {
     setError('');
+    growth.current = { count: 0, since: 0, frozen: false };
     setReloadKey((k) => k + 1);
   };
 

@@ -83,7 +83,16 @@ th, td { border: 1px solid var(--border-strong); padding: 6px 10px; text-align: 
 th { background: var(--elev); }
 code { font-family: var(--mono); font-size: .9em; }
 canvas, svg { max-width: 100%; }
+canvas { max-height: 480px; } /* stops Chart.js resize loops when a chart has no fixed-height container */
 `;
+
+/** Chart.js defaults that match the theme, so model-written charts look right without styling. */
+const CHART_DEFAULTS = `if (window.Chart) {
+  Chart.defaults.color = '#9a9ca5';
+  Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+  Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--font');
+  Chart.defaults.plugins.legend.labels.color = '#e6e7ea';
+}`;
 
 const escapeScript = (code: string) => code.replace(/<\/script/gi, '<\\/script');
 
@@ -101,7 +110,9 @@ function sanitize(code: string): { head: string; body: string } {
 }
 
 export async function buildWidgetDocument(code: string): Promise<string> {
-  const libs = await Promise.all(usedLibraries(code).map(loadLib));
+  const used = usedLibraries(code);
+  const libs = await Promise.all(used.map(loadLib));
+  if (used.includes('chart')) libs.push(CHART_DEFAULTS);
   const { head, body } = sanitize(code);
   return `<!doctype html>
 <html><head>

@@ -67,7 +67,29 @@ const BRIDGE = `(() => {
   addEventListener('DOMContentLoaded', () => { new ResizeObserver(size).observe(document.body); size(); });
   addEventListener('resize', size);
   addEventListener('load', () => { size(); [100, 500, 1500].forEach((t) => setTimeout(size, t)); post({ type: 'ready' }); });
-  window.penumbra = { ask: (text) => post({ type: 'followup', text: String(text).slice(0, 4000) }) };
+  // Place name to coordinates via OpenStreetMap. Models write over-specific searches ("El Morro, Old
+  // San Juan, Puerto Rico") that find nothing, so retry with fewer parts. Nominatim allows 1 request/s.
+  let geoQueue = Promise.resolve();
+  const geoCache = new Map();
+  const nominatim = (q) => {
+    const run = geoQueue.then(() => fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q)).then((r) => r.json()));
+    geoQueue = run.catch(() => {}).then(() => new Promise((r) => setTimeout(r, 1100)));
+    return run;
+  };
+  const geocode = async (query) => {
+    const parts = String(query).replace(/[(][^)]*[)]/g, ' ').split(',').map((s) => s.split(' ').filter(Boolean).join(' ')).filter(Boolean).slice(0, 6);
+    if (!parts.length) throw new Error('geocode: empty place name');
+    const tries = [parts.join(', ')];
+    if (parts.length > 2) tries.push([parts[0], ...parts.slice(2)].join(', '), [parts[0], parts[parts.length - 1]].join(', '));
+    if (parts.length > 1) tries.push(parts[0]);
+    for (const q of [...new Set(tries)]) {
+      if (!geoCache.has(q)) geoCache.set(q, nominatim(q));
+      const d = await geoCache.get(q);
+      if (d && d.length) return { lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon), name: d[0].display_name };
+    }
+    throw new Error('Place not found: ' + query);
+  };
+  window.penumbra = { ask: (text) => post({ type: 'followup', text: String(text).slice(0, 4000) }), geocode };
 })();`;
 
 /** Matches the app's dark theme so widgets feel native. */

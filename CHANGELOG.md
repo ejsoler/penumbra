@@ -16,6 +16,7 @@
   - Every widget has a network log listing each request it made, including blocked ones.
   - If a widget tries a site it wasn't granted, a bar offers to allow it.
   - Errors a widget catches and logs with `console.error` also show the **Ask model to fix** button.
+  - Built-in `penumbra.geocode()` helper, so maps place landmarks from OpenStreetMap instead of the model's memory, which is often hundreds of meters off.
 
 ### Changed
 - Chats with interactive answers on use a context of at least 16K tokens, since widget replies are long.

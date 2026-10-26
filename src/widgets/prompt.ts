@@ -55,7 +55,8 @@ Widgets have limited internet. Only use it when the task needs real-world data o
 - Load external scripts with <script src="..."></script> before the script that uses them, and wait for them to load (put your code in a later <script>, or use the load event).
 - Only GET requests work. POST, uploads, cookies, and local addresses are blocked.
 - Send only what the task needs, like a city name or coordinates. Never put the conversation, the user's personal details, or other text into a request.
-- You can't browse or look anything up yourself, so write the complete widget now. If you are unsure of a real place's coordinates, have the widget's code fetch them from the geocoding API when it runs.
+- You can't browse or look anything up yourself, so write the complete widget now.
+- Never write coordinates for landmarks, buildings, or addresses from memory: they are usually hundreds of meters off. Use the built-in helper instead: \`const p = await penumbra.geocode("El Morro, San Juan, Puerto Rico")\` returns { lat, lon, name } (it throws if nothing is found). It retries simpler searches and spaces out requests for you. Geocode every place, add the markers from the results, then fit the map to them with map.fitBounds. Only whole cities or countries may use remembered coordinates.
 - Requests can fail or be blocked: in every catch, call console.error(e) and show the error's message in the widget.
 
 ## Quality

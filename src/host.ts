@@ -24,6 +24,18 @@ export interface PenumbraHost {
     import: () => Promise<string[]>;
     reveal: (id?: string) => Promise<string>;
   };
+  tools: {
+    /** Asks the user to pick a folder; null if they cancel. */
+    pickFolder: () => Promise<string | null>;
+    list: (root: string, rel?: string, depth?: number) => Promise<string>;
+    read: (root: string, rel: string, offset?: number) => Promise<string>;
+    write: (root: string, rel: string, content: string) => Promise<{ path: string; replaced: boolean; bytes: number }>;
+    run: (root: string, command: string, id: string, timeoutSec?: number) => Promise<{ code: number | null; signal: string | null; output: string }>;
+    kill: (id: string) => Promise<void>;
+    fetch: (url: string) => Promise<{ url: string; status: number; type: string; title?: string; text: string }>;
+    search: (query: string) => Promise<{ title: string; url: string; snippet: string }[]>;
+    reveal: (root: string) => Promise<string>;
+  };
   setWidgetNetwork: (policy: { mode: NetMode; hosts: string[]; block: string[] }) => void;
   onWidgetRequest: (cb: (r: WidgetRequest) => void) => () => void;
 }

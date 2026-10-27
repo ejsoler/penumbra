@@ -1,9 +1,10 @@
 const { app, BrowserWindow, Menu, ipcMain, shell, session } = require('electron');
-const dns = require('dns').promises;
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
 const { registerSkills } = require('./skills.cjs');
+const { registerTools } = require('./tools.cjs');
+const { isLocalName, resolvesToPrivate } = require('./netsafe.cjs');
 
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
 app.setName('Penumbra');
@@ -103,31 +104,6 @@ ipcMain.on('widget-net:set', (e, policy) => {
 
 const isWidgetRequest = (d) => Boolean(d.webContents) && d.resourceType !== 'mainFrame' && (!d.frame || Boolean(d.frame.parent));
 
-const privateNets = new net.BlockList();
-for (const [a, p] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16], ['224.0.0.0', 3]]) {
-  privateNets.addSubnet(a, p, 'ipv4');
-}
-for (const [a, p] of [['::', 127], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]]) privateNets.addSubnet(a, p, 'ipv6');
-const isPrivateIp = (ip) => {
-  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip)?.[1];
-  if (v4) return privateNets.check(v4, 'ipv4');
-  return privateNets.check(ip, net.isIP(ip) === 6 ? 'ipv6' : 'ipv4');
-};
-
-const dnsCache = new Map();
-async function resolvesToPrivate(host) {
-  const hit = dnsCache.get(host);
-  if (hit && Date.now() - hit.at < 60_000) return hit.private;
-  let result = false;
-  try {
-    result = (await dns.lookup(host, { all: true })).some((a) => isPrivateIp(a.address));
-  } catch {
-    /* unresolvable: the request will fail on its own */
-  }
-  dnsCache.set(host, { at: Date.now(), private: result });
-  return result;
-}
-
 const hostMatches = (host, pattern) => (pattern.startsWith('*.') ? host.endsWith(pattern.slice(1)) : host === pattern);
 
 /** Why a widget request is blocked, or null if it may go ahead. */
@@ -145,7 +121,7 @@ async function widgetBlockReason(d) {
   if (d.url.length > 2048) return 'address too long';
   const host = url.hostname.toLowerCase();
   if (host.startsWith('[') || net.isIP(host)) return 'IP addresses are blocked';
-  if (/^(localhost|.*\.(localhost|local|internal|lan|home\.arpa))$/.test(host) || widgetNet.block.includes(host)) return 'this computer and the local network are blocked';
+  if (isLocalName(host) || widgetNet.block.includes(host)) return 'this computer and the local network are blocked';
   if (widgetNet.mode !== 'all' && !widgetNet.hosts.some((p) => hostMatches(host, p))) return 'site not allowed for widgets';
   if (await resolvesToPrivate(host)) return 'this site points to the local network';
   return null;
@@ -159,6 +135,7 @@ function logWidgetRequest(d, extra) {
 
 app.whenReady().then(() => {
   registerSkills();
+  registerTools();
   // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).
   if (process.platform === 'darwin') app.dock?.setIcon(ICON);
   const { webRequest } = session.defaultSession;

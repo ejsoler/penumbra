@@ -1,13 +1,9 @@
 // Agents: a name, a model, instructions, and the skills and tools it may use. Stored locally.
 import { useSyncExternalStore } from 'react';
 import { uid } from '../store';
+import type { ToolGroup } from './builtins';
 
-/** Tools an agent can be given. Interactive widgets follow the chat's Interactive switch instead. */
-export type ToolGroup = 'skills';
-
-export const TOOL_GROUPS: { id: ToolGroup; label: string; description: string }[] = [
-  { id: 'skills', label: 'Skills', description: 'Load the skills selected below when a task matches them' },
-];
+export { TOOL_GROUPS, type ToolGroup } from './builtins';
 
 export interface Agent {
   id: string;
@@ -82,8 +78,8 @@ export const AGENT_TEMPLATES: Pick<Agent, 'name' | 'description' | 'instructions
   {
     name: 'Researcher',
     description: 'Gathers facts and explains them clearly, with sources when it has them.',
-    instructions: 'You are a careful researcher. Answer with well-organized facts. Say clearly when you are unsure, and never invent sources or numbers.',
-    tools: ['skills'],
+    instructions: 'You are a careful researcher. Search the web for current or specific facts, read the most relevant pages, and answer with well-organized findings and the addresses you used. Say clearly when you are unsure, and never invent sources or numbers.',
+    tools: ['skills', 'web'],
   },
   {
     name: 'Writer',
@@ -94,8 +90,8 @@ export const AGENT_TEMPLATES: Pick<Agent, 'name' | 'description' | 'instructions
   {
     name: 'Coder',
     description: 'Writes, explains, and reviews code.',
-    instructions: 'You are an expert programmer. Write correct, idiomatic, well-structured code. Explain briefly what the code does and any assumptions.',
-    tools: ['skills'],
+    instructions: "You are an expert programmer. Look at the existing files before changing anything, write correct, idiomatic code that matches the project's style, and test it when you can. Explain briefly what you changed.",
+    tools: ['skills', 'files', 'write', 'terminal'],
   },
   {
     name: 'Analyst',

@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import * as api from '../api';
 import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, type GenParams, type OllamaState, type UiMessage } from '../store';
 import { INTERACTIVE_MIN_CTX } from '../widgets/prompt';
 import { getAgent, useAgents, type Agent } from '../agents/agents';
 import { runAgent, type Step } from '../agents/engine';
-import { replySetup } from '../agents/setup';
+import { DEFAULT_CHAT_TOOLS, replySetup } from '../agents/setup';
+import { enabledSkills, useSkills } from '../agents/skills';
+import { TOOL_GROUPS, type ToolGroup } from '../agents/builtins';
+import type { Approval, ApprovalRequest } from '../agents/tools';
+import { host } from '../host';
 import { APPROVED_SITES, removeAlwaysAllowed, setNetMode, useNetSettings } from '../widgets/network';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
@@ -14,7 +18,7 @@ import { Steps } from '../components/Steps';
 import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
-  ArrowUp, Bot, Brain, Check, ChevronDown, ChevronRight, Copy, Download, Eraser, GitBranch, Globe, PanelRight, PanelRightClose, Paperclip, Pencil,
+  ArrowUp, Bot, Brain, Check, ChevronDown, FileText, FolderOpen, ShieldAlert, ChevronRight, Copy, Download, Eraser, GitBranch, Globe, PanelRight, PanelRightClose, Paperclip, Pencil,
   Plus, RefreshCw, Sparkles, Square, Trash2, TriangleAlert, X,
 } from '../components/icons';
 
@@ -46,6 +50,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   onManageAgents: () => void;
 }) {
   const agents = useAgents();
+  useSkills(); // re-render when skills change, since they affect the tools a reply gets
   const [conversations, setConversations] = usePersistent<Conversation[]>('ollama-gui.conversations', [newConversation()]);
   const [currentId, setCurrentId] = usePersistent<string>('ollama-gui.current', conversations[0]?.id ?? '');
   const [storedParams, setParams] = usePersistent<GenParams>('ollama-gui.params', DEFAULT_PARAMS);
@@ -54,7 +59,9 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   const abortRef = useRef<AbortController | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [noticeSeen, setNoticeSeen] = usePersistent('ollama-gui.interactiveNoticeSeen', false);
-  const [pendingSend, setPendingSend] = useState<{ text: string; images: string[] } | null>(null);
+  const [pendingSend, setPendingSend] = useState<{ text: string; images: string[]; files: Attachment[] } | null>(null);
+  // A tool waiting for the user's OK (a command, a site).
+  const [approval, setApproval] = useState<{ req: ApprovalRequest; resolve: (a: Approval) => void } | null>(null);
   // Text a widget asked to put in the message box; `n` makes repeats of the same text count.
   const [composerFill, setComposerFill] = useState<{ text: string; n: number } | null>(null);
   const menu = useContextMenu();
@@ -67,7 +74,9 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   const caps = ollama.capabilities[activeModel] ?? [];
   const interactive = isInteractive(current);
   // Widgets are long; make sure the model has room for them.
-  const numCtx = interactive ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx;
+  // Widgets and tool results are long; make sure the model has room for them (generate() does the same).
+  const usesTools = caps.includes('tools') && (agent ? agent.tools : current?.tools ?? DEFAULT_CHAT_TOOLS).some((t) => t !== 'skills' || enabledSkills().length > 0);
+  const numCtx = interactive || usesTools ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx;
 
   const sorted = useMemo(() => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt), [conversations]);
 
@@ -153,10 +162,12 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       systemPrompt: conv.systemPrompt,
       interactive: isInteractive(conv),
       toolsSupported: modelCaps.includes('tools'),
+      chatTools: conv.tools,
+      folder: conv.folder,
     });
     const messages: api.ChatMessage[] = [
       ...(system ? [{ role: 'system' as const, content: system }] : []),
-      ...history.filter((m) => !m.error).map((m) => ({ role: m.role, content: m.content, ...(m.images?.length ? { images: m.images } : {}) })),
+      ...history.filter((m) => !m.error).map((m) => ({ role: m.role, content: withFiles(m), ...(m.images?.length ? { images: m.images } : {}) })),
     ];
     const options: Record<string, number> = {
       temperature: agent?.temperature ?? params.temperature,
@@ -179,6 +190,18 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         keepAlive: params.keep_alive,
         ...(modelCaps.includes('thinking') ? { think: params.think } : {}),
         signal: ac.signal,
+        approve: (req) =>
+          new Promise<Approval>((resolve) => {
+            if (ac.signal.aborted) return resolve(false);
+            const done = (a: Approval) => {
+              ac.signal.removeEventListener('abort', cancel);
+              setApproval(null);
+              resolve(a);
+            };
+            const cancel = () => done(false);
+            ac.signal.addEventListener('abort', cancel, { once: true });
+            setApproval({ req, resolve: done });
+          }),
         onText: (piece) => patch((m) => ({ ...m, content: m.content + piece })),
         onThinking: (piece) => patch((m) => ({ ...m, thinking: (m.thinking ?? '') + piece })),
         onStep: (step) =>
@@ -200,15 +223,15 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   };
 
   /** `interactive` forces the setting for this send (used right after the first-use notice). */
-  const send = (text: string, images: string[], interactive?: boolean) => {
+  const send = (text: string, images: string[], files: Attachment[] = [], interactive?: boolean) => {
     if (!current || !activeModel || streamingId) return;
     // The first time interactive answers would be used, explain them before sending.
     if (interactive === undefined && isInteractive(current) && !noticeSeen) {
-      setPendingSend({ text, images });
+      setPendingSend({ text, images, files });
       return;
     }
-    const user: UiMessage = { id: uid(), role: 'user', content: text, ...(images.length ? { images } : {}) };
-    const title = current.messages.length === 0 ? text.slice(0, 48) || 'Image' : current.title;
+    const user: UiMessage = { id: uid(), role: 'user', content: text, ...(images.length ? { images } : {}), ...(files.length ? { files } : {}) };
+    const title = current.messages.length === 0 ? text.slice(0, 48) || files[0]?.name || 'Image' : current.title;
     const conv = { ...current, title, ...(interactive !== undefined ? { interactive } : {}) };
     updateConv(current.id, (c) => ({ ...c, title, ...(interactive !== undefined ? { interactive } : {}) }));
     generate(conv, [...current.messages, user]);
@@ -349,6 +372,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         />
         </WidgetActionsContext.Provider>
 
+        {approval && <ApprovalBar req={approval.req} onAnswer={approval.resolve} />}
         <Composer
           disabled={!activeModel}
           streaming={isStreaming}
@@ -362,6 +386,16 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
 
       {showSettings && (
         <SettingsPanel
+          tools={
+            <ChatTools
+              agent={agent}
+              tools={current.tools ?? DEFAULT_CHAT_TOOLS}
+              setTools={(tools) => updateConv(current.id, (c) => ({ ...c, tools }))}
+              folder={current.folder}
+              setFolder={(folder) => updateConv(current.id, (c) => ({ ...c, folder }))}
+              toolsSupported={caps.includes('tools')}
+            />
+          }
           params={params}
           setParams={(p) => setParams({ ...params, ...p })}
           systemPrompt={current.systemPrompt}
@@ -378,14 +412,96 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       {pendingSend && (
         <InteractiveNotice
           onChoose={(keepOn) => {
-            const { text, images } = pendingSend;
+            const { text, images, files } = pendingSend;
             setPendingSend(null);
             setNoticeSeen(true);
-            send(text, images, keepOn);
+            send(text, images, files, keepOn);
           }}
         />
       )}
     </>
+  );
+}
+
+type Attachment = { name: string; text: string };
+const MAX_ATTACHMENT = 200 * 1024;
+/** Attached files go to the model inside the message, capped so they can't flood the context. */
+const MAX_ATTACHED_TOTAL = 60000;
+
+function withFiles(m: UiMessage): string {
+  if (!m.files?.length) return m.content;
+  let room = MAX_ATTACHED_TOTAL;
+  const blocks = m.files.map((f) => {
+    const text = f.text.length > room ? `${f.text.slice(0, Math.max(0, room))}\n[…cut: the file has ${f.text.length.toLocaleString()} characters]` : f.text;
+    room -= Math.min(room, f.text.length);
+    return `<attached_file name="${f.name.replace(/"/g, "'")}">\n${text}\n</attached_file>`;
+  });
+  return `${blocks.join('\n\n')}\n\n${m.content}`;
+}
+
+function ApprovalBar({ req, onAnswer }: { req: ApprovalRequest; onAnswer: (a: Approval) => void }) {
+  return (
+    <div className="approval" role="alertdialog" aria-label={req.title}>
+      <div className="approval-head"><ShieldAlert size={15} /> {req.title}</div>
+      <pre className="approval-detail">{req.detail}</pre>
+      {req.note && <div className="approval-note muted small">{req.note}</div>}
+      <div className="row gap approval-actions">
+        <button className="btn sm" onClick={() => onAnswer(false)}>Don't allow</button>
+        <span className="flex" />
+        {req.always && <button className="btn sm" onClick={() => onAnswer('always')}>{req.always}</button>}
+        <button className="btn sm primary" autoFocus onClick={() => onAnswer(true)}>{req.confirm ?? 'Allow'}</button>
+      </div>
+    </div>
+  );
+}
+
+function ChatTools({ agent, tools, setTools, folder, setFolder, toolsSupported }: {
+  agent?: Agent;
+  tools: ToolGroup[];
+  setTools: (t: ToolGroup[]) => void;
+  folder?: string;
+  setFolder: (f: string | undefined) => void;
+  toolsSupported: boolean;
+}) {
+  const active = agent ? agent.tools : tools;
+  const needsFolder = active.some((t) => TOOL_GROUPS.find((g) => g.id === t)?.needsFolder);
+  const pick = async () => {
+    const f = await host()?.tools.pickFolder();
+    if (f) setFolder(f);
+  };
+  return (
+    <section>
+      <h4>Tools</h4>
+      {!toolsSupported && <p className="net-note warn">This model can't use tools.</p>}
+      {agent ? (
+        <p className="net-note muted">Using {agent.name}'s tools: {active.map((t) => TOOL_GROUPS.find((g) => g.id === t)?.label).join(', ') || 'none'}.</p>
+      ) : (
+        TOOL_GROUPS.map((g) => (
+          <label key={g.id} className={`check-row ${toolsSupported ? '' : 'dim'}`} title={g.description}>
+            <input
+              type="checkbox"
+              checked={tools.includes(g.id)}
+              disabled={!toolsSupported || !host()}
+              onChange={(e) => setTools(e.target.checked ? [...tools, g.id] : tools.filter((t) => t !== g.id))}
+            />
+            <span>{g.label}{g.risky && <span className="muted small"> · asks first</span>}</span>
+          </label>
+        ))
+      )}
+      <div className="folder-row">
+        <span className="muted small">Folder</span>
+        {folder ? (
+          <>
+            <button className="link-btn mono folder-path" title={folder} onClick={() => host()?.tools.reveal(folder)}>{folder.split(/[\\/]/).slice(-2).join('/')}</button>
+            <button className="icon-btn sm" title="Change folder" onClick={pick}><FolderOpen size={13} /></button>
+            <button className="icon-btn sm" title="Remove folder" onClick={() => setFolder(undefined)}><X size={12} /></button>
+          </>
+        ) : (
+          <button className={`btn sm ${needsFolder ? 'primary' : ''}`} onClick={pick} disabled={!host()}><FolderOpen size={13} /> Choose…</button>
+        )}
+      </div>
+      {needsFolder && !folder && <p className="net-note warn">File and terminal tools need a folder.</p>}
+    </section>
   );
 }
 
@@ -604,7 +720,14 @@ function MessageView({ msg, agentName, live, busy, onRegenerate, onDelete, onEdi
           </div>
         </div>
       ) : msg.role === 'user' ? (
-        <div className="msg-body user-text">{msg.content}</div>
+        <div className="msg-body user-text">
+          {msg.files?.length ? (
+            <div className="msg-files">
+              {msg.files.map((f, i) => <span key={i} className="file-chip" title={`${f.text.length.toLocaleString()} characters`}><FileText size={12} /> {f.name}</span>)}
+            </div>
+          ) : null}
+          {msg.content}
+        </div>
       ) : (
         <div className="msg-body">
           {interleave ? (
@@ -679,13 +802,15 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
   disabled: boolean;
   streaming: boolean;
   vision: boolean;
-  onSend: (text: string, images: string[]) => void;
+  onSend: (text: string, images: string[], files: Attachment[]) => void;
   onStop: () => void;
   onNewChat: () => void;
   fill: { text: string; n: number } | null;
 }) {
   const [text, setText] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const [attachError, setAttachError] = useState('');
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -723,9 +848,24 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
     return () => window.removeEventListener('keydown', onKey);
   }, [onNewChat]);
 
-  const addFiles = async (files: FileList | File[]) => {
+  const addFiles = async (list: FileList | File[]) => {
+    const all = [...list];
+    const problems: string[] = [];
+    const texts: Attachment[] = [];
+    for (const f of all.filter((f) => !f.type.startsWith('image/'))) {
+      if (f.size > MAX_ATTACHMENT) {
+        problems.push(`${f.name} is too large (max ${MAX_ATTACHMENT / 1024} KB)`);
+        continue;
+      }
+      const text = await f.text();
+      if (text.slice(0, 8000).includes('\u0000')) problems.push(`${f.name} isn't a text file`);
+      else texts.push({ name: f.name, text });
+    }
+    if (!vision && all.some((f) => f.type.startsWith('image/'))) problems.push("This model can't see images");
+    setAttachError(problems.join(' · '));
+    setFiles((fs) => [...fs, ...texts]);
     const encoded = await Promise.all(
-      [...files].filter((f) => f.type.startsWith('image/')).map(
+      all.filter((f) => vision && f.type.startsWith('image/')).map(
         (f) =>
           new Promise<string>((resolve) => {
             const r = new FileReader();
@@ -737,24 +877,37 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
     setImages((im) => [...im, ...encoded]);
   };
 
+  const empty = !text.trim() && !images.length && !files.length;
   const submit = () => {
-    if (disabled || streaming || (!text.trim() && !images.length)) return;
-    onSend(text.trim(), images);
+    if (disabled || streaming || empty) return;
+    onSend(text.trim(), images, files);
     setText('');
     setImages([]);
+    setFiles([]);
+    setAttachError('');
   };
 
   return (
     <div className="composer-wrap">
       <div
         className={`composer ${disabled ? 'disabled' : ''}`}
-        onDragOver={(e) => vision && e.preventDefault()}
+        onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
-          if (!vision) return;
           e.preventDefault();
           addFiles(e.dataTransfer.files);
         }}
       >
+        {(files.length > 0 || attachError) && (
+          <div className="composer-files">
+            {files.map((f, i) => (
+              <span key={i} className="file-chip">
+                <FileText size={12} /> {f.name}
+                <button onClick={() => setFiles(files.filter((_, j) => j !== i))} title="Remove"><X size={11} /></button>
+              </span>
+            ))}
+            {attachError && <span className="attach-error">{attachError}</span>}
+          </div>
+        )}
         {images.length > 0 && (
           <div className="composer-images">
             {images.map((b64, i) => (
@@ -772,7 +925,7 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
           disabled={disabled}
           placeholder={disabled ? 'Select a model first…' : 'Send a message…'}
           onChange={(e) => setText(e.target.value)}
-          onPaste={(e) => vision && e.clipboardData.files.length && addFiles(e.clipboardData.files)}
+          onPaste={(e) => e.clipboardData.files.length && addFiles(e.clipboardData.files)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
@@ -781,11 +934,19 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
           }}
         />
         <div className="composer-bar">
-          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && addFiles(e.target.files)} />
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) addFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
           <button
             className="icon-btn"
-            disabled={!vision}
-            title={vision ? 'Attach images' : 'This model does not support images'}
+            title={vision ? 'Attach images or text files' : 'Attach text files (this model does not support images)'}
             onClick={() => fileRef.current?.click()}
           >
             <Paperclip size={16} />
@@ -794,7 +955,7 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
           {streaming ? (
             <button className="send-btn stop" onClick={onStop} title="Stop generating"><Square size={14} fill="currentColor" /></button>
           ) : (
-            <button className="send-btn" onClick={submit} disabled={disabled || (!text.trim() && !images.length)} title="Send (Enter)">
+            <button className="send-btn" onClick={submit} disabled={disabled || empty} title="Send (Enter)">
               <ArrowUp size={17} />
             </button>
           )}
@@ -804,7 +965,8 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
   );
 }
 
-function SettingsPanel({ params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens, contextLimit }: {
+function SettingsPanel({ tools, params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens, contextLimit }: {
+  tools: ReactNode;
   params: GenParams;
   setParams: (p: Partial<GenParams>) => void;
   systemPrompt: string;
@@ -835,6 +997,8 @@ function SettingsPanel({ params, setParams, systemPrompt, setSystemPrompt, think
             <span className="muted mono">{contextTokens.toLocaleString()} / {contextLimit.toLocaleString()} tokens</span>
           </div>
         </section>
+
+        {tools}
 
         <WidgetInternet />
 
@@ -878,7 +1042,7 @@ function WidgetInternet() {
   const [showList, setShowList] = useState(false);
   return (
     <section>
-      <h4>Widget Internet</h4>
+      <h4>Internet access</h4>
       <label className="field">
         <span>Access</span>
         <select value={net.mode} onChange={(e) => (e.target.value === 'all' ? setConfirmAll(true) : setNetMode('ask'))}>
@@ -887,10 +1051,10 @@ function WidgetInternet() {
         </select>
       </label>
       {net.mode === 'all' ? (
-        <p className="net-note warn"><TriangleAlert size={12} /> Widgets can reach any https site without asking.</p>
+        <p className="net-note warn"><TriangleAlert size={12} /> Widgets and agents can reach any site without asking.</p>
       ) : (
         <p className="net-note muted">
-          Maps, CDNs, and public data work right away.{' '}
+          For widgets and agents' web tools. Maps, CDNs, and public data work right away; other sites ask first.{' '}
           <button className="link-btn" onClick={() => setShowList(!showList)}>{showList ? 'Hide list' : 'See list'}</button>
         </p>
       )}
@@ -916,12 +1080,12 @@ function WidgetInternet() {
         <div className="modal-backdrop">
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="net-all-title">
             <div className="modal-icon warn"><Globe size={22} /></div>
-            <h3 id="net-all-title">Let widgets reach the whole internet?</h3>
-            <p>Widgets are code written by the model. With this on, any widget can load from any https website without asking you.</p>
+            <h3 id="net-all-title">Let widgets and agents reach the whole internet?</h3>
+            <p>Widgets and agents are driven by the model. With this on, widgets can load from any https website and agents can open any page, without asking you.</p>
             <ul>
-              <li><b>A widget could send small pieces of your conversation to a website</b> inside a web address. This is most likely if you paste text or documents you don't trust, since they can trick the model.</li>
+              <li><b>The model could send small pieces of your conversation to a website</b> inside a web address. This is most likely if you paste text, documents, or pages you don't trust, since they can trick the model.</li>
               <li><b>Still blocked:</b> uploads and posts, cookies, your computer and local network, and Ollama.</li>
-              <li>You can see every request in each widget's network log.</li>
+              <li>You can see every request in each widget's network log and each agent's steps.</li>
             </ul>
             <div className="modal-actions">
               <button className="btn primary" autoFocus onClick={() => setConfirmAll(false)}>Keep approved sites only</button>

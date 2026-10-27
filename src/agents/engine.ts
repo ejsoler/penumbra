@@ -1,7 +1,7 @@
 // The agent loop: ask the model, run the tools it calls, give it the results, repeat until it answers
 // without calling a tool. Used by chats (with or without an agent) and by the orchestrator.
 import * as api from '../api';
-import { toolDefinition, type ApprovalRequest, type Tool } from './tools';
+import { Declined, toolDefinition, type Approval, type ApprovalRequest, type Tool } from './tools';
 
 export interface Step {
   id: string;
@@ -9,7 +9,7 @@ export interface Step {
   label: string;
   summary: string;
   args: Record<string, unknown>;
-  status: 'running' | 'done' | 'error';
+  status: 'running' | 'done' | 'error' | 'declined';
   result?: string;
   /** Length of the reply text when the step ran, so the timeline shows it in place. */
   at: number;
@@ -37,7 +37,7 @@ export interface RunOptions {
   onThinking?: (piece: string) => void;
   /** Called when a step starts and again when it finishes (same id). */
   onStep?: (step: Step) => void;
-  approve?: (req: ApprovalRequest) => Promise<boolean>;
+  approve?: (req: ApprovalRequest) => Promise<Approval>;
 }
 
 export interface RunResult {
@@ -135,8 +135,13 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
           result = await tool.run(args, { signal: o.signal, approve: o.approve ?? (async () => false) });
         } catch (e) {
           if (o.signal.aborted) throw e;
-          result = `Error: ${(e as Error).message}`;
+          if (e instanceof Declined) {
+            result = e.message;
+            status = 'declined';
+          } else {
+          result = `Error: ${(e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')}`;
           status = 'error';
+          }
         }
       }
       result = clip(result);

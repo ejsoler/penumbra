@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Step } from '../agents/engine';
-import { ChevronRight, CircleAlert, CircleCheck, Loader2, Wrench } from './icons';
+import { Ban, ChevronRight, CircleAlert, CircleCheck, Loader2, Wrench } from './icons';
 
 /** The tools a reply used, in order. Each one opens to show what it returned. */
 export function Steps({ steps }: { steps: Step[] }) {
@@ -13,7 +13,7 @@ export function Steps({ steps }: { steps: Step[] }) {
 
 function StepRow({ step }: { step: Step }) {
   const [open, setOpen] = useState(false);
-  const Icon = step.status === 'running' ? Loader2 : step.status === 'error' ? CircleAlert : CircleCheck;
+  const Icon = step.status === 'running' ? Loader2 : step.status === 'error' ? CircleAlert : step.status === 'declined' ? Ban : CircleCheck;
   return (
     <div className={`step ${step.status} ${open ? 'open' : ''}`}>
       <button className="step-head" onClick={() => setOpen(!open)} disabled={step.status === 'running'}>
@@ -21,6 +21,7 @@ function StepRow({ step }: { step: Step }) {
         <Wrench size={12} className="muted" />
         <span className="step-label">{step.label}</span>
         {step.summary && <span className="step-summary mono">{step.summary}</span>}
+        {step.status === 'declined' && <span className="step-tag">declined</span>}
         {step.status !== 'running' && <ChevronRight size={13} className="chev" />}
       </button>
       {open && (

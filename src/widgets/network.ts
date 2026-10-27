@@ -58,6 +58,8 @@ function save(next: NetSettings) {
   syncHost();
 }
 
+export const getNetSettings = () => settings;
+
 export const useNetSettings = () =>
   useSyncExternalStore(
     (l) => {

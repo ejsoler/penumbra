@@ -6,14 +6,23 @@ export type ToolArgs = Record<string, unknown>;
 export interface ApprovalRequest {
   tool: string;
   title: string;
-  /** What will happen, shown to the user verbatim (a command, a file path…). */
+  /** What will happen, shown to the user verbatim (a command, a site…). */
   detail: string;
+  /** Extra context under the detail, like the folder a command runs in. */
+  note?: string;
+  /** Label for an "always" choice (for example "Always allow this site"); omit for once-only actions. */
+  always?: string;
+  /** Label for the approve button. */
+  confirm?: string;
 }
+
+/** 'always' only when the request offered it. */
+export type Approval = boolean | 'always';
 
 export interface ToolContext {
   signal: AbortSignal;
   /** Asks the user to allow an action. Resolves false if they decline or the run is stopped. */
-  approve: (req: ApprovalRequest) => Promise<boolean>;
+  approve: (req: ApprovalRequest) => Promise<Approval>;
 }
 
 export interface Tool {
@@ -26,6 +35,9 @@ export interface Tool {
   summary?: (args: ToolArgs) => string;
   run: (args: ToolArgs, ctx: ToolContext) => Promise<string>;
 }
+
+/** Thrown by a tool when the user says no; the message goes back to the model. */
+export class Declined extends Error {}
 
 export const toolDefinition = (t: Tool): ToolDefinition => ({
   type: 'function',

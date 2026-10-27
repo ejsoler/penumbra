@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { Step } from './agents/engine';
+import type { ToolGroup } from './agents/builtins';
 
 export interface UiMessage {
   id: string;
@@ -8,6 +9,8 @@ export interface UiMessage {
   content: string;
   thinking?: string;
   images?: string[];
+  /** Text files attached to a user message; the model gets their contents. */
+  files?: { name: string; text: string }[];
   model?: string;
   error?: string;
   stopped?: boolean;
@@ -29,6 +32,10 @@ export interface Conversation {
   interactive?: boolean;
   /** Replies come from this agent (its model, instructions, and skills) instead of the plain model. */
   agentId?: string;
+  /** Tools for replies without an agent. Missing means skills only. */
+  tools?: ToolGroup[];
+  /** The folder file and terminal tools work in. */
+  folder?: string;
 }
 
 export const isInteractive = (c: Conversation | undefined) => c?.interactive !== false;

@@ -75,6 +75,8 @@
       "electron/main.cjs",
       "electron/preload.cjs",
       "electron/skills.cjs",
+      "electron/tools.cjs",
+      "electron/netsafe.cjs",
       "build/icon.png",
       "package.json"
     ],

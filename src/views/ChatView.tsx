@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode }
 import * as api from '../api';
 import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, type GenParams, type OllamaState, type UiMessage } from '../store';
 import { INTERACTIVE_MIN_CTX } from '../widgets/prompt';
-import { getAgent, useAgents, type Agent } from '../agents/agents';
+import { createAgent, getAgent, useAgents, type Agent } from '../agents/agents';
+import {
+  normalizePlan, ORCHESTRATOR_ID, parsePlanText, planningPrompt, PROPOSE_PLAN, synthesisMessages, taskMessage,
+  type ModelInfo, type Orchestration, type PlanTask,
+} from '../agents/orchestrator';
+import { PlanActionsContext, PlanCard, type PlanActions } from '../components/PlanCard';
 import { runAgent, type Step } from '../agents/engine';
 import { DEFAULT_CHAT_TOOLS, replySetup } from '../agents/setup';
 import { enabledSkills, useSkills } from '../agents/skills';
@@ -18,7 +23,7 @@ import { Steps } from '../components/Steps';
 import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
-  ArrowUp, Bot, Brain, Check, ChevronDown, FileText, FolderOpen, ShieldAlert, ChevronRight, Copy, Download, Eraser, GitBranch, Globe, PanelRight, PanelRightClose, Paperclip, Pencil,
+  ArrowUp, Bot, Brain, Check, ChevronDown, FileText, FolderOpen, ShieldAlert, Workflow, ChevronRight, Copy, Download, Eraser, GitBranch, Globe, PanelRight, PanelRightClose, Paperclip, Pencil,
   Plus, RefreshCw, Sparkles, Square, Trash2, TriangleAlert, X,
 } from '../components/icons';
 
@@ -50,6 +55,9 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   onManageAgents: () => void;
 }) {
   const agents = useAgents();
+  const agentsRef = useRef(agents);
+  agentsRef.current = agents;
+  const getAgentByName = (name: string) => agentsRef.current.find((a) => a.name.toLowerCase() === name.toLowerCase());
   useSkills(); // re-render when skills change, since they affect the tools a reply gets
   const [conversations, setConversations] = usePersistent<Conversation[]>('ollama-gui.conversations', [newConversation()]);
   const [currentId, setCurrentId] = usePersistent<string>('ollama-gui.current', conversations[0]?.id ?? '');
@@ -146,7 +154,216 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     });
   };
 
+  /** Asks the user through the approval bar; a stopped run counts as "no". */
+  const approver = (ac: AbortController) => {
+    // Tools the user said yes to for the rest of this run ("Allow all sites for this run").
+    const allowedForRun = new Set<string>();
+    return (req: ApprovalRequest) =>
+    new Promise<Approval>((resolve) => {
+      if (ac.signal.aborted) return resolve(false);
+      if (req.forRun && allowedForRun.has(req.tool)) return resolve(true);
+      const done = (a: Approval) => {
+        ac.signal.removeEventListener('abort', cancel);
+        setApproval(null);
+        if (a === 'run') allowedForRun.add(req.tool);
+        resolve(a);
+      };
+      const cancel = () => done(false);
+      ac.signal.addEventListener('abort', cancel, { once: true });
+      setApproval({ req, resolve: done });
+    });
+  };
+
+  const genOptions = (temperature: number | undefined, bigContext: boolean) => {
+    const options: Record<string, number> = {
+      temperature: temperature ?? params.temperature,
+      top_p: params.top_p,
+      top_k: params.top_k,
+      min_p: params.min_p,
+      repeat_penalty: params.repeat_penalty,
+      num_ctx: bigContext ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx,
+      num_predict: params.num_predict,
+    };
+    if (params.seed >= 0) options.seed = params.seed;
+    return options;
+  };
+
+  const modelInfos = (): ModelInfo[] =>
+    ollama.models.map((m) => ({
+      name: m.name,
+      size: m.details.parameter_size,
+      capabilities: ollama.capabilities[m.name] ?? [],
+      loaded: ollama.running.some((r) => r.name === m.name),
+      remote: !!m.remote_host,
+    }));
+
+  // ---- orchestrator ----------------------------------------------------------------------------
+  const convRef = useRef(conversations);
+  convRef.current = conversations;
+  const patchOrch = (convId: string, msgId: string, fn: (o: Orchestration) => Orchestration) =>
+    patchMessage(convId, msgId, (m) => (m.orchestration ? { ...m, orchestration: fn(m.orchestration) } : m));
+  const patchTask = (convId: string, msgId: string, taskId: string, fn: (t: PlanTask) => PlanTask) =>
+    patchOrch(convId, msgId, (o) => (o.plan ? { ...o, plan: { ...o.plan, tasks: o.plan.tasks.map((t) => (t.id === taskId ? fn(t) : t)) } } : o));
+
+  /** Step 1: the orchestrator's model proposes a plan, which waits for the user's review. */
+  const planOrchestration = async (conv: Conversation, history: UiMessage[]) => {
+    const model = conv.model;
+    const goal = withFiles(history[history.length - 1]);
+    const assistant: UiMessage = { id: uid(), role: 'assistant', content: '', model, agentId: ORCHESTRATOR_ID, orchestration: { goal, phase: 'planning' } };
+    updateConv(conv.id, (c) => ({ ...c, messages: [...history, assistant], updatedAt: Date.now() }));
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setStreamingId(conv.id);
+    const models = modelInfos();
+    const caps = ollama.capabilities[model] ?? [];
+    const toolsOk = caps.includes('tools');
+    const system = planningPrompt({ agents: agentsRef.current, models, folder: conv.folder, toolsSupported: toolsOk });
+    const messages: api.ChatMessage[] = [
+      { role: 'system', content: system },
+      ...history.filter((m) => !m.error).map((m) => ({ role: m.role, content: withFiles(m) })),
+    ];
+    try {
+      let raw: Record<string, unknown> | null = null;
+      let said = '';
+      for (let attempt = 0; attempt < 2 && !raw; attempt++) {
+        let text = '';
+        for await (const chunk of api.chat(
+          { model, messages, options: genOptions(0.3, true), keep_alive: params.keep_alive, ...(toolsOk ? { tools: [PROPOSE_PLAN] } : {}), ...(caps.includes('thinking') ? { think: params.think } : {}) },
+          ac.signal,
+        )) {
+          text += chunk.message?.content ?? '';
+          const call = chunk.message?.tool_calls?.find((c) => c.function.name === 'propose_plan');
+          if (call) raw = call.function.arguments as Record<string, unknown>;
+        }
+        raw ??= parsePlanText(text);
+        said = text;
+        if (!raw) messages.push({ role: 'assistant', content: text }, { role: 'user', content: toolsOk ? 'Call the propose_plan tool now with your plan.' : 'Reply with only the JSON plan.' });
+      }
+      const plan = raw ? normalizePlan(raw, { agents: agentsRef.current, models, fallbackModel: model }) : null;
+      if (!plan || !plan.tasks.length) {
+        patchOrch(conv.id, assistant.id, (o) => ({ ...o, phase: 'error', error: "The model didn't produce a usable plan. Try again, rephrase the request, or pick a larger model for the orchestrator.", plannerNote: said }));
+      } else {
+        patchOrch(conv.id, assistant.id, (o) => ({ ...o, phase: 'review', plan }));
+      }
+    } catch (e) {
+      if (ac.signal.aborted) patchOrch(conv.id, assistant.id, (o) => ({ ...o, phase: 'cancelled' }));
+      else patchOrch(conv.id, assistant.id, (o) => ({ ...o, phase: 'error', error: (e as Error).message }));
+    } finally {
+      setStreamingId(null);
+      abortRef.current = null;
+      ollama.refresh();
+    }
+  };
+
+  /** Step 2: create the new agents, run every task on its agent in order, then write the answer. */
+  const runPlan = async (msgId: string) => {
+    const conv = convRef.current.find((c) => c.messages.some((m) => m.id === msgId));
+    const msg = conv?.messages.find((m) => m.id === msgId);
+    const orch = msg?.orchestration;
+    if (!conv || !orch?.plan || streamingId) return;
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setStreamingId(conv.id);
+    // New agents become real agents, so they can be reused and edited later.
+    for (const draft of orch.plan.newAgents) {
+      if (!agentsRef.current.some((a) => a.name.toLowerCase() === draft.name.toLowerCase())) {
+        createAgent({ ...draft, skills: [], createdBy: 'orchestrator' });
+      }
+    }
+    const approve = approver(ac); // one for the whole plan, so "for this run" covers every task
+    const tasks: PlanTask[] = orch.plan.tasks.map((t) => ({ ...t, status: 'pending', output: '', steps: [], error: undefined, stats: undefined }));
+    patchOrch(conv.id, msgId, (o) => ({ ...o, phase: 'running', plan: { ...o.plan!, tasks } }));
+    try {
+      for (const task of tasks) {
+        if (ac.signal.aborted) break;
+        const failedDep = task.dependsOn.find((d) => tasks.find((t) => t.id === d)?.status !== 'done');
+        if (failedDep) {
+          task.status = 'skipped';
+          task.error = `Skipped because ${failedDep} didn't finish.`;
+          patchTask(conv.id, msgId, task.id, (t) => ({ ...t, status: 'skipped', error: task.error }));
+          continue;
+        }
+        const agent = getAgentByName(task.agent);
+        const model = agent?.model || conv.model;
+        task.model = model;
+        task.status = 'running';
+        patchTask(conv.id, msgId, task.id, (t) => ({ ...t, status: 'running', model }));
+        const caps = ollama.capabilities[model] ?? [];
+        const { system, tools } = replySetup({ agent, systemPrompt: '', interactive: false, toolsSupported: caps.includes('tools'), folder: conv.folder });
+        try {
+          const result = await runAgent({
+            model,
+            messages: [...(system ? [{ role: 'system' as const, content: system }] : []), { role: 'user', content: taskMessage(orch.goal, task, tasks) }],
+            tools,
+            options: genOptions(agent?.temperature, tools.length > 0),
+            keepAlive: params.keep_alive,
+            ...(caps.includes('thinking') ? { think: params.think } : {}),
+            signal: ac.signal,
+            approve,
+            onText: (piece) => {
+              task.output = (task.output ?? '') + piece;
+              patchTask(conv.id, msgId, task.id, (t) => ({ ...t, output: (t.output ?? '') + piece }));
+            },
+            onStep: (step) =>
+              patchTask(conv.id, msgId, task.id, (t) => {
+                const steps = t.steps ?? [];
+                const i = steps.findIndex((x) => x.id === step.id);
+                return { ...t, steps: i < 0 ? [...steps, step] : steps.map((x) => (x.id === step.id ? step : x)) };
+              }),
+          });
+          task.status = 'done';
+          task.output = result.content;
+          patchTask(conv.id, msgId, task.id, (t) => ({ ...t, status: 'done', output: result.content, stats: result.stats }));
+        } catch (e) {
+          if (ac.signal.aborted) throw e;
+          task.status = 'error';
+          task.error = (e as Error).message;
+          patchTask(conv.id, msgId, task.id, (t) => ({ ...t, status: 'error', error: task.error }));
+        }
+      }
+      if (ac.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+      // Step 3: the orchestrator writes the answer from the results, streaming into the message.
+      patchOrch(conv.id, msgId, (o) => ({ ...o, phase: 'writing' }));
+      const caps = ollama.capabilities[conv.model] ?? [];
+      const { system } = replySetup({ systemPrompt: conv.systemPrompt, interactive: isInteractive(conv), toolsSupported: false });
+      const final = await runAgent({
+        model: conv.model,
+        messages: synthesisMessages(orch.goal, { ...orch.plan, tasks }, system || 'You are a helpful assistant.'),
+        options: genOptions(undefined, true),
+        keepAlive: params.keep_alive,
+        ...(caps.includes('thinking') ? { think: params.think } : {}),
+        signal: ac.signal,
+        onText: (piece) => patchMessage(conv.id, msgId, (m) => ({ ...m, content: m.content + piece })),
+        onThinking: (piece) => patchMessage(conv.id, msgId, (m) => ({ ...m, thinking: (m.thinking ?? '') + piece })),
+      });
+      patchMessage(conv.id, msgId, (m) => ({ ...m, stats: final.stats, orchestration: m.orchestration && { ...m.orchestration, phase: 'done' } }));
+    } catch (e) {
+      const stopped = ac.signal.aborted;
+      patchOrch(conv.id, msgId, (o) => ({
+        ...o,
+        phase: stopped ? 'cancelled' : 'error',
+        error: stopped ? undefined : (e as Error).message,
+        plan: o.plan && { ...o.plan, tasks: o.plan.tasks.map((t) => (t.status === 'running' ? { ...t, status: 'error', error: 'Stopped' } : t)) },
+      }));
+      if (stopped) patchMessage(conv.id, msgId, (m) => ({ ...m, stopped: true }));
+    } finally {
+      setStreamingId(null);
+      abortRef.current = null;
+      ollama.refresh();
+    }
+  };
+
+  const planActions: PlanActions = {
+    agents,
+    models: modelInfos(),
+    busy: !!streamingId,
+    change: (msgId, plan) => current && patchOrch(current.id, msgId, (o) => ({ ...o, plan })),
+    run: runPlan,
+    cancel: (msgId) => current && patchOrch(current.id, msgId, (o) => ({ ...o, phase: 'cancelled' })),
+  };
+
   const generate = async (conv: Conversation, history: UiMessage[]) => {
+    if (conv.agentId === ORCHESTRATOR_ID) return planOrchestration(conv, history);
     const agent = getAgent(conv.agentId);
     const model = agent?.model || conv.model;
     const assistant: UiMessage = { id: uid(), role: 'assistant', content: '', model, ...(agent ? { agentId: agent.id } : {}) };
@@ -169,16 +386,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       ...(system ? [{ role: 'system' as const, content: system }] : []),
       ...history.filter((m) => !m.error).map((m) => ({ role: m.role, content: withFiles(m), ...(m.images?.length ? { images: m.images } : {}) })),
     ];
-    const options: Record<string, number> = {
-      temperature: agent?.temperature ?? params.temperature,
-      top_p: params.top_p,
-      top_k: params.top_k,
-      min_p: params.min_p,
-      repeat_penalty: params.repeat_penalty,
-      num_ctx: isInteractive(conv) || tools.length ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx,
-      num_predict: params.num_predict,
-    };
-    if (params.seed >= 0) options.seed = params.seed;
+    const options = genOptions(agent?.temperature, isInteractive(conv) || tools.length > 0);
 
     const patch = (fn: (m: UiMessage) => UiMessage) => patchMessage(conv.id, assistant.id, fn);
     try {
@@ -190,18 +398,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         keepAlive: params.keep_alive,
         ...(modelCaps.includes('thinking') ? { think: params.think } : {}),
         signal: ac.signal,
-        approve: (req) =>
-          new Promise<Approval>((resolve) => {
-            if (ac.signal.aborted) return resolve(false);
-            const done = (a: Approval) => {
-              ac.signal.removeEventListener('abort', cancel);
-              setApproval(null);
-              resolve(a);
-            };
-            const cancel = () => done(false);
-            ac.signal.addEventListener('abort', cancel, { once: true });
-            setApproval({ req, resolve: done });
-          }),
+        approve: approver(ac),
         onText: (piece) => patch((m) => ({ ...m, content: m.content + piece })),
         onThinking: (piece) => patch((m) => ({ ...m, thinking: (m.thinking ?? '') + piece })),
         onStep: (step) =>
@@ -337,6 +534,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
             <AgentPicker
               agents={agents}
               value={agent}
+              orchestrator={current.agentId === ORCHESTRATOR_ID}
               onChange={(agentId) => updateConv(current.id, (c) => ({ ...c, agentId }))}
               onManage={onManageAgents}
             />
@@ -360,6 +558,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         </header>
 
         <WidgetActionsContext.Provider value={widgetActions}>
+        <PlanActionsContext.Provider value={planActions}>
         <Messages
           messages={current.messages}
           agents={agents}
@@ -370,6 +569,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
           onEdit={editAndResend}
           onBranch={(id) => duplicateChat(current, id)}
         />
+        </PlanActionsContext.Provider>
         </WidgetActionsContext.Provider>
 
         {approval && <ApprovalBar req={approval.req} onAnswer={approval.resolve} />}
@@ -448,6 +648,7 @@ function ApprovalBar({ req, onAnswer }: { req: ApprovalRequest; onAnswer: (a: Ap
       <div className="row gap approval-actions">
         <button className="btn sm" onClick={() => onAnswer(false)}>Don't allow</button>
         <span className="flex" />
+        {req.forRun && <button className="btn sm" onClick={() => onAnswer('run')}>{req.forRun}</button>}
         {req.always && <button className="btn sm" onClick={() => onAnswer('always')}>{req.always}</button>}
         <button className="btn sm primary" autoFocus onClick={() => onAnswer(true)}>{req.confirm ?? 'Allow'}</button>
       </div>
@@ -505,20 +706,22 @@ function ChatTools({ agent, tools, setTools, folder, setFolder, toolsSupported }
   );
 }
 
-function AgentPicker({ agents, value, onChange, onManage }: {
+function AgentPicker({ agents, value, orchestrator, onChange, onManage }: {
   agents: Agent[];
   value?: Agent;
+  orchestrator: boolean;
   onChange: (agentId: string | undefined) => void;
   onManage: () => void;
 }) {
   const menu = useContextMenu();
   return (
     <button
-      className={`agent-picker ${value ? 'on' : ''}`}
-      title={value ? `Replies come from the ${value.name} agent` : 'Pick an agent to answer in this chat'}
+      className={`agent-picker ${value || orchestrator ? 'on' : ''}`}
+      title={orchestrator ? 'The orchestrator plans the work and assigns tasks to agents. The model next to it does the planning.' : value ? `Replies come from the ${value.name} agent` : 'Pick an agent or the orchestrator for this chat'}
       onClick={(e) =>
         menu(e, [
-          { label: 'No agent (just the model)', icon: value ? undefined : Check, onClick: () => onChange(undefined) },
+          { label: 'No agent (just the model)', icon: value || orchestrator ? undefined : Check, onClick: () => onChange(undefined) },
+          { label: 'Orchestrator: plans and assigns tasks to agents', icon: orchestrator ? Check : Workflow, onClick: () => onChange(ORCHESTRATOR_ID) },
           agents.length > 0 && 'separator',
           ...agents.map((a) => ({ label: `${a.name}${a.model ? `  ·  ${a.model}` : ''}`, icon: a.id === value?.id ? Check : Bot, onClick: () => onChange(a.id) })),
           'separator',
@@ -526,8 +729,8 @@ function AgentPicker({ agents, value, onChange, onManage }: {
         ])
       }
     >
-      <Bot size={14} />
-      <span>{value ? value.name : 'No agent'}</span>
+      {orchestrator ? <Workflow size={14} /> : <Bot size={14} />}
+      <span>{orchestrator ? 'Orchestrator' : value ? value.name : 'No agent'}</span>
       <ChevronDown size={13} />
     </button>
   );
@@ -635,7 +838,7 @@ function Messages(props: {
           <MessageView
             key={m.id}
             msg={m}
-            agentName={m.agentId ? props.agents.find((a) => a.id === m.agentId)?.name : undefined}
+            agentName={m.agentId === ORCHESTRATOR_ID ? 'Orchestrator' : m.agentId ? props.agents.find((a) => a.id === m.agentId)?.name : undefined}
             live={streaming && i === messages.length - 1}
             busy={streaming}
             onRegenerate={() => props.onRegenerate(m.id)}
@@ -710,6 +913,7 @@ function MessageView({ msg, agentName, live, busy, onRegenerate, onDelete, onEdi
         </div>
       ) : null}
       {thinking && <Thinking text={thinking} active={stillThinking} />}
+      {msg.orchestration && <PlanCard msgId={msg.id} orch={msg.orchestration} />}
       {msg.steps?.length && !interleave ? <Steps steps={msg.steps} /> : null}
       {editing ? (
         <div className="msg-edit">

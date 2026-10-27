@@ -42,6 +42,7 @@ async function allowSite(url: string, ctx: ToolContext): Promise<string | null> 
     detail: url.length > 300 ? `${url.slice(0, 300)}…` : url,
     note: `${hostname} is not on the approved list. Check that the address doesn't contain anything private from your chat.`,
     always: `Always allow ${hostname}`,
+    forRun: 'Allow all sites for this run',
     confirm: 'Allow once',
   });
   if (answer === 'always') alwaysAllow([hostname]);

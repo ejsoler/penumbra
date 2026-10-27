@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { Step } from './agents/engine';
 import type { ToolGroup } from './agents/builtins';
+import type { Orchestration } from './agents/orchestrator';
 
 export interface UiMessage {
   id: string;
@@ -19,6 +20,8 @@ export interface UiMessage {
   steps?: Step[];
   /** The agent that wrote this reply. */
   agentId?: string;
+  /** For orchestrator replies: the plan and how its tasks went. */
+  orchestration?: Orchestration;
 }
 
 export interface Conversation {

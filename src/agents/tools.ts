@@ -14,10 +14,12 @@ export interface ApprovalRequest {
   always?: string;
   /** Label for the approve button. */
   confirm?: string;
+  /** Label for "yes to every request like this until the run ends" (web only, never commands). */
+  forRun?: string;
 }
 
-/** 'always' only when the request offered it. */
-export type Approval = boolean | 'always';
+/** 'always' and 'run' only when the request offered them. */
+export type Approval = boolean | 'always' | 'run';
 
 export interface ToolContext {
   signal: AbortSignal;

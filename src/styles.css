@@ -492,3 +492,48 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 4px; }
 .topbar .picker-btn { min-width: 220px; }
 .agent-model { min-width: 140px; width: 260px; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-picker { flex-shrink: 0; }
+
+/* orchestrator plan */
+.plan { border: 1px solid rgba(139, 124, 246, 0.35); border-radius: 12px; background: var(--bg-side); padding: 12px 14px; margin-bottom: 12px; }
+.plan-head { display: flex; align-items: center; gap: 8px; color: var(--accent-strong); }
+.plan-head b { color: var(--text); }
+.plan-phase { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-dim); border: 1px solid var(--border-strong); border-radius: 999px; padding: 1px 9px; }
+.plan-phase.review { color: var(--amber); border-color: rgba(240, 180, 76, 0.45); }
+.plan-phase.done { color: var(--green); border-color: rgba(62, 207, 142, 0.4); }
+.plan-phase.error, .plan-phase.cancelled { color: var(--red); border-color: rgba(242, 109, 109, 0.4); }
+.plan-summary { margin: 8px 0 0; color: var(--text-dim); font-size: 13px; }
+.plan-error { margin-top: 8px; font-size: 13px; color: #ffb3b3; }
+.plan-error details { margin-top: 6px; color: var(--text-dim); }
+.plan-section { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.plan-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
+.plan-label .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.plan-agent, .plan-task { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+.plan-task.running { border-color: rgba(139, 124, 246, 0.6); }
+.plan-task.done .task-num { color: var(--green); }
+.plan-task.error .task-num { color: var(--red); }
+.plan-task.skipped { opacity: 0.6; }
+.plan-task-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.task-num { width: 20px; height: 20px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-elev); font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.task-title { display: flex; align-items: center; gap: 6px; background: none; border: none; padding: 0; color: var(--text); text-align: left; min-width: 0; cursor: pointer; }
+.task-title:disabled { cursor: default; }
+.task-title b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-title .chev { transition: transform 0.15s; flex-shrink: 0; }
+.task-title .chev.open { transform: rotate(90deg); }
+.task-agent { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--accent-strong); white-space: nowrap; }
+.task-model { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-deps { padding-left: 28px; }
+.task-output { padding-left: 28px; display: flex; flex-direction: column; gap: 6px; }
+.task-output .md { font-size: 13.5px; }
+.plan-instr { white-space: pre-wrap; font-size: 12.5px; }
+.plan-input { flex: 1; min-width: 0; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; padding: 3px 7px; outline: none; color: var(--text); font-size: 13px; }
+.plan-input:focus, .plan-text:focus, .plan-select:focus { border-color: var(--accent); }
+.plan-select { background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font-size: 12px; max-width: 200px; outline: none; }
+.plan-select.bad { border-color: var(--red); }
+.plan-text { width: 100%; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; outline: none; resize: vertical; font-size: 12.5px; line-height: 1.45; }
+.plan-tools { display: flex; flex-wrap: wrap; gap: 4px; }
+.tool-chip { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border-strong); background: none; color: var(--text-dim); }
+.tool-chip.on { color: var(--accent-strong); border-color: rgba(139, 124, 246, 0.5); background: var(--accent-bg); }
+.tool-chip:disabled { cursor: default; }
+.collapsible { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.collapsible .plan-text, .collapsible .plan-instr { width: 100%; }
+.plan-actions { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }

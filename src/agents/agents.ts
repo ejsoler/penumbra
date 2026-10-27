@@ -17,6 +17,8 @@ export interface Agent {
   tools: ToolGroup[];
   temperature?: number;
   createdAt: number;
+  /** Set when the orchestrator created this agent. */
+  createdBy?: 'orchestrator';
 }
 
 const KEY = 'ollama-gui.agents';

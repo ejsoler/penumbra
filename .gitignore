@@ -5,3 +5,4 @@ release/
 .DS_Store
 *.log
 src/widgets/vendor/
+demo-video/

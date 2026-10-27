@@ -119,8 +119,9 @@ OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve
 ## Project structure
 
 ```
-electron/         Electron main process, preload bridge, skills and tools (files, terminal, web)
+electron/         Electron main process, preload bridge, skills, tools (files, terminal, web), update check
 src/
+  updates.ts      Update check state (the sidebar icon and Developer panel)
   api.ts          Ollama REST client (streaming chat, pull, show, ps…)
   hf.ts           Hugging Face Hub search + GGUF quant listing
   downloads.ts    Download queue with pause/resume
@@ -135,7 +136,7 @@ build/            App icon source, icon generator, install script
 
 ## Privacy
 
-Everything runs locally. The app itself talks only to your Ollama server, plus the Hugging Face API when you browse the Hugging Face tab. Widgets and agents reach the internet only for what they're doing (a map, a weather forecast, a web search or page), under the rules below. Chats and settings are stored in the app's local storage on your machine.
+Everything runs locally. The app itself talks only to your Ollama server, plus the Hugging Face API when you browse the Hugging Face tab, and GitHub's release list to check for updates (turn that off in the Developer tab). Widgets and agents reach the internet only for what they're doing (a map, a weather forecast, a web search or page), under the rules below. Chats and settings are stored in the app's local storage on your machine.
 
 If you use a cloud model from Ollama (names ending in `-cloud`), Ollama sends that chat to its servers. The orchestrator never picks a cloud model for new agents on its own.
 

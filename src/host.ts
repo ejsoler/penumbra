@@ -11,6 +11,17 @@ export interface SkillInfo {
   files: string[];
 }
 
+export interface UpdateInfo {
+  current: string;
+  available: boolean;
+  version?: string;
+  url?: string;
+  notes?: string;
+  publishedAt?: string | null;
+  /** The installer for this computer, if the release has one. */
+  file?: { name: string; size: number } | null;
+}
+
 export interface PenumbraHost {
   skills: {
     list: () => Promise<SkillInfo[]>;
@@ -35,6 +46,16 @@ export interface PenumbraHost {
     fetch: (url: string) => Promise<{ url: string; status: number; type: string; title?: string; text: string }>;
     search: (query: string) => Promise<{ title: string; url: string; snippet: string }[]>;
     reveal: (root: string) => Promise<string>;
+  };
+  updates: {
+    check: () => Promise<UpdateInfo>;
+    /** Downloads the installer for this computer to Downloads; resolves to its path. */
+    download: () => Promise<string>;
+    cancel: () => Promise<void>;
+    /** Opens the downloaded installer (on Windows, Penumbra then quits so it can be replaced). */
+    install: (file: string) => Promise<'opened' | 'shown'>;
+    reveal: () => Promise<void>;
+    onProgress: (cb: (p: { got: number; total: number }) => void) => () => void;
   };
   setWidgetNetwork: (policy: { mode: NetMode; hosts: string[]; block: string[] }) => void;
   onWidgetRequest: (cb: (r: WidgetRequest) => void) => () => void;

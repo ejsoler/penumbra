@@ -4,6 +4,7 @@ const net = require('net');
 const path = require('path');
 const { registerSkills } = require('./skills.cjs');
 const { registerTools } = require('./tools.cjs');
+const { registerUpdates } = require('./updates.cjs');
 const { isLocalName, resolvesToPrivate } = require('./netsafe.cjs');
 
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
@@ -136,6 +137,7 @@ function logWidgetRequest(d, extra) {
 app.whenReady().then(() => {
   registerSkills();
   registerTools();
+  registerUpdates();
   // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).
   if (process.platform === 'darwin') app.dock?.setIcon(ICON);
   const { webRequest } = session.defaultSession;

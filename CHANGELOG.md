@@ -30,6 +30,7 @@
   - You review and edit the plan, then run it. Tasks run one at a time on their agents, each getting the results it depends on, and the orchestrator writes the final answer.
   - The Orchestrator tab lists every run and shows a board with one column per agent and live task cards.
   - Agents it creates are saved to the Agents tab.
+- **Update check.** Penumbra asks GitHub for the latest release shortly after it opens and twice a day. A newer version shows as a small arrow icon at the bottom of the sidebar, with no pop-ups. Clicking it shows what's new and downloads the installer for your computer to the Downloads folder, checking it against the release's checksum. You can also skip that version. The **Developer** tab has **Check now** and a switch to turn the check off.
 
 ### Changed
 - Chats with interactive answers or tools use a context of at least 16K tokens, since widget replies and tool results are long.

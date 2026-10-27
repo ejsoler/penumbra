@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import * as api from '../api';
 import type { OllamaState } from '../store';
-import { Check, Copy, Server } from '../components/icons';
+import { Check, Copy, Loader2, RefreshCw, Server } from '../components/icons';
+import { host as penumbraHost } from '../host';
+import { checkForUpdates, setUpdateSettings, useUpdates } from '../updates';
 
 export function DeveloperView({ ollama }: { ollama: OllamaState }) {
   const [host, setHostInput] = useState(api.getHost());
@@ -46,7 +48,7 @@ print(response.message.content)`,
       <header className="page-head">
         <div>
           <h1>Developer</h1>
-          <p className="muted">Server connection and API usage.</p>
+          <p className="muted">Server connection, API usage, and updates.</p>
         </div>
       </header>
 
@@ -72,6 +74,8 @@ print(response.message.content)`,
         )}
       </section>
 
+      {penumbraHost() && <UpdatesPanel />}
+
       <section className="panel">
         <h4>Quick start</h4>
         {Object.entries(snippets).map(([k, v]) => (
@@ -85,5 +89,41 @@ print(response.message.content)`,
         ))}
       </section>
     </main>
+  );
+}
+
+function UpdatesPanel() {
+  const u = useUpdates();
+  const { info, settings } = u;
+  const status = u.checking
+    ? 'Checking…'
+    : u.error
+      ? `Couldn't check: ${u.error}`
+      : !info
+        ? 'Not checked yet.'
+        : info.available
+          ? settings.skipped === info.version
+            ? `Penumbra ${info.version} is available. You chose to skip it.`
+            : `Penumbra ${info.version} is available. Open it from the arrow icon in the sidebar.`
+          : "You're up to date.";
+  return (
+    <section className="panel">
+      <h4>Updates</h4>
+      <div className="row gap" style={{ alignItems: 'center' }}>
+        <span className="muted">Penumbra <span className="mono">{info?.current ?? '…'}</span></span>
+        <span className="flex" />
+        <button className="btn sm" onClick={checkForUpdates} disabled={u.checking}>
+          {u.checking ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />} Check now
+        </button>
+      </div>
+      <p className="muted small">{status}</p>
+      {info?.available && settings.skipped === info.version && (
+        <button className="link small" style={{ marginLeft: 0 }} onClick={() => setUpdateSettings({ skipped: '' })}>Show it in the sidebar again</button>
+      )}
+      <label className="check-row">
+        <input type="checkbox" checked={settings.auto} onChange={(e) => setUpdateSettings({ auto: e.target.checked })} />
+        <span>Check for updates automatically <span className="muted">(asks GitHub for the latest release; nothing else is sent)</span></span>
+      </label>
+    </section>
   );
 }

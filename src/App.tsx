@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useOllama, usePersistent } from './store';
 import { ChatView } from './views/ChatView';
 import { ModelsView } from './views/ModelsView';
@@ -12,6 +12,8 @@ import { chatController, streaming } from './session';
 import { ContextMenuProvider } from './components/ContextMenu';
 import { Logo } from './components/Logo';
 import { isElectron, isMac } from './platform';
+import { UpdateButton } from './components/UpdateButton';
+import { startUpdateChecks } from './updates';
 
 type View = 'chat' | 'orchestrator' | 'agents' | 'models' | 'discover' | 'developer';
 
@@ -42,6 +44,7 @@ export default function App() {
   };
   const pulling = Object.values(dl.downloads).some((d) => d.state === 'downloading');
   const running = !!streaming.use();
+  useEffect(startUpdateChecks, []);
 
   return (
     <ContextMenuProvider>
@@ -56,6 +59,7 @@ export default function App() {
           </button>
         ))}
         <span className="flex" />
+        <UpdateButton />
         <div className={`rail-status ${ollama.connected ? 'on' : ollama.connected === false ? 'off' : ''}`} title={ollama.connected ? `Ollama v${ollama.version}` : 'Ollama not reachable'} />
       </nav>
 

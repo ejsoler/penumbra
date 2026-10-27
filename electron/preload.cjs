@@ -1,6 +1,6 @@
 // Runs in the app's main frame only (never in widget iframes). Gives the app its skills folder and the
 // agent tools (chat folder, terminal, web), lets it tell the main process which sites widgets may
-// reach, and receive a log of widget requests.
+// reach, receive a log of widget requests, and check for app updates.
 // Typed in src/host.ts.
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -24,6 +24,18 @@ contextBridge.exposeInMainWorld('penumbraHost', {
     fetch: (url) => ipcRenderer.invoke('tools:fetch', url),
     search: (query) => ipcRenderer.invoke('tools:search', query),
     reveal: (root) => ipcRenderer.invoke('tools:reveal', root),
+  },
+  updates: {
+    check: () => ipcRenderer.invoke('update:check'),
+    download: () => ipcRenderer.invoke('update:download'),
+    cancel: () => ipcRenderer.invoke('update:cancel'),
+    install: (file) => ipcRenderer.invoke('update:install', file),
+    reveal: () => ipcRenderer.invoke('update:reveal'),
+    onProgress: (cb) => {
+      const listener = (_e, p) => cb(p);
+      ipcRenderer.on('update:progress', listener);
+      return () => ipcRenderer.removeListener('update:progress', listener);
+    },
   },
   setWidgetNetwork: (policy) => ipcRenderer.send('widget-net:set', policy),
   onWidgetRequest: (cb) => {

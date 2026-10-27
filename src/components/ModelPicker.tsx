@@ -35,6 +35,7 @@ export function ModelPicker({ ollama, value, onChange, keepAlive, numCtx }: Prop
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!ref.current?.offsetParent) return; // the chat view is hidden behind another tab
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         setOpen((o) => !o);

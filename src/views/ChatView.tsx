@@ -14,6 +14,7 @@ import { enabledSkills, useSkills } from '../agents/skills';
 import { TOOL_GROUPS, type ToolGroup } from '../agents/builtins';
 import type { Approval, ApprovalRequest } from '../agents/tools';
 import { host } from '../host';
+import { approval as approvalStore, chatController, streaming, useConversations } from '../session';
 import { APPROVED_SITES, removeAlwaysAllowed, setNetMode, useNetSettings } from '../widgets/network';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
@@ -59,17 +60,18 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   agentsRef.current = agents;
   const getAgentByName = (name: string) => agentsRef.current.find((a) => a.name.toLowerCase() === name.toLowerCase());
   useSkills(); // re-render when skills change, since they affect the tools a reply gets
-  const [conversations, setConversations] = usePersistent<Conversation[]>('ollama-gui.conversations', [newConversation()]);
+  const [conversations, setConversations] = useConversations(newConversation);
   const [currentId, setCurrentId] = usePersistent<string>('ollama-gui.current', conversations[0]?.id ?? '');
   const [storedParams, setParams] = usePersistent<GenParams>('ollama-gui.params', DEFAULT_PARAMS);
   const [showSettings, setShowSettings] = usePersistent('ollama-gui.showSettings', true);
-  const [streamingId, setStreamingId] = useState<string | null>(null);
+  const streamingId = streaming.use();
+  const setStreamingId = streaming.set;
   const abortRef = useRef<AbortController | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [noticeSeen, setNoticeSeen] = usePersistent('ollama-gui.interactiveNoticeSeen', false);
   const [pendingSend, setPendingSend] = useState<{ text: string; images: string[]; files: Attachment[] } | null>(null);
-  // A tool waiting for the user's OK (a command, a site).
-  const [approval, setApproval] = useState<{ req: ApprovalRequest; resolve: (a: Approval) => void } | null>(null);
+  // A tool waiting for the user's OK (a command, a site). Shared, so the Orchestrator page shows it too.
+  const pendingApproval = approvalStore.use();
   // Text a widget asked to put in the message box; `n` makes repeats of the same text count.
   const [composerFill, setComposerFill] = useState<{ text: string; n: number } | null>(null);
   const menu = useContextMenu();
@@ -155,7 +157,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   };
 
   /** Asks the user through the approval bar; a stopped run counts as "no". */
-  const approver = (ac: AbortController) => {
+  const approver = (ac: AbortController, convId: string) => {
     // Tools the user said yes to for the rest of this run ("Allow all sites for this run").
     const allowedForRun = new Set<string>();
     return (req: ApprovalRequest) =>
@@ -164,13 +166,13 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       if (req.forRun && allowedForRun.has(req.tool)) return resolve(true);
       const done = (a: Approval) => {
         ac.signal.removeEventListener('abort', cancel);
-        setApproval(null);
+        approvalStore.set(null);
         if (a === 'run') allowedForRun.add(req.tool);
         resolve(a);
       };
       const cancel = () => done(false);
       ac.signal.addEventListener('abort', cancel, { once: true });
-      setApproval({ req, resolve: done });
+      approvalStore.set({ req, resolve: done, convId });
     });
   };
 
@@ -270,7 +272,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         createAgent({ ...draft, skills: [], createdBy: 'orchestrator' });
       }
     }
-    const approve = approver(ac); // one for the whole plan, so "for this run" covers every task
+    const approve = approver(ac, conv.id); // one for the whole plan, so "for this run" covers every task
     const tasks: PlanTask[] = orch.plan.tasks.map((t) => ({ ...t, status: 'pending', output: '', steps: [], error: undefined, stats: undefined }));
     patchOrch(conv.id, msgId, (o) => ({ ...o, phase: 'running', plan: { ...o.plan!, tasks } }));
     try {
@@ -398,7 +400,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         keepAlive: params.keep_alive,
         ...(modelCaps.includes('thinking') ? { think: params.think } : {}),
         signal: ac.signal,
-        approve: approver(ac),
+        approve: approver(ac, conv.id),
         onText: (piece) => patch((m) => ({ ...m, content: m.content + piece })),
         onThinking: (piece) => patch((m) => ({ ...m, thinking: (m.thinking ?? '') + piece })),
         onStep: (step) =>
@@ -462,6 +464,23 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       ),
     busy: !!streamingId,
   }), [streamingId]);
+
+  // Other views (the Orchestrator page) drive runs through this; the chat view stays mounted.
+  chatController.current = {
+    startOrchestration: (goal, model, folder) => {
+      if (streamingId || !goal.trim() || !model) return null;
+      const user: UiMessage = { id: uid(), role: 'user', content: goal.trim() };
+      const conv: Conversation = { ...newConversation(model), title: goal.trim().slice(0, 48), agentId: ORCHESTRATOR_ID, folder, messages: [user] };
+      setConversations((cs) => [conv, ...cs]);
+      generate(conv, [user]);
+      return conv.id;
+    },
+    runPlan,
+    cancelPlan: (convId, msgId) => patchOrch(convId, msgId, (o) => ({ ...o, phase: 'cancelled' })),
+    changePlan: (convId, msgId, plan) => patchOrch(convId, msgId, (o) => ({ ...o, plan })),
+    stop: () => abortRef.current?.abort(),
+    openChat: (convId) => setCurrentId(convId),
+  };
 
   if (!current) return null;
   const isStreaming = streamingId === current.id;
@@ -572,7 +591,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         </PlanActionsContext.Provider>
         </WidgetActionsContext.Provider>
 
-        {approval && <ApprovalBar req={approval.req} onAnswer={approval.resolve} />}
+        {pendingApproval && <ApprovalBar req={pendingApproval.req} onAnswer={pendingApproval.resolve} />}
         <Composer
           disabled={!activeModel}
           streaming={isStreaming}
@@ -1043,6 +1062,7 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!taRef.current?.offsetParent) return; // the chat view is hidden behind another tab
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         onNewChat();

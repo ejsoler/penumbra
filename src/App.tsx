@@ -6,15 +6,18 @@ import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
-import { Bot, FolderOpen, MessageSquare, Telescope, Terminal } from './components/icons';
+import { Bot, FolderOpen, MessageSquare, Telescope, Terminal, Workflow } from './components/icons';
+import { WorkspaceView } from './views/WorkspaceView';
+import { chatController, streaming } from './session';
 import { ContextMenuProvider } from './components/ContextMenu';
 import { Logo } from './components/Logo';
 import { isElectron, isMac } from './platform';
 
-type View = 'chat' | 'agents' | 'models' | 'discover' | 'developer';
+type View = 'chat' | 'orchestrator' | 'agents' | 'models' | 'discover' | 'developer';
 
 const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
+  { id: 'orchestrator', label: 'Orchestrator', icon: Workflow },
   { id: 'agents', label: 'Agents & Skills', icon: Bot },
   { id: 'developer', label: 'Developer', icon: Terminal },
   { id: 'models', label: 'My Models', icon: FolderOpen },
@@ -38,6 +41,7 @@ export default function App() {
     setView('chat');
   };
   const pulling = Object.values(dl.downloads).some((d) => d.state === 'downloading');
+  const running = !!streaming.use();
 
   return (
     <ContextMenuProvider>
@@ -48,6 +52,7 @@ export default function App() {
           <button key={id} className={`rail-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)} title={label}>
             <Icon size={19} />
             {id === 'discover' && pulling && <span className="rail-dot" />}
+            {id === 'chat' && running && view !== 'chat' && <span className="rail-dot" />}
           </button>
         ))}
         <span className="flex" />
@@ -62,13 +67,23 @@ export default function App() {
           </div>
         )}
         <div className="content-inner">
-          {view === 'chat' && (
+          {/* The chat stays mounted on other tabs, so replies and orchestrator runs keep streaming. */}
+          <div className="view-host" style={{ display: view === 'chat' ? 'contents' : 'none' }}>
             <ChatView
               ollama={ollama}
               pendingModel={pendingModel}
               pendingAgent={pendingAgent}
               onPendingHandled={() => { setPendingModel(null); setPendingAgent(null); }}
               onManageAgents={() => setView('agents')}
+            />
+          </div>
+          {view === 'orchestrator' && (
+            <WorkspaceView
+              ollama={ollama}
+              onOpenChat={(id) => {
+                chatController.current?.openChat(id);
+                setView('chat');
+              }}
             />
           )}
           {view === 'agents' && <AgentsView ollama={ollama} onChatWithAgent={chatWithAgent} />}

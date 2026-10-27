@@ -35,6 +35,13 @@
 - If a widget breaks, **Ask model to fix** sends the error back to the model for a corrected version
 - Works best with 7B+ models. Interactive chats use at least a 16K context
 
+**Agents, skills & orchestration** *(new in 0.2.0)*
+- Create agents with their own model, instructions, skills, and tools, and pick one in any chat
+- Skills use Claude's `SKILL.md` format: create them in the app or import folders and `.zip` files. The model loads a skill only when a task needs it
+- Tools: web search and pages, read and write files in a folder you choose, and terminal commands (each one asks you first). Every reply shows the tools it used
+- Attach text files to a message
+- The **Orchestrator** plans a goal into tasks, creates the agents it needs, lets you review and edit the plan, then runs each task on its agent and writes the final answer. Follow runs on a board with one column per agent
+
 **Models**
 - Model picker (<kbd>⌘L</kbd>) that loads the model into memory, with capability badges (vision, tools, reasoning)
 - *My Models*: see what's loaded and how much VRAM it uses, load/eject/delete, and inspect architecture, template, and modelfile
@@ -112,25 +119,31 @@ OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve
 ## Project structure
 
 ```
-electron/         Electron main process and dev launcher
+electron/         Electron main process, preload bridge, skills and tools (files, terminal, web)
 src/
   api.ts          Ollama REST client (streaming chat, pull, show, ps…)
   hf.ts           Hugging Face Hub search + GGUF quant listing
   downloads.ts    Download queue with pause/resume
   store.ts        Persistent state and Ollama polling
-  components/     Model picker, Markdown renderer, widget frame, context menu, icons
+  session.ts      Shared chat state (conversations, running reply, pending approvals)
+  agents/         Agent loop, tools, skills, agents store, orchestrator planning
+  components/     Model picker, Markdown renderer, widget frame, plan card, context menu, icons
   widgets/        Widget sandbox document, system prompt, bundled chart/3D libraries
-  views/          Chat, My Models, Discover, Hugging Face, Developer
+  views/          Chat, Orchestrator, Agents & Skills, My Models, Discover, Hugging Face, Developer
 build/            App icon source, icon generator, install script
 ```
 
 ## Privacy
 
-Everything runs locally. The app talks only to your Ollama server, plus the Hugging Face API when you browse the Hugging Face tab. Chats and settings are stored in the app's local storage on your machine.
+Everything runs locally. The app itself talks only to your Ollama server, plus the Hugging Face API when you browse the Hugging Face tab. Widgets and agents reach the internet only for what they're doing (a map, a weather forecast, a web search or page), under the rules below. Chats and settings are stored in the app's local storage on your machine.
+
+If you use a cloud model from Ollama (names ending in `-cloud`), Ollama sends that chat to its servers. The orchestrator never picks a cloud model for new agents on its own.
 
 Interactive widgets are code written by the model, so Penumbra treats them as untrusted. Each one runs in a sandboxed frame with no network access and no access to your chats, files, or Ollama. It can only resize itself, report errors, and suggest a follow-up question that you choose whether to send.
 
 Widgets can download from a list of approved sites (map tiles, script CDNs, and keyless public data). Any other site needs your OK for that widget, unless you turn on **Whole internet** in the settings panel. In every mode, widgets can only make https GET requests: they can't upload or post data, send cookies, or reach your computer, local network, or Ollama. Each widget's network log shows every request it made.
+
+Agents follow the same internet rules. Their file tools only work inside the folder you choose for a chat, replaced files go to the Trash, and every terminal command waits for your approval. Approved commands run with your user account's permissions, so read them before you allow them. Skills are stored in Penumbra's data folder (open it from the Skills tab).
 
 ## Support
 

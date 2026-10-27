@@ -76,7 +76,8 @@ export function planningPrompt({ agents, models, folder, toolsSupported }: {
     ? agents.map((a) => `- "${a.name}" (model ${a.model || 'none'}; tools: ${a.tools.join(', ') || 'none'}): ${a.description || a.instructions.slice(0, 160)}`).join('\n')
     : '(none yet)';
   const modelLines = models
-    .map((m) => `- ${m.name}${m.size ? ` (${m.size})` : ''}: ${m.capabilities.filter((c) => c !== 'completion').join(', ') || 'text only'}${m.loaded ? ', already loaded' : ''}${m.remote ? ', cloud' : ''}`)
+    .filter((m) => !m.capabilities.includes('embedding'))
+    .map((m) => `- ${m.name}${m.size ? ` (${m.size})` : ''}: ${m.capabilities.filter((c) => c !== 'completion').join(', ') || 'text only'}${m.loaded ? ', already loaded' : ''}${m.remote ? ', cloud (sends data off this computer; do not use unless the user asks)' : ''}`)
     .join('\n');
   return `You are the orchestrator in Penumbra, a desktop app for local AI models. Your job now is to PLAN, not to do the work: break the user's request into a few tasks and assign each task to an agent. After the user approves the plan, each agent does its task and you will write the final answer from their results.
 
@@ -169,8 +170,11 @@ export function normalizePlan(raw: Record<string, unknown>, { agents, models, fa
   fallbackModel: string;
 }): Plan {
   const usable = models.filter((m) => !m.capabilities.includes('embedding'));
+  const plannerIsLocal = !models.find((m) => m.name === fallbackModel)?.remote;
   const fixModel = (name: string, needsTools: boolean) => {
     const exact = usable.find((m) => m.name === name) ?? usable.find((m) => m.name.split(':')[0] === name.split(':')[0]);
+    // A local planner never hands work to a cloud model on its own; the user can still pick one when reviewing.
+    if (exact?.remote && plannerIsLocal) return fallbackModel;
     if (exact && (!needsTools || exact.capabilities.includes('tools'))) return exact.name;
     return fallbackModel;
   };

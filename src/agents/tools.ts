@@ -23,6 +23,8 @@ export type Approval = boolean | 'always' | 'run';
 
 export interface ToolContext {
   signal: AbortSignal;
+  /** The user's latest message, for tools that check a call against it. */
+  request?: string;
   /** Asks the user to allow an action. Resolves false if they decline or the run is stopped. */
   approve: (req: ApprovalRequest) => Promise<Approval>;
 }

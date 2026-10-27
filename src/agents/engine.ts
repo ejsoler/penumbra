@@ -132,7 +132,8 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
         status = 'error';
       } else {
         try {
-          result = await tool.run(args, { signal: o.signal, approve: o.approve ?? (async () => false) });
+          const request = [...o.messages].reverse().find((m) => m.role === 'user')?.content;
+          result = await tool.run(args, { signal: o.signal, approve: o.approve ?? (async () => false), request });
         } catch (e) {
           if (o.signal.aborted) throw e;
           if (e instanceof Declined) {

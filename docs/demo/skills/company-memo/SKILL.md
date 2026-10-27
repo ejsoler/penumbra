@@ -1,6 +1,6 @@
 ---
 name: company-memo
-description: Use whenever the user asks for a memo, announcement, or internal notice for the team.
+description: Use only when the user asks for a memo. Not for emails, posts, or other writing.
 ---
 
 # Company memo

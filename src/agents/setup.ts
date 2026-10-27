@@ -21,7 +21,6 @@ export function replySetup({ agent, systemPrompt, interactive, toolsSupported, c
   const tools: Tool[] = [];
   if (agent) parts.push(`You are "${agent.name}"${agent.description ? `: ${agent.description}` : '.'}\n\n${agent.instructions}`.trim());
   if (systemPrompt.trim()) parts.push(systemPrompt.trim());
-  if (interactive) parts.push(WIDGET_PROMPT);
   if (toolsSupported) {
     const groups = agent ? agent.tools : chatTools ?? DEFAULT_CHAT_TOOLS;
     const env = { folder };
@@ -36,5 +35,7 @@ export function replySetup({ agent, systemPrompt, interactive, toolsSupported, c
       }
     }
   }
+  // Last, because it's long: the skills and tools rules above stay easy for the model to follow.
+  if (interactive) parts.push(WIDGET_PROMPT);
   return { system: parts.join('\n\n'), tools };
 }

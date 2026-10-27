@@ -3,7 +3,10 @@
 // full instructions with the load_skill tool when a task calls for it. That keeps context small.
 import { useSyncExternalStore } from 'react';
 import { host, type SkillInfo } from '../host';
-import type { Tool } from './tools';
+import { Declined, type Tool } from './tools';
+
+/** Words every skill description has, which say nothing about whether a skill fits. */
+const COMMON = new Set(['the', 'and', 'for', 'use', 'user', 'users', 'asks', 'ask', 'when', 'whenever', 'with', 'that', 'this', 'not', 'only', 'other', 'from', 'into', 'about', 'any', 'all', 'you', 'your', 'make', 'write', 'create', 'help', 'want', 'wants', 'need', 'needs', 'show', 'give', 'get']);
 
 let skills: SkillInfo[] = [];
 let loaded = false;
@@ -73,7 +76,8 @@ Step-by-step instructions the model follows when it uses this skill.
 export function skillsPrompt(list: SkillInfo[]): string {
   if (!list.length) return '';
   return `# Skills
-You have skills: packaged instructions for specific tasks. Before starting a task that matches a skill's description, call load_skill with its name and follow the instructions it returns. Load only the skills you need.
+You have skills: packaged instructions for specific kinds of tasks. Most requests don't need any skill.
+Call load_skill only when the user's request is clearly the kind of task a skill's description names, then follow what it returns. If you're unsure whether a skill applies, don't load it. Never load a skill to see what it contains, and never load one for a different kind of task (an email is not a memo, a widget is not a poem).
 
 ${list.map((s) => `- ${s.name}: ${s.description || '(no description)'}`).join('\n')}`;
 }
@@ -91,17 +95,29 @@ export function skillTools(list: SkillInfo[]): Tool[] {
     {
       name: 'load_skill',
       label: 'Load skill',
-      description: 'Load the full instructions of one of your skills. Call this before doing a task that matches the skill.',
+      description: "Load the full instructions of one of your skills. Only for a request that is clearly the kind of task the skill's description names.",
       parameters: {
         type: 'object',
-        properties: { name: { type: 'string', enum: names, description: 'The skill name' } },
-        required: ['name'],
+        properties: {
+          name: { type: 'string', enum: names, description: 'The skill name' },
+          matching_words: { type: 'string', description: "Quote the words in the user's request that match the skill's description, for example \"write a memo\"." },
+        },
+        required: ['name', 'matching_words'],
       },
       summary: (a) => String(a.name ?? ''),
-      run: async (a) => {
+      run: async (a, ctx) => {
         const skill = findSkill(list, a.name);
         if (!skill) return `No skill named "${a.name}". Available: ${names.join(', ')}`;
-        const text = await host()!.skills.read(skill.id);
+        // A skill loaded "just in case" pulls the answer off course; ask for the evidence first.
+        const quote = String(a.matching_words ?? '').trim().toLowerCase();
+        const request = ctx.request?.toLowerCase() ?? '';
+        const words = quote.split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2 && !COMMON.has(w));
+        const about = `${skill.name} ${skill.description}`.toLowerCase();
+        const fits = words.some((w) => (!request || request.includes(w)) && about.includes(w.replace(/s$/, '')));
+        if (!fits) {
+          throw new Declined(`Not loaded: the request doesn't match what ${skill.name} is for ("${skill.description}"). Do the task without it, and don't try to load it again.`);
+        }
+        const text = `${await host()!.skills.read(skill.id)}\n\n---\n(If this skill doesn't fit what the user asked for, ignore it and do the task normally.)`;
         const files = skill.files.length
           ? `\n\n---\nReference files in this skill (read them with read_skill_file when the instructions point to them):\n${skill.files.map((f) => `- ${f}`).join('\n')}`
           : '';

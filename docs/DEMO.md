@@ -2,7 +2,7 @@
 
 A walkthrough of everything new in 0.2.0: interactive answers, internet widgets, agents, skills, tools, and the orchestrator. It takes about 25 minutes. Each section says what to click, what to type, and what to say. Times are from test runs on a Mac with `qwen3.8:27b-mlx`; a different model or computer will be faster or slower.
 
-Lines in *italics* are things to say. Prompts in code blocks are meant to be pasted as-is: they've all been tested, except where a section says otherwise.
+Lines in *italics* are things to say. Prompts in code blocks are meant to be pasted as-is; all of them have been run in the app with `qwen3.8:27b-mlx`.
 
 ## Before the demo
 
@@ -49,7 +49,7 @@ Do this 10 minutes before you start.
    Show me how the phases of the moon work, with a slider and a play button.
    ```
    About a minute. *"Explanations become something you can play with."*
-2. **Ask model to fix:** when a widget shows a red error bar, click **Ask model to fix**. The model gets the error and writes a corrected version. *(You can't count on an error appearing during a demo. If you want to show this for sure, see "Optional: a guaranteed error" at the end.)*
+2. **Ask model to fix:** when a widget shows a red error bar, click **Ask model to fix**. The model gets the error and writes a corrected version. *(Errors don't show up on demand; see the last section.)*
 3. **Follow-ups:** some widgets have buttons with suggested questions. Clicking one puts the question in your message box. *"It never sends anything by itself; you decide."*
 
 ## 3. Widgets with internet (4 min)
@@ -71,7 +71,7 @@ Do this 10 minutes before you start.
    ```
    What's the weather forecast for the next 5 days in Madrid? Show it as a chart.
    ```
-5. **Asking before other sites:** maps, weather, and similar public data are on an approved list. Any other site shows **Allow / Always allow / Run offline** before the widget runs. *(Not tested as a demo prompt; this one should trigger it:)*
+5. **Asking before other sites:** maps, weather, and similar public data are on an approved list. Any other site shows **Allow / Always allow / Run offline** before the widget runs. This prompt triggers it for `api.coingecko.com`; click **Allow** and the live price appears:
    ```
    Show the current price of Bitcoin in USD from the CoinGecko API.
    ```
@@ -170,12 +170,6 @@ Do this 10 minutes before you start.
 - **Too many "Open a website?" prompts:** click **Allow all sites for this run**.
 - **Numbers look wrong:** models can make mistakes, including in widgets. Say so; it's honest, and the network log and steps show where answers came from.
 
-## Optional: a guaranteed error
+## Optional: showing "Ask model to fix"
 
-To show **Ask model to fix** on demand, ask for a widget with a deliberate bug:
-
-```
-Make a tip calculator widget, and in its script call a helper function named formatMoney without defining it.
-```
-
-The widget shows `formatMoney is not defined`. Click **Ask model to fix**; the corrected version calculates correctly (18% of $80 = $14.40). *(This exact prompt hasn't been tested; the fix itself was tested with a widget containing this same bug.)*
+Models usually write working widgets, so you can't count on an error during a demo, and asking for a broken one doesn't work either: in testing, the model fixed the bug on its own. If a widget does show a red error bar at any point, that's your moment: click **Ask model to fix**, and the corrected version replaces it in a few seconds.

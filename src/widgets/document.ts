@@ -71,17 +71,37 @@ const BRIDGE = `(() => {
   // San Juan, Puerto Rico") that find nothing, so retry with fewer parts. Nominatim allows 1 request/s.
   let geoQueue = Promise.resolve();
   const geoCache = new Map();
+  const lookup = async (q) => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q));
+        if (r.ok) return r.json();
+        if (attempt >= 2) throw new Error('Place lookup failed (HTTP ' + r.status + ')');
+      } catch (e) {
+        if (attempt >= 2) throw new Error('Place lookup is busy or unreachable; try Reload in a minute');
+      }
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+    }
+  };
   const nominatim = (q) => {
-    const run = geoQueue.then(() => fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q)).then((r) => r.json()));
+    const run = geoQueue.then(() => lookup(q));
     geoQueue = run.catch(() => {}).then(() => new Promise((r) => setTimeout(r, 1100)));
     return run;
   };
   const geocode = async (query) => {
     const parts = String(query).replace(/[(][^)]*[)]/g, ' ').split(',').map((s) => s.split(' ').filter(Boolean).join(' ')).filter(Boolean).slice(0, 6);
     if (!parts.length) throw new Error('geocode: empty place name');
-    const tries = [parts.join(', ')];
-    if (parts.length > 2) tries.push([parts[0], ...parts.slice(2)].join(', '), [parts[0], parts[parts.length - 1]].join(', '));
-    if (parts.length > 1) tries.push(parts[0]);
+    // Names like "El Morro fort" fail where "El Morro" works, so also try without generic words.
+    const generic = ['fort', 'fortress', 'castle', 'museum', 'park', 'palace', 'church', 'cathedral', 'building', 'monument', 'the'];
+    const bare = parts[0].split(' ').filter((w) => !generic.includes(w.toLowerCase())).join(' ') || parts[0];
+    const names = [...new Set([parts[0], bare])];
+    const contexts = [parts.slice(1), parts.length > 2 ? [parts[parts.length - 1]] : null, []].filter(Boolean);
+    const tries = [];
+    for (const ctx of contexts) for (const n of names) tries.push([n, ...ctx].join(', '));
+    // Then shorten the name word by word ("La Fortaleza Presidential Palace" → "La Fortaleza"), keeping the country.
+    const words = bare.split(' ');
+    const where = parts.length > 1 ? [parts[parts.length - 1]] : [];
+    for (let k = words.length - 1; k >= 2; k--) tries.push([words.slice(0, k).join(' '), ...where].join(', '));
     for (const q of [...new Set(tries)]) {
       if (!geoCache.has(q)) geoCache.set(q, nominatim(q));
       const d = await geoCache.get(q);

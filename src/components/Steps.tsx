@@ -2,11 +2,16 @@ import { useState } from 'react';
 import type { Step } from '../agents/engine';
 import { Ban, ChevronRight, CircleAlert, CircleCheck, Loader2, Wrench } from './icons';
 
+/** A skill shows up only once it has actually loaded: not while the model is asking, and not if it was turned down. */
+export const visibleSteps = (steps: Step[]) => steps.filter((s) => s.tool !== 'load_skill' || s.status === 'done' || s.status === 'error');
+
 /** The tools a reply used, in order. Each one opens to show what it returned. */
 export function Steps({ steps }: { steps: Step[] }) {
+  const shown = visibleSteps(steps);
+  if (!shown.length) return null;
   return (
     <div className="steps">
-      {steps.map((s) => <StepRow key={s.id} step={s} />)}
+      {shown.map((s) => <StepRow key={s.id} step={s} />)}
     </div>
   );
 }

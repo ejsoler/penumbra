@@ -578,3 +578,21 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 4px; }
 .task-card-output .md { font-size: 13px; }
 .panel.final { max-width: 900px; margin-top: 14px; }
 .panel.final h4 { display: flex; align-items: center; gap: 6px; }
+
+/* ---- Scheduler ---- */
+.amber { color: var(--amber); }
+.red { color: var(--red); }
+.green { color: var(--green); }
+.banner.warn { background: rgba(240, 180, 80, 0.12); border: 1px solid rgba(240, 180, 80, 0.35); color: var(--amber); }
+.conv-title svg { vertical-align: -1px; flex-shrink: 0; }
+.list-empty { padding: 10px 14px; }
+.idea-list { margin: 0; padding-left: 18px; }
+.idea-list li { margin: 4px 0; }
+.seg.seg-wide { display: inline-flex; margin-bottom: 4px; }
+.seg.seg-wide button { padding: 5px 14px; }
+.schedule-row { align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.time-input { flex: 0 0 auto; width: 120px; }
+.day-chips { display: flex; gap: 4px; }
+.day-chip { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--bg-input); color: var(--text-dim); font-size: 12px; font-weight: 600; }
+.day-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.editor .field.slim input[type='datetime-local'] { flex: 0 0 auto; width: 230px; }

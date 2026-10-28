@@ -14,7 +14,7 @@ import { enabledSkills, useSkills } from '../agents/skills';
 import { TOOL_GROUPS, type ToolGroup } from '../agents/builtins';
 import type { Approval, ApprovalRequest } from '../agents/tools';
 import { host } from '../host';
-import { approval as approvalStore, chatController, streaming, useConversations } from '../session';
+import { approval as approvalStore, chatController, getConversations, streaming, useConversations, type RunOptions } from '../session';
 import { APPROVED_SITES, removeAlwaysAllowed, setNetMode, useNetSettings } from '../widgets/network';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
@@ -157,12 +157,14 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   };
 
   /** Asks the user through the approval bar; a stopped run counts as "no". */
-  const approver = (ac: AbortController, convId: string) => {
+  const approver = (ac: AbortController, convId: string, preApproved: string[] = []) => {
     // Tools the user said yes to for the rest of this run ("Allow all sites for this run").
     const allowedForRun = new Set<string>();
     return (req: ApprovalRequest) =>
     new Promise<Approval>((resolve) => {
       if (ac.signal.aborted) return resolve(false);
+      // A scheduled task's own settings ("without asking"); anything else still asks.
+      if (preApproved.includes(req.tool)) return resolve(true);
       if (req.forRun && allowedForRun.has(req.tool)) return resolve(true);
       const done = (a: Approval) => {
         ac.signal.removeEventListener('abort', cancel);
@@ -208,7 +210,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     patchOrch(convId, msgId, (o) => (o.plan ? { ...o, plan: { ...o.plan, tasks: o.plan.tasks.map((t) => (t.id === taskId ? fn(t) : t)) } } : o));
 
   /** Step 1: the orchestrator's model proposes a plan, which waits for the user's review. */
-  const planOrchestration = async (conv: Conversation, history: UiMessage[]) => {
+  const planOrchestration = async (conv: Conversation, history: UiMessage[], run: RunOptions = {}) => {
     const model = conv.model;
     const goal = withFiles(history[history.length - 1]);
     const assistant: UiMessage = { id: uid(), role: 'assistant', content: '', model, agentId: ORCHESTRATOR_ID, orchestration: { goal, phase: 'planning' } };
@@ -222,7 +224,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     const system = planningPrompt({ agents: agentsRef.current, models, folder: conv.folder, toolsSupported: toolsOk });
     const messages: api.ChatMessage[] = [
       { role: 'system', content: system },
-      ...history.filter((m) => !m.error).map((m) => ({ role: m.role, content: withFiles(m) })),
+      ...(run.fresh ? history.slice(-1) : history).filter((m) => !m.error).map((m) => ({ role: m.role, content: withFiles(m) })),
     ];
     try {
       let raw: Record<string, unknown> | null = null;
@@ -258,11 +260,12 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   };
 
   /** Step 2: create the new agents, run every task on its agent in order, then write the answer. */
-  const runPlan = async (msgId: string) => {
-    const conv = convRef.current.find((c) => c.messages.some((m) => m.id === msgId));
+  const runPlan = async (msgId: string, run: RunOptions = {}) => {
+    // Read the store directly: a scheduled task calls this right after planning, before a re-render.
+    const conv = getConversations().find((c) => c.messages.some((m) => m.id === msgId));
     const msg = conv?.messages.find((m) => m.id === msgId);
     const orch = msg?.orchestration;
-    if (!conv || !orch?.plan || streamingId) return;
+    if (!conv || !orch?.plan || streaming.get()) return;
     const ac = new AbortController();
     abortRef.current = ac;
     setStreamingId(conv.id);
@@ -272,7 +275,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         createAgent({ ...draft, skills: [], createdBy: 'orchestrator' });
       }
     }
-    const approve = approver(ac, conv.id); // one for the whole plan, so "for this run" covers every task
+    const approve = approver(ac, conv.id, run.preApproved); // one for the whole plan, so "for this run" covers every task
     const tasks: PlanTask[] = orch.plan.tasks.map((t) => ({ ...t, status: 'pending', output: '', steps: [], error: undefined, stats: undefined }));
     patchOrch(conv.id, msgId, (o) => ({ ...o, phase: 'running', plan: { ...o.plan!, tasks } }));
     try {
@@ -364,8 +367,9 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     cancel: (msgId) => current && patchOrch(current.id, msgId, (o) => ({ ...o, phase: 'cancelled' })),
   };
 
-  const generate = async (conv: Conversation, history: UiMessage[]) => {
-    if (conv.agentId === ORCHESTRATOR_ID) return planOrchestration(conv, history);
+  /** `run.fresh` sends only the last message (a scheduled task's runs don't build on each other). */
+  const generate = async (conv: Conversation, history: UiMessage[], run: RunOptions = {}) => {
+    if (conv.agentId === ORCHESTRATOR_ID) return planOrchestration(conv, history, run);
     const agent = getAgent(conv.agentId);
     const model = agent?.model || conv.model;
     const assistant: UiMessage = { id: uid(), role: 'assistant', content: '', model, ...(agent ? { agentId: agent.id } : {}) };
@@ -386,7 +390,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     });
     const messages: api.ChatMessage[] = [
       ...(system ? [{ role: 'system' as const, content: system }] : []),
-      ...history.filter((m) => !m.error).map((m) => ({ role: m.role, content: withFiles(m), ...(m.images?.length ? { images: m.images } : {}) })),
+      ...(run.fresh ? history.slice(-1) : history).filter((m) => !m.error).map((m) => ({ role: m.role, content: withFiles(m), ...(m.images?.length ? { images: m.images } : {}) })),
     ];
     const options = genOptions(agent?.temperature, isInteractive(conv) || tools.length > 0);
 
@@ -400,7 +404,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         keepAlive: params.keep_alive,
         ...(modelCaps.includes('thinking') ? { think: params.think } : {}),
         signal: ac.signal,
-        approve: approver(ac, conv.id),
+        approve: approver(ac, conv.id, run.preApproved),
         onText: (piece) => patch((m) => ({ ...m, content: m.content + piece })),
         onThinking: (piece) => patch((m) => ({ ...m, thinking: (m.thinking ?? '') + piece })),
         onStep: (step) =>
@@ -476,6 +480,12 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       return conv.id;
     },
     runPlan,
+    runInChat: async (convId, text, run) => {
+      const conv = getConversations().find((c) => c.id === convId);
+      if (!conv || streaming.get()) throw new Error('Another reply is running');
+      const user: UiMessage = { id: uid(), role: 'user', content: text };
+      await generate(conv, [...conv.messages, user], { ...run, fresh: true });
+    },
     cancelPlan: (convId, msgId) => patchOrch(convId, msgId, (o) => ({ ...o, phase: 'cancelled' })),
     changePlan: (convId, msgId, plan) => patchOrch(convId, msgId, (o) => ({ ...o, plan })),
     stop: () => abortRef.current?.abort(),

@@ -84,6 +84,9 @@ export function useConversations(fallback: () => Conversation) {
 
 export const getConversations = () => conversations?.get() ?? [];
 
+/** Changes the chats from outside the chat view (the scheduler adds its task chats this way). */
+export const updateConversations = (fn: (cs: Conversation[]) => Conversation[]) => conversations?.set(fn);
+
 // ---- run state ------------------------------------------------------------------------------------
 
 /** The conversation currently generating (one at a time). */
@@ -92,11 +95,24 @@ export const streaming = store<string | null>(null);
 /** A tool waiting for the user's OK. Shown in the chat and on the Orchestrator page. */
 export const approval = store<{ req: ApprovalRequest; resolve: (a: Approval) => void; convId: string } | null>(null);
 
+/** Asks the app to show a chat (switching to the Chat tab). */
+export const openChatRequest = store<string | null>(null);
+
+/** How a run started by something other than the user's message box behaves. */
+export interface RunOptions {
+  /** Tools that may go ahead without asking (a scheduled task's "without asking" settings). */
+  preApproved?: string[];
+  /** Send only the newest message to the model, not the whole chat. */
+  fresh?: boolean;
+}
+
 /** Actions the chat view offers to other views (it stays mounted, so these keep working). */
 export interface ChatController {
   /** Starts an orchestrator run in a new chat and returns that chat's id. */
   startOrchestration: (goal: string, model: string, folder?: string) => string | null;
-  runPlan: (msgId: string) => void;
+  runPlan: (msgId: string, run?: RunOptions) => Promise<void>;
+  /** Sends a message in an existing chat and resolves when the reply (or plan) is finished. */
+  runInChat: (convId: string, text: string, run?: RunOptions) => Promise<void>;
   cancelPlan: (convId: string, msgId: string) => void;
   changePlan: (convId: string, msgId: string, plan: import('./agents/orchestrator').Plan) => void;
   stop: () => void;

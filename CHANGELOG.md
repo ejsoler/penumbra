@@ -30,6 +30,13 @@
   - You review and edit the plan, then run it. Tasks run one at a time on their agents, each getting the results it depends on, and the orchestrator writes the final answer.
   - The Orchestrator tab lists every run and shows a board with one column per agent and live task cards.
   - Agents it creates are saved to the Agents tab.
+- **Scheduler.** A new **Scheduler** tab for timed tasks:
+  - A task can be a prompt for a model or agent, an orchestrator goal (planned and run without review, since nobody is there to approve it), or a terminal command in a folder.
+  - Run it once at a set time, daily or on chosen weekdays at a set time, or every N minutes or hours. **Run now** runs it right away.
+  - Each task has its own chat (⏰ in the chat list) that collects every run's result. Runs don't build on each other: each one starts from the task's prompt.
+  - **Without asking:** choose what a task may do on its own (open websites, run terminal commands). Anything else waits for your OK, with a notification.
+  - While any task is on, closing the window keeps Penumbra in the menu bar (system tray on Windows and Linux) so tasks run on time. Quit from the menu bar icon. You can turn this off.
+  - A notification when a task finishes or needs you. Tasks run one at a time and wait while you're using the chat. A run missed while Penumbra was quit runs once when it opens.
 - **Update check.** Penumbra asks GitHub for the latest release shortly after it opens and twice a day. A newer version shows as a small arrow icon at the bottom of the sidebar, with no pop-ups. Clicking it shows what's new and downloads the installer for your computer to the Downloads folder, checking it against the release's checksum. You can also skip that version. The **Developer** tab has **Check now** and a switch to turn the check off.
 
 ### Changed

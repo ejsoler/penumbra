@@ -57,6 +57,8 @@ export interface PenumbraHost {
     reveal: () => Promise<void>;
     onProgress: (cb: (p: { got: number; total: number }) => void) => () => void;
   };
+  setTrayStatus: (status: { enabled: boolean; active: number; next: { name: string; when: string } | null }) => void;
+  showWindow: () => void;
   setWidgetNetwork: (policy: { mode: NetMode; hosts: string[]; block: string[] }) => void;
   onWidgetRequest: (cb: (r: WidgetRequest) => void) => () => void;
 }

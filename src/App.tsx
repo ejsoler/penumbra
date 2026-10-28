@@ -6,20 +6,23 @@ import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
-import { Bot, FolderOpen, MessageSquare, Telescope, Terminal, Workflow } from './components/icons';
+import { Bot, CalendarClock, FolderOpen, MessageSquare, Telescope, Terminal, Workflow } from './components/icons';
 import { WorkspaceView } from './views/WorkspaceView';
-import { chatController, streaming } from './session';
+import { SchedulerView } from './views/SchedulerView';
+import { startScheduler, useScheduler } from './scheduler';
+import { chatController, openChatRequest, streaming } from './session';
 import { ContextMenuProvider } from './components/ContextMenu';
 import { Logo } from './components/Logo';
 import { isElectron, isMac } from './platform';
 import { UpdateButton } from './components/UpdateButton';
 import { startUpdateChecks } from './updates';
 
-type View = 'chat' | 'orchestrator' | 'agents' | 'models' | 'discover' | 'developer';
+type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'models' | 'discover' | 'developer';
 
 const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
   { id: 'orchestrator', label: 'Orchestrator', icon: Workflow },
+  { id: 'scheduler', label: 'Scheduler', icon: CalendarClock },
   { id: 'agents', label: 'Agents & Skills', icon: Bot },
   { id: 'developer', label: 'Developer', icon: Terminal },
   { id: 'models', label: 'My Models', icon: FolderOpen },
@@ -45,6 +48,19 @@ export default function App() {
   const pulling = Object.values(dl.downloads).some((d) => d.state === 'downloading');
   const running = !!streaming.use();
   useEffect(startUpdateChecks, []);
+  useEffect(startScheduler, []);
+  const scheduler = useScheduler();
+  const openChat = (convId: string) => {
+    chatController.current?.openChat(convId);
+    setView('chat');
+  };
+  // A notification (or the scheduler) asked to show a chat.
+  const chatRequest = openChatRequest.use();
+  useEffect(() => {
+    if (!chatRequest) return;
+    openChat(chatRequest);
+    openChatRequest.set(null);
+  }, [chatRequest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <ContextMenuProvider>
@@ -56,6 +72,7 @@ export default function App() {
             <Icon size={19} />
             {id === 'discover' && pulling && <span className="rail-dot" />}
             {id === 'chat' && running && view !== 'chat' && <span className="rail-dot" />}
+            {id === 'scheduler' && scheduler.running && view !== 'scheduler' && <span className="rail-dot" />}
           </button>
         ))}
         <span className="flex" />
@@ -90,6 +107,7 @@ export default function App() {
               }}
             />
           )}
+          {view === 'scheduler' && <SchedulerView ollama={ollama} onOpenChat={openChat} />}
           {view === 'agents' && <AgentsView ollama={ollama} onChatWithAgent={chatWithAgent} />}
           {view === 'models' && <ModelsView ollama={ollama} onChatWith={chatWith} />}
           {view === 'discover' && <DiscoverView ollama={ollama} dl={dl} />}

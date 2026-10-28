@@ -41,6 +41,7 @@
 - Tools: web search and pages, read and write files in a folder you choose, and terminal commands (each one asks you first). Every reply shows the tools it used
 - Attach text files to a message
 - The **Orchestrator** plans a goal into tasks, creates the agents it needs, lets you review and edit the plan, then runs each task on its agent and writes the final answer. Follow runs on a board with one column per agent
+- The **Scheduler** runs prompts, agents, orchestrator goals, or terminal commands at set times or on repeat, with a chat per task for the results. While tasks are on, Penumbra keeps running in the menu bar when you close the window
 
 **Models**
 - Model picker (<kbd>⌘L</kbd>) that loads the model into memory, with capability badges (vision, tools, reasoning)
@@ -119,9 +120,10 @@ OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve
 ## Project structure
 
 ```
-electron/         Electron main process, preload bridge, skills, tools (files, terminal, web), update check
+electron/         Electron main process, preload bridge, skills, tools (files, terminal, web), update check, menu bar
 src/
   updates.ts      Update check state (the sidebar icon and Developer panel)
+  scheduler.ts    Scheduled tasks: timing, running them, menu bar status
   api.ts          Ollama REST client (streaming chat, pull, show, ps…)
   hf.ts           Hugging Face Hub search + GGUF quant listing
   downloads.ts    Download queue with pause/resume
@@ -130,7 +132,7 @@ src/
   agents/         Agent loop, tools, skills, agents store, orchestrator planning
   components/     Model picker, Markdown renderer, widget frame, plan card, context menu, icons
   widgets/        Widget sandbox document, system prompt, bundled chart/3D libraries
-  views/          Chat, Orchestrator, Agents & Skills, My Models, Discover, Hugging Face, Developer
+  views/          Chat, Orchestrator, Scheduler, Agents & Skills, My Models, Discover, Hugging Face, Developer
 build/            App icon source, icon generator, install script
 ```
 
@@ -143,6 +145,8 @@ If you use a cloud model from Ollama (names ending in `-cloud`), Ollama sends th
 Interactive widgets are code written by the model, so Penumbra treats them as untrusted. Each one runs in a sandboxed frame with no network access and no access to your chats, files, or Ollama. It can only resize itself, report errors, and suggest a follow-up question that you choose whether to send.
 
 Widgets can download from a list of approved sites (map tiles, script CDNs, and keyless public data). Any other site needs your OK for that widget, unless you turn on **Whole internet** in the settings panel. In every mode, widgets can only make https GET requests: they can't upload or post data, send cookies, or reach your computer, local network, or Ollama. Each widget's network log shows every request it made.
+
+Scheduled tasks run unattended, so they only skip the usual questions for what you allow in each task (opening websites, running commands); everything else waits for you. A command task runs its command without asking each time, since you wrote it.
 
 Agents follow the same internet rules. Their file tools only work inside the folder you choose for a chat, replaced files go to the Trash, and every terminal command waits for your approval. Approved commands run with your user account's permissions, so read them before you allow them. Skills are stored in Penumbra's data folder (open it from the Skills tab).
 

@@ -22,4 +22,10 @@ if (process.platform === 'darwin') {
   execFileSync('iconutil', ['-c', 'icns', iconset, '-o', join(dir, 'icon.icns')]);
   rmSync(iconset, { recursive: true });
 }
+// Menu bar / tray icon: the mark alone, black on transparent (macOS tints "Template" images itself).
+const tray = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#000" stroke-width="2.4"/><path d="M12 3 A9 9 0 0 0 12 21 Z" fill="#000"/></svg>');
+const renderTray = (size) => new Resvg(tray, { fitTo: { mode: 'width', value: size } }).render().asPng();
+writeFileSync(join(dir, 'trayTemplate.png'), renderTray(16));
+writeFileSync(join(dir, 'trayTemplate@2x.png'), renderTray(32));
+
 console.log('Icons written to build/ and public/favicon.png');

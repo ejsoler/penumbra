@@ -1,6 +1,6 @@
 // Runs in the app's main frame only (never in widget iframes). Gives the app its skills folder and the
 // agent tools (chat folder, terminal, web), lets it tell the main process which sites widgets may
-// reach, receive a log of widget requests, and check for app updates.
+// reach, receive a log of widget requests, and check for app updates, and keep running in the menu bar for scheduled tasks.
 // Typed in src/host.ts.
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -37,6 +37,9 @@ contextBridge.exposeInMainWorld('penumbraHost', {
       return () => ipcRenderer.removeListener('update:progress', listener);
     },
   },
+  /** Tells the main process whether to stay in the menu bar, and what to show there. */
+  setTrayStatus: (status) => ipcRenderer.send('tray:status', status),
+  showWindow: () => ipcRenderer.send('app:show'),
   setWidgetNetwork: (policy) => ipcRenderer.send('widget-net:set', policy),
   onWidgetRequest: (cb) => {
     const listener = (_e, r) => cb(r);

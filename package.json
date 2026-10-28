@@ -78,6 +78,9 @@
       "electron/tools.cjs",
       "electron/netsafe.cjs",
       "electron/updates.cjs",
+      "electron/tray.cjs",
+      "build/trayTemplate.png",
+      "build/trayTemplate@2x.png",
       "build/icon.png",
       "package.json"
     ],

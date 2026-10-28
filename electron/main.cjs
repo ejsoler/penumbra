@@ -5,6 +5,7 @@ const path = require('path');
 const { registerSkills } = require('./skills.cjs');
 const { registerTools } = require('./tools.cjs');
 const { registerUpdates } = require('./updates.cjs');
+const { registerTray, attachWindow, showWindow } = require('./tray.cjs');
 const { isLocalName, resolvesToPrivate } = require('./netsafe.cjs');
 
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
@@ -31,8 +32,16 @@ function createWindow() {
     trafficLightPosition: { x: 14, y: 14 },
     icon: ICON, // Windows/Linux window icon
     autoHideMenuBar: process.platform !== 'darwin', // Alt shows the menu on Windows/Linux
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(__dirname, 'preload.cjs') },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      preload: path.join(__dirname, 'preload.cjs'),
+      // Scheduled tasks run while the window is hidden in the menu bar; don't slow their timers down.
+      backgroundThrottling: false,
+    },
   });
+  attachWindow(win);
 
   if (process.env.VITE_DEV_SERVER_URL) win.loadURL(process.env.VITE_DEV_SERVER_URL);
   else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
@@ -138,6 +147,7 @@ app.whenReady().then(() => {
   registerSkills();
   registerTools();
   registerUpdates();
+  registerTray();
   // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).
   if (process.platform === 'darwin') app.dock?.setIcon(ICON);
   const { webRequest } = session.defaultSession;
@@ -183,7 +193,8 @@ app.whenReady().then(() => {
   session.defaultSession.setPermissionCheckHandler((_wc, _permission, _origin, details) => details.isMainFrame !== false);
 
   createWindow();
-  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow());
+  // The Dock icon brings back a window hidden in the menu bar.
+  app.on('activate', () => (BrowserWindow.getAllWindows().length ? showWindow() : createWindow()));
 });
 
 app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit());

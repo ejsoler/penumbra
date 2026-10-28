@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { OllamaState } from '../store';
 import { useAgents } from '../agents/agents';
 import { host } from '../host';
 import { useContextMenu } from '../components/ContextMenu';
 import { CalendarClock, CircleAlert, CircleCheck, FolderOpen, Loader2, MessageSquare, Play, Plus, Trash2, TriangleAlert, X } from '../components/icons';
 import {
-  deleteTask, describeSchedule, describeWhen, newTaskId, runTaskNow, saveTask, setSchedulerSettings, setTaskEnabled, useScheduler,
-  type PreApproval, type Schedule, type ScheduledTask, type TaskKind,
+  clearTaskLog, deleteTask, describeSchedule, describeWhen, newTaskId, runTaskNow, saveTask, setSchedulerSettings, setTaskEnabled, useScheduler,
+  type PreApproval, type RunLogEntry, type Schedule, type ScheduledTask, type TaskKind,
 } from '../scheduler';
 
 const KINDS: { id: TaskKind; label: string; hint: string }[] = [
@@ -37,7 +37,7 @@ const toLocalInput = (t: number) => {
 };
 
 export function SchedulerView({ ollama, onOpenChat }: { ollama: OllamaState; onOpenChat: (convId: string) => void }) {
-  const { tasks, settings, running } = useScheduler();
+  const { tasks, settings, running, log } = useScheduler();
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const menu = useContextMenu();
@@ -91,6 +91,7 @@ export function SchedulerView({ ollama, onOpenChat }: { ollama: OllamaState; onO
             draft={current}
             saved={tasks.find((t) => t.id === current.id)}
             running={running === current.id}
+            log={log.filter((e) => e.taskId === current.id)}
             models={models.map((m) => ({ name: m.name, label: `${m.name}${m.details.parameter_size ? ` (${m.details.parameter_size})` : ''}${m.remote_host ? ' · cloud' : ''}` }))}
             onChange={setDraft}
             onSave={(d) => {
@@ -160,10 +161,11 @@ function SchedulerHome({ count, onNew, settings }: { count: number; onNew: () =>
   );
 }
 
-function TaskEditor({ draft: d, saved, running, models, onChange, onSave, onDelete, onOpenChat }: {
+function TaskEditor({ draft: d, saved, running, log, models, onChange, onSave, onDelete, onOpenChat }: {
   draft: Draft;
   saved?: ScheduledTask;
   running: boolean;
+  log: RunLogEntry[];
   models: { name: string; label: string }[];
   onChange: (d: Draft) => void;
   onSave: (d: Draft) => void;
@@ -354,6 +356,8 @@ function TaskEditor({ draft: d, saved, running, models, onChange, onSave, onDele
         </section>
       )}
 
+      {saved && <RunLog entries={log} onOpen={() => saved.convId && onOpenChat(saved.convId)} onClear={() => clearTaskLog(saved.id)} />}
+
       {saved && (
         <section className="panel">
           <div className="row gap">
@@ -366,5 +370,65 @@ function TaskEditor({ draft: d, saved, running, models, onChange, onSave, onDele
         </section>
       )}
     </div>
+  );
+}
+
+const TRIGGERS: Record<RunLogEntry['trigger'], string> = { schedule: 'On schedule', manual: 'Run now', missed: 'Missed, ran at launch' };
+
+const duration = (ms: number) => {
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  return m < 60 ? `${m}m ${sec % 60}s` : `${Math.floor(m / 60)}h ${m % 60}m`;
+};
+
+function RunLog({ entries, onOpen, onClear }: { entries: RunLogEntry[]; onOpen: () => void; onClear: () => void }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const live = entries.some((e) => e.status === 'running');
+  useEffect(() => {
+    if (!live) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [live]);
+  return (
+    <section className="panel">
+      <div className="row gap log-head">
+        <h4 className="flex">Run log</h4>
+        {entries.length > 0 && <button className="btn ghost sm" onClick={() => confirm('Clear this task’s run log? Its chat stays.') && onClear()}>Clear</button>}
+      </div>
+      {!entries.length ? (
+        <p className="muted small">No runs yet. Each run shows up here with its result, how long it took, and the tools it used.</p>
+      ) : (
+        <div className="run-log">
+          {entries.map((e) => {
+            const expanded = open === e.id;
+            const tools = Object.entries(e.tools ?? {});
+            return (
+              <div key={e.id} className={`run-entry ${e.status}`}>
+                <button className="run-row" onClick={() => setOpen(expanded ? null : e.id)}>
+                  <span className="run-icon">{e.status === 'running' ? <Loader2 size={13} className="spin accent" /> : e.status === 'ok' ? <CircleCheck size={13} className="green" /> : <CircleAlert size={13} className="red" />}</span>
+                  <span className="run-when">{new Date(e.startedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  <span className="run-tag">{TRIGGERS[e.trigger]}</span>
+                  <span className="run-text muted">{e.status === 'running' ? 'Running…' : e.error ? e.error : e.summary || 'Finished'}</span>
+                  <span className="run-dur mono muted">{duration((e.endedAt ?? now) - e.startedAt)}</span>
+                </button>
+                {expanded && (
+                  <div className="run-detail small">
+                    <div><span className="muted">By</span> {e.by}</div>
+                    {e.error && <div className="red">{e.error}</div>}
+                    {e.summary && <div className="run-summary">{e.summary}{e.summary.length >= 400 ? '…' : ''}</div>}
+                    {tools.length > 0 && <div><span className="muted">Tools</span> {tools.map(([k, n]) => `${k}${n > 1 ? ` ×${n}` : ''}`).join(', ')}</div>}
+                    {e.approvals?.map((a, i) => <div key={i} className="amber">Waited {duration(a.waitedMs)} for your OK: {a.title}</div>)}
+                    {e.endedAt && <div className="muted">Finished {new Date(e.endedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</div>}
+                    {e.msgId && <button className="link-btn" onClick={onOpen}>Open in the task’s chat</button>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

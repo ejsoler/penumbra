@@ -45,6 +45,28 @@ export interface ScheduledTask {
   createdAt: number;
 }
 
+/** One run of a task, for its run log. */
+export interface RunLogEntry {
+  id: string;
+  taskId: string;
+  startedAt: number;
+  endedAt?: number;
+  /** schedule: on time; manual: Run now; missed: was due while Penumbra was quit. */
+  trigger: 'schedule' | 'manual' | 'missed';
+  status: 'running' | 'ok' | 'error';
+  /** Who did the work, e.g. "Researcher · qwen3.8:27b-mlx" or "Command". */
+  by: string;
+  /** The start of the result. */
+  summary?: string;
+  error?: string;
+  /** Tools it used, e.g. { web_search: 1, web_fetch: 2 }. */
+  tools?: Record<string, number>;
+  /** Questions it had to wait for, and how long. */
+  approvals?: { title: string; waitedMs: number }[];
+  /** The reply in the task's chat. */
+  msgId?: string;
+}
+
 export interface SchedulerSettings {
   /** Stay in the menu bar when the window closes, while any task is on. */
   menuBar: boolean;
@@ -53,6 +75,8 @@ export interface SchedulerSettings {
 
 const TASKS_KEY = 'ollama-gui.schedule';
 const SETTINGS_KEY = 'ollama-gui.scheduleSettings';
+const LOG_KEY = 'ollama-gui.scheduleLog';
+const LOG_PER_TASK = 50;
 const TICK_MS = 15000;
 
 const load = <T>(key: string, fallback: T): T => {
@@ -72,12 +96,19 @@ let tasks: ScheduledTask[] = (() => {
   }
 })();
 let settings: SchedulerSettings = load(SETTINGS_KEY, { menuBar: true, notify: true });
+let log: RunLogEntry[] = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+  } catch {
+    return [];
+  }
+})();
 let running = null as string | null;
-let snapshot: { tasks: ScheduledTask[]; settings: SchedulerSettings; running: string | null } = { tasks, settings, running };
+let snapshot: { tasks: ScheduledTask[]; settings: SchedulerSettings; running: string | null; log: RunLogEntry[] } = { tasks, settings, running, log };
 const listeners = new Set<() => void>();
 
 function emit() {
-  snapshot = { tasks, settings, running };
+  snapshot = { tasks, settings, running, log };
   listeners.forEach((l) => l());
   syncTray();
 }
@@ -91,6 +122,22 @@ function saveTasks(next: ScheduledTask[]) {
   }
   emit();
 }
+
+function saveLog(next: RunLogEntry[]) {
+  // Newest first, and only the latest runs of each task.
+  const count: Record<string, number> = {};
+  log = next.filter((e) => (count[e.taskId] = (count[e.taskId] ?? 0) + 1) <= LOG_PER_TASK);
+  try {
+    localStorage.setItem(LOG_KEY, JSON.stringify(log));
+  } catch {
+    /* storage unavailable */
+  }
+  emit();
+}
+
+const patchLog = (id: string, fn: (e: RunLogEntry) => RunLogEntry) => saveLog(log.map((e) => (e.id === id ? fn(e) : e)));
+
+export const clearTaskLog = (taskId: string) => saveLog(log.filter((e) => e.taskId !== taskId));
 
 const patchTask = (id: string, patch: Partial<ScheduledTask>) => saveTasks(tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
@@ -179,10 +226,15 @@ export function setTaskEnabled(id: string, enabled: boolean) {
   patchTask(id, { enabled, nextRun: enabled ? nextAfter(t.schedule, Date.now()) : t.nextRun });
 }
 
-export const deleteTask = (id: string) => saveTasks(tasks.filter((t) => t.id !== id));
+export function deleteTask(id: string) {
+  saveTasks(tasks.filter((t) => t.id !== id));
+  clearTaskLog(id);
+}
 
 /** Due now, regardless of its schedule; runs as soon as nothing else is. */
+const manualRuns = new Set<string>();
 export function runTaskNow(id: string) {
+  manualRuns.add(id);
   patchTask(id, { nextRun: Date.now() - 1, ...(tasks.find((t) => t.id === id)?.enabled ? {} : { enabled: true }) });
   tick();
 }
@@ -227,6 +279,9 @@ function notify(t: ScheduledTask, body: string, convId?: string) {
   }
 }
 
+/** The run being logged, filled in as it goes. */
+let current: { logId: string; msgId?: string; tools?: Record<string, number>; by?: string; approvals: { title: string; waitedMs: number }[] } = { logId: '', approvals: [] };
+
 async function runCommand(t: ScheduledTask, convId: string) {
   const h = host();
   if (!h || !t.folder || !t.command) throw new Error('A command task needs a folder and a command');
@@ -239,6 +294,7 @@ async function runCommand(t: ScheduledTask, convId: string) {
   const ok = r.code === 0;
   const content = `${ok ? 'Finished' : r.signal ? `Stopped (${r.signal})` : `Exited with code ${r.code}`}.\n\n\`\`\`\n${output}\n\`\`\``;
   add((ms) => ms.map((m) => (m.id === reply.id ? { ...m, content, ...(ok ? {} : { error: `Exit code ${r.code ?? r.signal}` }) } : m)));
+  current.msgId = reply.id;
   if (!ok) throw new Error(`Exited with code ${r.code ?? r.signal}`);
   return output;
 }
@@ -250,6 +306,7 @@ async function runModel(t: ScheduledTask, convId: string) {
   const preApproved = t.preApproved.map((p) => APPROVAL_TOOLS[p]);
   await c.runInChat(convId, t.prompt, { preApproved });
   let reply = lastReply(convId);
+  current.msgId = reply?.id;
   // Nobody is there to review the plan, so a scheduled orchestrator runs it right away.
   if (t.kind === 'orchestrator' && reply?.orchestration?.phase === 'review') {
     await new Promise((r) => setTimeout(r, 50));
@@ -257,6 +314,11 @@ async function runModel(t: ScheduledTask, convId: string) {
     reply = lastReply(convId);
   }
   const o = reply?.orchestration;
+  // Count the tools it used, including each orchestrator task's.
+  const tools: Record<string, number> = {};
+  for (const step of [...(reply?.steps ?? []), ...(o?.plan?.tasks.flatMap((x) => x.steps ?? []) ?? [])]) tools[step.tool] = (tools[step.tool] ?? 0) + 1;
+  if (Object.keys(tools).length) current.tools = tools;
+  if (o?.plan) current.by = `Orchestrator · ${t.model} → ${[...new Set(o.plan.tasks.map((x) => x.agent))].join(', ')}`;
   const error = reply?.error || (o && o.phase !== 'done' ? o.error || `The run ended in "${o.phase}"` : '') || (reply?.stopped ? 'Stopped' : '');
   if (error) throw new Error(error);
   return reply?.content ?? '';
@@ -264,16 +326,36 @@ async function runModel(t: ScheduledTask, convId: string) {
 
 async function runTask(t: ScheduledTask) {
   running = t.id;
+  const now = Date.now();
+  const trigger: RunLogEntry['trigger'] = manualRuns.delete(t.id) ? 'manual' : t.nextRun !== null && now - t.nextRun > 2 * 60000 ? 'missed' : 'schedule';
+  const agent = t.kind === 'prompt' ? getAgent(t.agentId) : undefined;
+  const by = t.kind === 'command' ? 'Command' : t.kind === 'orchestrator' ? `Orchestrator · ${t.model}` : agent ? `${agent.name} · ${agent.model}` : t.model;
+  current = { logId: uid(), approvals: [] };
+  saveLog([{ id: current.logId, taskId: t.id, startedAt: now, trigger, status: 'running', by }, ...log]);
+  const finish = (patch: Partial<RunLogEntry>) =>
+    patchLog(current.logId, (e) => ({
+      ...e,
+      ...patch,
+      endedAt: Date.now(),
+      msgId: current.msgId,
+      ...(current.by ? { by: current.by } : {}),
+      ...(current.tools ? { tools: current.tools } : {}),
+      ...(current.approvals.length ? { approvals: current.approvals } : {}),
+    }));
   // The next time is set before running, so a long run doesn't fire twice.
   patchTask(t.id, { lastStatus: 'running', lastError: undefined, lastRun: Date.now(), nextRun: nextAfter(t.schedule, Date.now()), ...(t.schedule.type === 'once' ? { enabled: false } : {}) });
   const convId = taskChat(t);
   try {
     const out = t.kind === 'command' ? await runCommand(t, convId) : await runModel(t, convId);
     patchTask(t.id, { lastStatus: 'ok' });
+    // Plain text for the log: no Markdown symbols or code fences.
+    const plain = out.replace(/```[a-z]*/gi, ' ').replace(/\*\*|__|`/g, '').replace(/^\s*(#{1,6}|>)\s+/gm, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\s+/g, ' ').trim();
+    finish({ status: 'ok', summary: plain.slice(0, 400) });
     notify(t, out || 'Finished.', convId);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     patchTask(t.id, { lastStatus: 'error', lastError: msg });
+    finish({ status: 'error', error: msg });
     notify(t, `Didn't finish: ${msg}`, convId);
   } finally {
     running = null;
@@ -308,9 +390,19 @@ approval.subscribe(() => {
   notifiedFor = a;
   patchTask(t.id, { lastStatus: 'waiting' });
   notify(t, `Needs your OK: ${a.req.title}`, a.convId);
+  const asked = Date.now();
+  const logId = current.logId;
   const off = approval.subscribe(() => {
     if (approval.get() === a) return;
     off();
+    // "Open a website? github.com" says more than the question alone.
+    let detail = a.req.detail;
+    try {
+      if (/^https?:\/\//.test(detail)) detail = new URL(detail).hostname;
+    } catch {
+      /* not a full address; keep it as is */
+    }
+    if (current.logId === logId) current.approvals.push({ title: `${a.req.title} ${detail}`.trim().slice(0, 160), waitedMs: Date.now() - asked });
     if (running === t.id) patchTask(t.id, { lastStatus: 'running' });
   });
 });
@@ -329,6 +421,9 @@ export function startScheduler() {
   // A run that was cut off by quitting isn't "running" anymore.
   if (tasks.some((t) => t.lastStatus === 'running' || t.lastStatus === 'waiting')) {
     saveTasks(tasks.map((t) => (t.lastStatus === 'running' || t.lastStatus === 'waiting' ? { ...t, lastStatus: 'error', lastError: 'Penumbra closed during the run' } : t)));
+  }
+  if (log.some((e) => e.status === 'running')) {
+    saveLog(log.map((e) => (e.status === 'running' ? { ...e, status: 'error', error: 'Penumbra closed during the run' } : e)));
   }
   syncTray();
   setTimeout(tick, 3000);

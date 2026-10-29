@@ -18,6 +18,7 @@
   - Errors a widget catches and logs with `console.error` also show the **Ask model to fix** button.
   - Built-in `penumbra.geocode()` helper, so maps place landmarks from OpenStreetMap instead of the model's memory, which is often hundreds of meters off.
 - **Agents.** A new **Agents & Skills** tab to create agents: a name, a model, instructions, and the skills and tools each one may use. Start from a template (Researcher, Writer, Coder, Analyst) or a blank agent, and pick an agent in any chat.
+- **Personas.** **New agent** opens a short wizard: a **Purpose**, an **Agent name**, and a **Persona** (a sentence or two on personality, communication style, and approach, with a few ideas to start from). Every agent keeps the model's full knowledge and abilities; the persona shapes how it talks, reasons, and works, for the whole conversation. Templates come with personas, the orchestrator gives new agents one, and **Instructions** are now optional extra rules.
 - **Skills** in the same format Claude uses: a folder with a `SKILL.md` and optional reference files. Create and edit them in the app, import folders or `.zip` files, and turn each one on or off. The model only sees each skill's name and description, and loads the full skill when a task matches it.
 - **Tools** for agents and chats, using Ollama's tool calling:
   - **Web:** search (DuckDuckGo, no key) and read pages.
@@ -38,6 +39,7 @@
   - While any task is on, closing the window keeps Penumbra in the menu bar (system tray on Windows and Linux) so tasks run on time. Quit from the menu bar icon. You can turn this off.
   - A **run log** on each task: every run with its start time, what triggered it (on schedule, Run now, or missed while Penumbra was quit), how long it took, the result or error, the tools it used, and any wait for your OK. It keeps the last 50 runs per task, and you can clear it.
   - A notification when a task finishes or needs you. Tasks run one at a time and wait while you're using the chat. A run missed while Penumbra was quit runs once when it opens.
+- **Guided demo.** **Developer → Guided demo → Start demo** opens the tour from `docs/DEMO.md` in its own window, with demo chats, agents, skills, and files, so yours aren't touched. A panel shows each step, and nothing happens until you click Next. Closing the window deletes the demo's files.
 - **Update check.** Penumbra asks GitHub for the latest release shortly after it opens and twice a day. A newer version shows as a small arrow icon at the bottom of the sidebar, with no pop-ups. Clicking it shows what's new and downloads the installer for your computer to the Downloads folder, checking it against the release's checksum. You can also skip that version. The **Developer** tab has **Check now** and a switch to turn the check off.
 
 ### Changed

@@ -2,22 +2,25 @@ import { useEffect, useState } from 'react';
 import type { OllamaState } from '../store';
 import { usePersistent } from '../store';
 import {
-  AGENT_TEMPLATES, createAgent, deleteAgent, duplicateAgent, TOOL_GROUPS, updateAgent, useAgents, type Agent, type ToolGroup,
+  AGENT_TEMPLATES, createAgent, deleteAgent, duplicateAgent, PERSONA_LIMIT, TOOL_GROUPS, updateAgent, useAgents, type Agent, type ToolGroup,
 } from '../agents/agents';
 import { NEW_SKILL, refreshSkills, setSkillEnabled, useSkills } from '../agents/skills';
 import { host, type SkillInfo } from '../host';
 import { useContextMenu } from '../components/ContextMenu';
 import {
-  BookOpen, Bot, Copy, FolderOpen, MessageSquarePlus, Plus, Trash2, Upload, X,
+  BookOpen, Bot, Copy, FolderOpen, MessageSquarePlus, Plus, Sparkles, Trash2, Upload, X,
 } from '../components/icons';
 
 type Tab = 'agents' | 'skills';
+type Template = (typeof AGENT_TEMPLATES)[number];
 
 export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; onChatWithAgent: (agentId: string) => void }) {
   const [tab, setTab] = usePersistent<Tab>('ollama-gui.agentsTab', 'agents');
   const [selected, setSelected] = useState<string | null>(null);
   const agents = useAgents();
   const { skills } = useSkills();
+  // The New agent wizard: closed, blank, or started from a template.
+  const [wizard, setWizard] = useState<{ template?: Template } | null>(null);
 
   // Keep a valid selection when the list changes.
   const ids = tab === 'agents' ? agents.map((a) => a.id) : skills.map((s) => s.id);
@@ -33,7 +36,7 @@ export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; o
           </div>
         </div>
         {tab === 'agents' ? (
-          <AgentList agents={agents} current={current} onSelect={setSelected} />
+          <AgentList agents={agents} current={current} onSelect={setSelected} onNew={() => setWizard({})} />
         ) : (
           <SkillList skills={skills} current={current} onSelect={setSelected} />
         )}
@@ -43,7 +46,7 @@ export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; o
           current ? (
             <AgentEditor key={current} agent={agents.find((a) => a.id === current)!} ollama={ollama} skills={skills} onChat={() => onChatWithAgent(current)} />
           ) : (
-            <AgentsEmpty onCreate={(id) => setSelected(id)} />
+            <AgentsEmpty onStart={(template) => setWizard({ template })} />
           )
         ) : current ? (
           <SkillEditor key={current} id={current === 'new-skill' ? null : current} onSaved={setSelected} />
@@ -51,17 +54,30 @@ export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; o
           <SkillsEmpty onNew={() => setSelected('new-skill')} />
         )}
       </main>
+      {wizard && (
+        <NewAgentWizard
+          template={wizard.template}
+          ollama={ollama}
+          agents={agents}
+          onClose={() => setWizard(null)}
+          onCreated={(id) => {
+            setWizard(null);
+            setTab('agents');
+            setSelected(id);
+          }}
+        />
+      )}
     </>
   );
 }
 
 // ---- agents ---------------------------------------------------------------------------------------
 
-function AgentList({ agents, current, onSelect }: { agents: Agent[]; current: string | null; onSelect: (id: string) => void }) {
+function AgentList({ agents, current, onSelect, onNew }: { agents: Agent[]; current: string | null; onSelect: (id: string) => void; onNew: () => void }) {
   const menu = useContextMenu();
   return (
     <div className="conv-list">
-      <button className="btn sm list-new" onClick={() => onSelect(createAgent().id)}><Plus size={13} /> New agent</button>
+      <button className="btn sm list-new" onClick={onNew}><Plus size={13} /> New agent</button>
       {agents.map((a) => (
         <div
           key={a.id}
@@ -85,20 +101,20 @@ function AgentList({ agents, current, onSelect }: { agents: Agent[]; current: st
   );
 }
 
-function AgentsEmpty({ onCreate }: { onCreate: (id: string) => void }) {
+function AgentsEmpty({ onStart }: { onStart: (template?: Template) => void }) {
   return (
     <div className="agents-empty">
       <Bot size={36} className="accent" />
       <h2>Create your first agent</h2>
-      <p className="muted">An agent is a model with its own instructions and skills. Use one in any chat, or let the orchestrator assign it tasks.</p>
+      <p className="muted">An agent has its own purpose, name, and persona. Every agent shares the model’s full knowledge; the persona shapes how it talks and works. Use one in any chat, or let the orchestrator assign it tasks.</p>
       <div className="template-grid">
         {AGENT_TEMPLATES.map((t) => (
-          <button key={t.name} className="template" onClick={() => onCreate(createAgent(t).id)}>
+          <button key={t.name} className="template" onClick={() => onStart(t)}>
             <b>{t.name}</b>
             <span className="muted small">{t.description}</span>
           </button>
         ))}
-        <button className="template blank" onClick={() => onCreate(createAgent().id)}>
+        <button className="template blank" onClick={() => onStart()}>
           <b><Plus size={13} /> Blank agent</b>
           <span className="muted small">Start from scratch</span>
         </button>
@@ -120,7 +136,7 @@ function AgentEditor({ agent, ollama, skills, onChat }: { agent: Agent; ollama: 
       <header className="page-head">
         <div className="editor-title">
           <input className="title-input" value={agent.name} onChange={(e) => set({ name: e.target.value })} aria-label="Agent name" />
-          <input className="subtitle-input" value={agent.description} placeholder="What is this agent for? (the orchestrator reads this)" onChange={(e) => set({ description: e.target.value })} />
+          <input className="subtitle-input" value={agent.description} placeholder="Purpose: what is this agent for? (the orchestrator reads this)" onChange={(e) => set({ description: e.target.value })} aria-label="Purpose" />
         </div>
         <button className="btn primary" disabled={!agent.model} onClick={onChat}><MessageSquarePlus size={14} /> Chat with agent</button>
       </header>
@@ -150,12 +166,17 @@ function AgentEditor({ agent, ollama, skills, onChat }: { agent: Agent; ollama: 
       </section>
 
       <section className="panel">
-        <h4>Instructions</h4>
+        <h4>Persona</h4>
+        <PersonaField value={agent.persona ?? ''} onChange={(persona) => set({ persona })} />
+      </section>
+
+      <section className="panel">
+        <h4>Instructions <span className="muted small normal">optional</span></h4>
         <textarea
           className="instructions"
-          rows={8}
+          rows={5}
           value={agent.instructions}
-          placeholder="How should this agent behave? What is it good at? What should it avoid?"
+          placeholder="Extra rules on top of the persona: formats to follow, steps to always take, things to avoid."
           onChange={(e) => set({ instructions: e.target.value })}
         />
       </section>
@@ -207,6 +228,118 @@ function AgentEditor({ agent, ollama, skills, onChat }: { agent: Agent; ollama: 
           )}
         </section>
       )}
+    </div>
+  );
+}
+
+const PERSONA_IDEAS = [
+  'Friendly and encouraging; explains simply and celebrates progress.',
+  'Direct and concise; leads with the answer, no filler.',
+  'Patient teacher; asks a question before explaining, and checks understanding.',
+  'Playful and creative; offers bold ideas and fresh angles.',
+];
+
+/** A short persona with a soft length limit and a few ideas to start from. */
+function PersonaField({ value, onChange, autoFocus }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
+  const long = value.length > PERSONA_LIMIT;
+  return (
+    <div className="persona-field">
+      <textarea
+        className="instructions"
+        rows={3}
+        value={value}
+        autoFocus={autoFocus}
+        placeholder="Personality, communication style, and approach, in a sentence or two. For example: Calm and thorough. Explains the why, not just the how, and flags risks early."
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <div className="persona-foot">
+        <div className="persona-ideas">
+          {PERSONA_IDEAS.map((idea) => (
+            <button key={idea} type="button" className="chip" title={idea} onClick={() => onChange(idea)}>{idea.split(';')[0]}</button>
+          ))}
+        </div>
+        <span className={`small ${long ? 'amber' : 'muted'}`} title="Personas work best short">{value.length}/{PERSONA_LIMIT}</span>
+      </div>
+      <p className="hint muted">{long ? 'Shorter works better: a persona sets the tone, it isn’t a full prompt. Put detailed rules in Instructions.' : 'It changes how the agent talks and works, not what it knows.'}</p>
+    </div>
+  );
+}
+
+function NewAgentWizard({ template, ollama, agents, onClose, onCreated }: {
+  template?: Template;
+  ollama: OllamaState;
+  agents: Agent[];
+  onClose: () => void;
+  onCreated: (id: string) => void;
+}) {
+  const [purpose, setPurpose] = useState(template?.description ?? '');
+  const [name, setName] = useState(template?.name ?? '');
+  const [persona, setPersona] = useState(template?.persona ?? '');
+  const chatModels = ollama.models
+    .filter((m) => !(ollama.capabilities[m.name] ?? []).includes('embedding'))
+    .sort((a, b) => Number(!!a.remote_host) - Number(!!b.remote_host));
+  // The model the newest agent uses, or the first local one.
+  const lastModel = [...agents].sort((a, b) => b.createdAt - a.createdAt).find((a) => chatModels.some((m) => m.name === a.model))?.model;
+  const [model, setModel] = useState(lastModel ?? chatModels[0]?.name ?? '');
+  const taken = agents.some((a) => a.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const ready = purpose.trim() && name.trim() && !taken;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const create = () => {
+    if (!ready) return;
+    const a = createAgent({
+      name: name.trim(),
+      description: purpose.trim(),
+      persona: persona.trim() || undefined,
+      model,
+      instructions: template?.instructions ?? '',
+      tools: template?.tools ?? ['skills'],
+    });
+    onCreated(a.id);
+  };
+  const enter = (e: React.KeyboardEvent) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), create());
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal wizard" role="dialog" aria-label="New agent">
+        <div className="wizard-head">
+          <h3><Sparkles size={16} className="accent" /> {template ? `New agent from ${template.name}` : 'New agent'}</h3>
+          <button className="icon-btn sm" onClick={onClose} title="Close"><X size={14} /></button>
+        </div>
+        <p>Every agent shares the model’s knowledge. Give this one a purpose, a name, and a persona.</p>
+
+        <label className="wizard-field">
+          <span>Purpose</span>
+          <input className="text plain" value={purpose} autoFocus placeholder="What is it for? e.g. Helps me plan healthy weekly meals" onChange={(e) => setPurpose(e.target.value)} onKeyDown={enter} />
+        </label>
+        <label className="wizard-field">
+          <span>Agent name</span>
+          <input className="text plain" value={name} placeholder="e.g. Chef Ana" onChange={(e) => setName(e.target.value)} onKeyDown={enter} />
+          {taken && <small className="amber">An agent with this name already exists.</small>}
+        </label>
+        <div className="wizard-field">
+          <span>Persona <small className="muted">optional</small></span>
+          <PersonaField value={persona} onChange={setPersona} />
+        </div>
+        <label className="wizard-field">
+          <span>Model</span>
+          <select className="wide-select" value={model} onChange={(e) => setModel(e.target.value)}>
+            {!chatModels.length && <option value="">No models installed</option>}
+            {chatModels.map((m) => <option key={m.name} value={m.name}>{m.name}{m.details.parameter_size ? ` (${m.details.parameter_size})` : ''}{m.remote_host ? ' · cloud' : ''}</option>)}
+          </select>
+        </label>
+
+        <div className="modal-actions">
+          <span className="muted small flex">{template ? `Tools: ${(template.tools ?? []).join(', ')}. ` : ''}Tools, skills, and instructions can be changed after.</span>
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={!ready} onClick={create}>Create agent</button>
+        </div>
+      </div>
     </div>
   );
 }

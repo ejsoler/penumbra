@@ -12,6 +12,7 @@ export const MAX_TASKS = 8;
 export interface AgentDraft {
   name: string;
   description: string;
+  persona?: string;
   model: string;
   instructions: string;
   tools: ToolGroup[];
@@ -102,7 +103,7 @@ ${folder ? `The chat folder for file and terminal tools is ${folder}.` : 'No cha
 ${toolsSupported
   ? 'Call the propose_plan tool exactly once with the plan. Do not answer the request yourself.'
   : `Reply with only a JSON object, no other text, in this shape:
-{"summary": "...", "new_agents": [{"name": "...", "description": "...", "model": "...", "instructions": "...", "tools": ["web"]}], "tasks": [{"id": "t1", "title": "...", "agent": "...", "instructions": "...", "depends_on": []}]}`}`;
+{"summary": "...", "new_agents": [{"name": "...", "description": "...", "persona": "...", "model": "...", "instructions": "...", "tools": ["web"]}], "tasks": [{"id": "t1", "title": "...", "agent": "...", "instructions": "...", "depends_on": []}]}`}`;
 }
 
 export const PROPOSE_PLAN: api.ToolDefinition = {
@@ -121,7 +122,8 @@ export const PROPOSE_PLAN: api.ToolDefinition = {
             type: 'object',
             properties: {
               name: { type: 'string' },
-              description: { type: 'string', description: 'What this agent is for' },
+              description: { type: 'string', description: 'What this agent is for (its purpose)' },
+              persona: { type: 'string', description: 'One or two sentences: its personality, communication style, and approach' },
               model: { type: 'string', description: 'An installed model name' },
               instructions: { type: 'string', description: "The agent's system instructions" },
               tools: { type: 'array', items: { type: 'string', enum: toolList } },
@@ -185,7 +187,7 @@ export function normalizePlan(raw: Record<string, unknown>, { agents, models, fa
     const name = s(a.name).slice(0, 60);
     if (!name || existing.has(name.toLowerCase()) || newAgents.some((n) => n.name.toLowerCase() === name.toLowerCase())) continue;
     const tools = asArray(a.tools).map(s).filter((t): t is ToolGroup => toolList.includes(t as ToolGroup));
-    newAgents.push({ name, description: s(a.description), model: fixModel(s(a.model), tools.length > 0), instructions: s(a.instructions), tools });
+    newAgents.push({ name, description: s(a.description), persona: s(a.persona).slice(0, 300) || undefined, model: fixModel(s(a.model), tools.length > 0), instructions: s(a.instructions), tools });
   }
   const agentNames = [...agents.map((a) => a.name), ...newAgents.map((a) => a.name)];
   const findAgent = (name: string) => agentNames.find((n) => n.toLowerCase() === name.toLowerCase());

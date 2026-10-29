@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { OllamaState } from '../store';
 import { usePersistent } from '../store';
 import {
@@ -7,13 +7,19 @@ import {
 import { NEW_SKILL, refreshSkills, setSkillEnabled, useSkills } from '../agents/skills';
 import { host, type SkillInfo } from '../host';
 import { useContextMenu } from '../components/ContextMenu';
-import { AgentAvatar, AvatarPicker } from '../components/AgentAvatar';
+import { AgentAvatar, AvatarPicker, colorFor, initials, isImageAvatar } from '../components/AgentAvatar';
 import {
-  BookOpen, Bot, Copy, FolderOpen, MessageSquarePlus, Plus, Sparkles, Trash2, Upload, X,
+  BookOpen, Bot, Copy, FileText, FolderOpen, Globe, MessageSquarePlus, Pencil, Plus, Sparkles, Terminal, Trash2, Upload, X,
 } from '../components/icons';
 
 type Tab = 'agents' | 'skills';
 type Template = (typeof AGENT_TEMPLATES)[number];
+
+/** Installed models that can generate images (Ollama's "image" capability, or a known image model name). */
+const imageModelsOf = (ollama: OllamaState) =>
+  ollama.models
+    .filter((m) => !m.remote_host && ((ollama.capabilities[m.name] ?? []).includes('image') || /(^|\/)(z-image|flux|stable-diffusion|sdxl)/i.test(m.name)))
+    .map((m) => m.name);
 
 export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; onChatWithAgent: (agentId: string) => void }) {
   const [tab, setTab] = usePersistent<Tab>('ollama-gui.agentsTab', 'agents');
@@ -48,7 +54,7 @@ export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; o
           current ? (
             <AgentEditor key={current} agent={agents.find((a) => a.id === current)!} ollama={ollama} skills={skills} onChat={() => onChatWithAgent(current)} onBack={() => setSelected(null)} />
           ) : agents.length ? (
-            <AgentCards agents={agents} onOpen={setSelected} onChat={onChatWithAgent} onNew={() => setWizard({})} />
+            <AgentCards agents={agents} ollama={ollama} onOpen={setSelected} onChat={onChatWithAgent} onNew={() => setWizard({})} />
           ) : (
             <AgentsEmpty onStart={(template) => setWizard({ template })} />
           )
@@ -115,9 +121,10 @@ function AgentList({ agents, current, onSelect, onNew }: { agents: Agent[]; curr
   );
 }
 
-/** The Agents page's overview: one card per agent. */
-function AgentCards({ agents, onOpen, onChat, onNew }: { agents: Agent[]; onOpen: (id: string) => void; onChat: (id: string) => void; onNew: () => void }) {
-  const toolLabel = (t: ToolGroup) => TOOL_GROUPS.find((g) => g.id === t)?.label ?? t;
+const TOOL_ICONS: Record<ToolGroup, typeof Globe> = { skills: BookOpen, web: Globe, files: FileText, write: Pencil, terminal: Terminal };
+
+/** The Agents page's overview: one trading card per agent. */
+function AgentCards({ agents, ollama, onOpen, onChat, onNew }: { agents: Agent[]; ollama: OllamaState; onOpen: (id: string) => void; onChat: (id: string) => void; onNew: () => void }) {
   return (
     <div className="editor wide">
       <header className="page-head">
@@ -127,34 +134,75 @@ function AgentCards({ agents, onOpen, onChat, onNew }: { agents: Agent[]; onOpen
         </div>
         <button className="btn primary" onClick={onNew}><Plus size={14} /> New agent</button>
       </header>
-      <div className="agent-cards">
-        {agents.map((a) => (
-          <div key={a.id} className="agent-card" onClick={() => onOpen(a.id)}>
-            <div className="agent-card-top">
-              <AgentAvatar agent={a} size={64} />
-              <div className="agent-card-name">
-                <b>{a.name}</b>
-                <span className="muted small mono">{a.model || 'No model'}</span>
-              </div>
-              {a.createdBy === 'orchestrator' && <span className="badge" title="Created by the orchestrator">auto</span>}
-            </div>
-            <p className="agent-card-purpose">{a.description || <span className="muted">No purpose yet</span>}</p>
-            {a.persona && <p className="agent-card-persona">“{a.persona}”</p>}
-            <div className="agent-card-tools">
-              {a.tools.map((t) => <span key={t} className="tool-tag">{toolLabel(t)}</span>)}
-            </div>
-            <div className="agent-card-actions" onClick={(e) => e.stopPropagation()}>
+      <div className="tcards">
+        {agents.map((a, i) => (
+          <div key={a.id} className="tcard-wrap">
+            <TradingCard agent={a} size={ollama.models.find((m) => m.name === a.model)?.details.parameter_size} number={`${i + 1}/${agents.length}`} onClick={() => onOpen(a.id)} />
+            <div className="tcard-actions">
               <button className="btn sm" onClick={() => onOpen(a.id)}>Edit</button>
               <button className="btn primary sm" disabled={!a.model} title={a.model ? '' : 'Choose a model first'} onClick={() => onChat(a.id)}><MessageSquarePlus size={13} /> Chat</button>
             </div>
           </div>
         ))}
-        <button className="agent-card new" onClick={onNew}>
-          <Plus size={22} />
-          <span>New agent</span>
-        </button>
+        <div className="tcard-wrap">
+          <button className="tcard new" onClick={onNew}>
+            <Plus size={26} />
+            <span>New agent</span>
+          </button>
+        </div>
       </div>
     </div>
+  );
+}
+
+function TradingCard({ agent: a, size, number, onClick }: { agent: Agent; size?: string; number: string; onClick: () => void }) {
+  const card = useRef<HTMLButtonElement>(null);
+  // Tilts toward the pointer, with a light that follows it.
+  const tilt = (e: React.MouseEvent) => {
+    const el = card.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    el.style.setProperty('--rx', `${(x - 0.5) * 14}deg`);
+    el.style.setProperty('--ry', `${(0.5 - y) * 14}deg`);
+    el.style.setProperty('--mx', `${x * 100}%`);
+    el.style.setProperty('--my', `${y * 100}%`);
+  };
+  const reset = () => {
+    for (const p of ['--rx', '--ry', '--mx', '--my']) card.current?.style.removeProperty(p);
+  };
+  const label = (t: ToolGroup) => TOOL_GROUPS.find((g) => g.id === t)?.label ?? t;
+  return (
+    <button ref={card} className="tcard" style={{ '--c': colorFor(a.id) } as React.CSSProperties} onClick={onClick} onMouseMove={tilt} onMouseLeave={reset} title={`Open ${a.name}`}>
+      <div className="tcard-inner">
+        <div className="tcard-head">
+          <b>{a.name}</b>
+          {size && <span className="tcard-cost" title="Model size">{size}</span>}
+        </div>
+        <div className="tcard-art">
+          {isImageAvatar(a.avatar) ? <img src={a.avatar} alt="" draggable={false} /> : <span className={a.avatar ? 'tcard-emoji' : 'tcard-initials'}>{a.avatar || initials(a.name)}</span>}
+        </div>
+        <div className="tcard-type">
+          <span>Agent{a.createdBy === 'orchestrator' ? ' · made by the orchestrator' : ''}</span>
+        </div>
+        <div className="tcard-text">
+          <p className="tcard-purpose">{a.description || 'No purpose yet.'}</p>
+          <div className="tcard-abilities">
+            {a.tools.map((t) => {
+              const Icon = TOOL_ICONS[t] ?? Sparkles;
+              return <span key={t} className="tcard-ability"><Icon size={11} /> {label(t)}</span>;
+            })}
+          </div>
+          {a.persona && <p className="tcard-flavor">{a.persona}</p>}
+        </div>
+        <div className="tcard-foot">
+          <span className="mono">{a.model || 'No model'}</span>
+          <span>{number}</span>
+        </div>
+      </div>
+      <span className="tcard-shine" aria-hidden="true" />
+    </button>
   );
 }
 
@@ -192,7 +240,7 @@ function AgentEditor({ agent, ollama, skills, onChat, onBack }: { agent: Agent; 
     <div className="editor">
       <button className="link-btn back-link" onClick={onBack}>← All agents</button>
       <header className="page-head">
-        <AvatarPicker agent={agent} onChange={(avatar) => set({ avatar })} size={84} />
+        <AvatarPicker agent={agent} onChange={(avatar) => set({ avatar })} size={84} imageModels={imageModelsOf(ollama)} />
         <div className="editor-title">
           <input className="title-input" value={agent.name} onChange={(e) => set({ name: e.target.value })} aria-label="Agent name" />
           <input className="subtitle-input" value={agent.description} placeholder="Purpose: what is this agent for? (the orchestrator reads this)" onChange={(e) => set({ description: e.target.value })} aria-label="Purpose" />
@@ -374,7 +422,7 @@ function NewAgentWizard({ template, ollama, agents, onClose, onCreated }: {
           <button className="icon-btn sm" onClick={onClose} title="Close"><X size={14} /></button>
         </div>
         <div className="wizard-intro">
-          <AvatarPicker agent={{ id: draftId, name: name || '?', avatar }} onChange={setAvatar} size={52} />
+          <AvatarPicker agent={{ id: draftId, name: name || '?', avatar, description: purpose, persona }} onChange={setAvatar} size={52} imageModels={imageModelsOf(ollama)} />
           <p>Every agent shares the model’s knowledge. Give this one a purpose, a name, and a persona, and an avatar if you like.</p>
         </div>
 

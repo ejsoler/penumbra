@@ -196,3 +196,26 @@ export function formatBytes(n: number): string {
   const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
   return `${(n / 1024 ** i).toFixed(i >= 3 ? 2 : 1)} ${units[i]}`;
 }
+
+/**
+ * Generates an image with an image model (Ollama's experimental image generation, e.g. x/z-image-turbo
+ * on macOS). Streams step progress; resolves to a PNG data URL. Field names follow Ollama's API and
+ * may change, so a couple of shapes are accepted.
+ */
+export async function generateImage(
+  { model, prompt, width = 512, height = 512 }: { model: string; prompt: string; width?: number; height?: number },
+  onProgress?: (completed: number, total: number) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await request('/api/generate', { method: 'POST', body: JSON.stringify({ model, prompt, width, height, stream: true }), signal });
+  let image = '';
+  for await (const chunk of readNdjson<{ image?: string; images?: string[]; completed?: number; total?: number; response?: string }>(res)) {
+    if (chunk.total) onProgress?.(chunk.completed ?? 0, chunk.total);
+    const found = chunk.image || chunk.images?.[0] || (/^(iVBOR|\/9j\/|UklGR)/.test(chunk.response ?? '') ? chunk.response : '');
+    if (found) image = found;
+  }
+  if (!image) throw new Error("This model didn't return an image. Pick an image generation model, like x/z-image-turbo.");
+  if (image.startsWith('data:')) return image;
+  const type = image.startsWith('/9j/') ? 'jpeg' : image.startsWith('UklGR') ? 'webp' : 'png';
+  return `data:image/${type};base64,${image}`;
+}

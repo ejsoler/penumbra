@@ -650,24 +650,51 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .wizard-intro { display: flex; align-items: center; gap: 14px; }
 .wizard-intro p { margin: 0; }
 
-/* ---- Agent cards ---- */
-.editor.wide { max-width: 1100px; }
-.agent-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; padding-bottom: 30px; }
-.agent-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--bg-side); border: 1px solid var(--border); border-radius: 14px; cursor: pointer; transition: border-color 0.12s, transform 0.12s; min-height: 210px; }
-.agent-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-.agent-card-top { display: flex; align-items: center; gap: 12px; }
-.agent-card-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.agent-card-name b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-card-name .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-card-purpose { margin: 0; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.agent-card-persona { margin: 0; font-size: 12.5px; font-style: italic; color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.agent-card-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; }
-.tool-tag { font-size: 11px; padding: 1px 8px; border-radius: 10px; background: var(--bg-input); color: var(--text-dim); border: 1px solid var(--border); }
-.agent-card-actions { display: flex; justify-content: flex-end; gap: 6px; }
-.agent-card.new { align-items: center; justify-content: center; border-style: dashed; background: none; color: var(--text-dim); font-size: 13px; gap: 8px; }
-.agent-card.new:hover { color: var(--accent-strong); }
-.agent-card .badge { padding: 1px 7px; border-radius: 10px; align-self: flex-start; }
+/* ---- Agent trading cards ---- */
+.editor.wide { max-width: 1180px; }
+.tcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 26px 22px; padding-bottom: 36px; }
+.tcard-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.tcard {
+  --c: #7c6cf0; --rx: 0deg; --ry: 0deg; --mx: 50%; --my: 30%;
+  position: relative; width: 100%; max-width: 260px; aspect-ratio: 5 / 7; padding: 9px; border: none; border-radius: 16px; cursor: pointer; text-align: left; color: #f3f1ff;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--c) 55%, #fff) 0%, var(--c) 32%, color-mix(in srgb, var(--c) 55%, #000) 68%, color-mix(in srgb, var(--c) 70%, #fff) 100%);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  transform: perspective(900px) rotateX(var(--ry)) rotateY(var(--rx)); transition: transform 0.18s ease-out, box-shadow 0.18s; transform-style: preserve-3d;
+}
+.tcard:hover { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 24px color-mix(in srgb, var(--c) 45%, transparent), inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+.tcard-inner { height: 100%; display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 10px; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 22%, #15141c), #121118 70%); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); overflow: hidden; }
+.tcard-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 7px; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 45%, #1d1b26), #1d1b26); }
+.tcard-head b { font-size: 14.5px; letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.tcard-cost { flex-shrink: 0; min-width: 30px; height: 22px; padding: 0 6px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font: 600 11px var(--mono); background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 40%, #fff), var(--c)); color: #120f1f; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.tcard-art { position: relative; flex: 1 1 auto; min-height: 90px; border-radius: 7px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--c) 75%, #fff) 0%, var(--c) 35%, color-mix(in srgb, var(--c) 35%, #000) 100%); box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.tcard-art img { width: 100%; height: 100%; object-fit: cover; }
+.tcard-emoji { font-size: 74px; line-height: 1; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); }
+.tcard-initials { font-size: 64px; font-weight: 800; letter-spacing: 0.02em; color: rgba(255, 255, 255, 0.92); text-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+.tcard-type { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: color-mix(in srgb, var(--c) 40%, #fff); background: rgba(255, 255, 255, 0.05); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tcard-text { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; padding: 7px 8px; border-radius: 7px; background: rgba(255, 255, 255, 0.04); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); overflow: hidden; }
+.tcard-purpose { margin: 0; font-size: 12px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tcard-abilities { display: flex; flex-wrap: wrap; gap: 4px; }
+.tcard-ability { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; padding: 1px 7px; border-radius: 9px; background: color-mix(in srgb, var(--c) 22%, transparent); color: color-mix(in srgb, var(--c) 30%, #fff); }
+.tcard-flavor { margin: auto 0 0; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 11px; line-height: 1.35; font-style: italic; color: rgba(243, 241, 255, 0.65); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tcard-foot { display: flex; justify-content: space-between; gap: 8px; padding: 0 4px; font-size: 10px; color: rgba(243, 241, 255, 0.5); }
+.tcard-foot .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The foil light: follows the pointer, brighter on hover. */
+.tcard-shine { position: absolute; inset: 0; border-radius: 16px; pointer-events: none; opacity: 0.35; transition: opacity 0.18s; mix-blend-mode: soft-light;
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.75), transparent 45%), linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.25) 45%, transparent 60%); }
+.tcard:hover .tcard-shine { opacity: 0.9; }
+.tcard.new { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: none; border: 2px dashed var(--border-strong); box-shadow: none; color: var(--text-dim); font-size: 13.5px; transform: none; }
+.tcard.new:hover { border-color: var(--accent); color: var(--accent-strong); }
+.tcard-actions { display: flex; gap: 6px; }
+.avatar-gen { display: flex; flex-direction: column; gap: 8px; }
+.avatar-gen b { display: flex; align-items: center; gap: 6px; }
+.avatar-gen textarea { width: 100%; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .tcard { transform: none; transition: none; } }
 .back-link { margin-top: 18px; font-size: 12.5px; }
 .back-link + .page-head { padding-top: 10px; }
 .all-agents-icon { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-input); color: var(--text-dim); flex-shrink: 0; }
 .conv-item.all-agents { gap: 10px; }
+/* Every card keeps the 5:7 shape; only the art shrinks to make room for text. */
+.tcard { min-height: 0; overflow: hidden; display: block; }
+.tcard-inner { min-height: 0; }
+.tcard-head, .tcard-type, .tcard-text, .tcard-foot { flex-shrink: 0; }
+.tcard-wrap { justify-content: flex-start; }

@@ -698,3 +698,14 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .tcard-inner { min-height: 0; }
 .tcard-head, .tcard-type, .tcard-text, .tcard-foot { flex-shrink: 0; }
 .tcard-wrap { justify-content: flex-start; }
+
+/* ---- Your profile ---- */
+.rail-profile { margin-bottom: 4px; }
+.rail-profile .agent-avatar { box-shadow: 0 0 0 2px var(--bg-rail), 0 0 0 3px var(--border-strong); }
+.rail-profile.active .agent-avatar, .rail-profile:hover .agent-avatar { box-shadow: 0 0 0 2px var(--bg-rail), 0 0 0 3px var(--accent); }
+.profile-card { position: fixed; left: 68px; bottom: 14px; z-index: 300; width: 360px; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5); animation: ctx-in 0.1s ease-out; }
+.profile-card p { margin: 0; }
+.profile-row { display: flex; align-items: center; gap: 14px; }
+.profile-name { flex: 1; margin-top: 0; }
+.profile-card .avatar-pop { top: auto; bottom: -14px; left: 356px; }
+.msg.user .msg-role:has(.agent-avatar) { display: flex; align-items: center; gap: 7px; }

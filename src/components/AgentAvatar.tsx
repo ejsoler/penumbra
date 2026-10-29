@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Agent } from '../agents/agents';
 import * as api from '../api';
+import type { OllamaState } from '../store';
 import { Loader2, Sparkles, Upload, X } from './icons';
 
 const COLORS = ['#7c6cf0', '#e0688f', '#3fa7d6', '#3ecf8e', '#f0a04b', '#c06bd6', '#5f9e8f', '#d6604d'];
@@ -74,6 +75,20 @@ export const avatarPrompt = (a: Pick<Agent, 'name' | 'description' | 'persona'>)
     .filter(Boolean)
     .join('. ');
 };
+
+/**
+ * Installed models that can generate images: Ollama's "image" capability. A known image model name only
+ * counts while its capabilities haven't loaded; a GGUF copy from Hugging Face reports "completion" and
+ * can't generate images in Ollama.
+ */
+export const imageModelsOf = (ollama: OllamaState) =>
+  ollama.models
+    .filter((m) => {
+      if (m.remote_host) return false;
+      const caps = ollama.capabilities[m.name];
+      return caps ? caps.includes('image') : /^x\/(z-image|flux)/i.test(m.name);
+    })
+    .map((m) => m.name);
 
 const EMOJIS = ['🤖', '🧠', '🦉', '🧪', '📚', '✍️', '💻', '📊', '🎨', '🧭', '🦜', '👩‍🏫', '🧑‍🍳', '🩺', '🚀', '🌱', '🐙', '🦊', '⚡', '🎧'];
 

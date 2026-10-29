@@ -7,7 +7,7 @@ import {
 import { NEW_SKILL, refreshSkills, setSkillEnabled, useSkills } from '../agents/skills';
 import { host, type SkillInfo } from '../host';
 import { useContextMenu } from '../components/ContextMenu';
-import { AgentAvatar, AvatarPicker, colorFor, initials, isImageAvatar } from '../components/AgentAvatar';
+import { AgentAvatar, AvatarPicker, colorFor, imageModelsOf, initials, isImageAvatar } from '../components/AgentAvatar';
 import {
   BookOpen, Bot, Copy, FileText, FolderOpen, Globe, MessageSquarePlus, Pencil, Plus, Sparkles, Terminal, Trash2, Upload, X,
 } from '../components/icons';
@@ -15,19 +15,6 @@ import {
 type Tab = 'agents' | 'skills';
 type Template = (typeof AGENT_TEMPLATES)[number];
 
-/**
- * Installed models that can generate images: Ollama's "image" capability. A known image model name only
- * counts while its capabilities haven't loaded; a GGUF copy from Hugging Face reports "completion" and
- * can't generate images in Ollama.
- */
-const imageModelsOf = (ollama: OllamaState) =>
-  ollama.models
-    .filter((m) => {
-      if (m.remote_host) return false;
-      const caps = ollama.capabilities[m.name];
-      return caps ? caps.includes('image') : /^x\/(z-image|flux)/i.test(m.name);
-    })
-    .map((m) => m.name);
 
 export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; onChatWithAgent: (agentId: string) => void }) {
   const [tab, setTab] = usePersistent<Tab>('ollama-gui.agentsTab', 'agents');

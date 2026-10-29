@@ -15,6 +15,7 @@ import { ContextMenuProvider } from './components/ContextMenu';
 import { Logo } from './components/Logo';
 import { isElectron, isMac } from './platform';
 import { UpdateButton } from './components/UpdateButton';
+import { ProfileButton } from './components/ProfileButton';
 import { startUpdateChecks } from './updates';
 
 type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'models' | 'discover' | 'developer';
@@ -77,6 +78,7 @@ export default function App() {
         ))}
         <span className="flex" />
         <UpdateButton />
+        <ProfileButton ollama={ollama} />
         <div className={`rail-status ${ollama.connected ? 'on' : ollama.connected === false ? 'off' : ''}`} title={ollama.connected ? `Ollama v${ollama.version}` : 'Ollama not reachable'} />
       </nav>
 

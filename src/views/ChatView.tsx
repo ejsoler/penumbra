@@ -4,6 +4,7 @@ import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, t
 import { INTERACTIVE_MIN_CTX } from '../widgets/prompt';
 import { createAgent, getAgent, useAgents, type Agent } from '../agents/agents';
 import { AgentAvatar } from '../components/AgentAvatar';
+import { asAvatar, useProfile } from '../profile';
 import {
   normalizePlan, ORCHESTRATOR_ID, parsePlanText, planningPrompt, PROPOSE_PLAN, synthesisMessages, taskMessage,
   type ModelInfo, type Orchestration, type PlanTask,
@@ -894,6 +895,7 @@ function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete
   onEdit: (text: string) => void;
   onBranch: () => void;
 }) {
+  const me = asAvatar(useProfile());
   const menu = useContextMenu();
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -935,7 +937,7 @@ function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete
   return (
     <div className={`msg ${msg.role}`} onContextMenu={onContextMenu}>
       <div className="msg-role">
-        {msg.role === 'user' ? 'You' : agentName ? <>{agent ? <AgentAvatar agent={agent} size={26} /> : <Bot size={12} />} {agentName} <span className="muted">· {msg.model}</span></> : msg.model ?? 'Assistant'}
+        {msg.role === 'user' ? <><AgentAvatar agent={me} size={26} /> {me.name}</> : agentName ? <>{agent ? <AgentAvatar agent={agent} size={26} /> : <Bot size={12} />} {agentName} <span className="muted">· {msg.model}</span></> : msg.model ?? 'Assistant'}
       </div>
       {msg.images?.length ? (
         <div className="msg-images">

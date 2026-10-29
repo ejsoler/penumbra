@@ -632,7 +632,8 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .conv-item:has(> .agent-avatar) { display: flex; align-items: center; gap: 10px; }
 .msg-role .agent-avatar { margin-right: 2px; }
 .agent-picker .agent-avatar { margin: -2px 0; }
-.ctx-menu .agent-avatar { margin: -1px; }
+.ctx-menu .agent-avatar { margin: -3px; }
+.msg-role:has(.agent-avatar) { display: flex; align-items: center; gap: 7px; }
 .avatar-picker { position: relative; flex-shrink: 0; }
 .avatar-btn { position: relative; padding: 0; border: none; background: none; border-radius: 50%; cursor: pointer; display: block; }
 .avatar-btn .avatar-edit { position: absolute; inset: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 11px; font-weight: 600; opacity: 0; transition: opacity 0.12s; }
@@ -648,3 +649,25 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .page-head:has(> .avatar-picker) > .editor-title { flex: 1; min-width: 0; }
 .wizard-intro { display: flex; align-items: center; gap: 14px; }
 .wizard-intro p { margin: 0; }
+
+/* ---- Agent cards ---- */
+.editor.wide { max-width: 1100px; }
+.agent-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; padding-bottom: 30px; }
+.agent-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; background: var(--bg-side); border: 1px solid var(--border); border-radius: 14px; cursor: pointer; transition: border-color 0.12s, transform 0.12s; min-height: 210px; }
+.agent-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.agent-card-top { display: flex; align-items: center; gap: 12px; }
+.agent-card-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.agent-card-name b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-card-name .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-card-purpose { margin: 0; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.agent-card-persona { margin: 0; font-size: 12.5px; font-style: italic; color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.agent-card-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; }
+.tool-tag { font-size: 11px; padding: 1px 8px; border-radius: 10px; background: var(--bg-input); color: var(--text-dim); border: 1px solid var(--border); }
+.agent-card-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.agent-card.new { align-items: center; justify-content: center; border-style: dashed; background: none; color: var(--text-dim); font-size: 13px; gap: 8px; }
+.agent-card.new:hover { color: var(--accent-strong); }
+.agent-card .badge { padding: 1px 7px; border-radius: 10px; align-self: flex-start; }
+.back-link { margin-top: 18px; font-size: 12.5px; }
+.back-link + .page-head { padding-top: 10px; }
+.all-agents-icon { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-input); color: var(--text-dim); flex-shrink: 0; }
+.conv-item.all-agents { gap: 10px; }

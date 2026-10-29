@@ -25,7 +25,8 @@ export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; o
 
   // Keep a valid selection when the list changes.
   const ids = tab === 'agents' ? agents.map((a) => a.id) : skills.map((s) => s.id);
-  const current = selected && (ids.includes(selected) || selected === 'new-skill') ? selected : ids[0] ?? null;
+  // Agents open on the card grid; skills open on the first skill.
+  const current = selected && (ids.includes(selected) || selected === 'new-skill') ? selected : tab === 'agents' ? null : ids[0] ?? null;
 
   return (
     <>
@@ -45,7 +46,9 @@ export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; o
       <main className="page agents-page">
         {tab === 'agents' ? (
           current ? (
-            <AgentEditor key={current} agent={agents.find((a) => a.id === current)!} ollama={ollama} skills={skills} onChat={() => onChatWithAgent(current)} />
+            <AgentEditor key={current} agent={agents.find((a) => a.id === current)!} ollama={ollama} skills={skills} onChat={() => onChatWithAgent(current)} onBack={() => setSelected(null)} />
+          ) : agents.length ? (
+            <AgentCards agents={agents} onOpen={setSelected} onChat={onChatWithAgent} onNew={() => setWizard({})} />
           ) : (
             <AgentsEmpty onStart={(template) => setWizard({ template })} />
           )
@@ -79,6 +82,15 @@ function AgentList({ agents, current, onSelect, onNew }: { agents: Agent[]; curr
   return (
     <div className="conv-list">
       <button className="btn sm list-new" onClick={onNew}><Plus size={13} /> New agent</button>
+      {agents.length > 0 && (
+        <div className={`conv-item all-agents ${current ? '' : 'active'}`} onClick={() => onSelect('')}>
+          <span className="all-agents-icon"><Bot size={16} /></span>
+          <div className="conv-text">
+            <span className="conv-title">All agents</span>
+            <span className="conv-sub">{agents.length} agent{agents.length === 1 ? '' : 's'}</span>
+          </div>
+        </div>
+      )}
       {agents.map((a) => (
         <div
           key={a.id}
@@ -92,13 +104,56 @@ function AgentList({ agents, current, onSelect, onNew }: { agents: Agent[]; curr
             ])
           }
         >
-          <AgentAvatar agent={a} size={28} />
+          <AgentAvatar agent={a} size={34} />
           <div className="conv-text">
             <span className="conv-title">{a.name}</span>
             <span className="conv-sub">{a.model || 'No model'}</span>
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** The Agents page's overview: one card per agent. */
+function AgentCards({ agents, onOpen, onChat, onNew }: { agents: Agent[]; onOpen: (id: string) => void; onChat: (id: string) => void; onNew: () => void }) {
+  const toolLabel = (t: ToolGroup) => TOOL_GROUPS.find((g) => g.id === t)?.label ?? t;
+  return (
+    <div className="editor wide">
+      <header className="page-head">
+        <div>
+          <h1>Agents</h1>
+          <p className="muted">Each agent has its own purpose and persona, and shares the model’s full knowledge.</p>
+        </div>
+        <button className="btn primary" onClick={onNew}><Plus size={14} /> New agent</button>
+      </header>
+      <div className="agent-cards">
+        {agents.map((a) => (
+          <div key={a.id} className="agent-card" onClick={() => onOpen(a.id)}>
+            <div className="agent-card-top">
+              <AgentAvatar agent={a} size={64} />
+              <div className="agent-card-name">
+                <b>{a.name}</b>
+                <span className="muted small mono">{a.model || 'No model'}</span>
+              </div>
+              {a.createdBy === 'orchestrator' && <span className="badge" title="Created by the orchestrator">auto</span>}
+            </div>
+            <p className="agent-card-purpose">{a.description || <span className="muted">No purpose yet</span>}</p>
+            {a.persona && <p className="agent-card-persona">“{a.persona}”</p>}
+            <div className="agent-card-tools">
+              {a.tools.map((t) => <span key={t} className="tool-tag">{toolLabel(t)}</span>)}
+            </div>
+            <div className="agent-card-actions" onClick={(e) => e.stopPropagation()}>
+              <button className="btn sm" onClick={() => onOpen(a.id)}>Edit</button>
+              <button className="btn primary sm" disabled={!a.model} title={a.model ? '' : 'Choose a model first'} onClick={() => onChat(a.id)}><MessageSquarePlus size={13} /> Chat</button>
+            </div>
+          </div>
+        ))}
+        <button className="agent-card new" onClick={onNew}>
+          <Plus size={22} />
+          <span>New agent</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -125,7 +180,7 @@ function AgentsEmpty({ onStart }: { onStart: (template?: Template) => void }) {
   );
 }
 
-function AgentEditor({ agent, ollama, skills, onChat }: { agent: Agent; ollama: OllamaState; skills: SkillInfo[]; onChat: () => void }) {
+function AgentEditor({ agent, ollama, skills, onChat, onBack }: { agent: Agent; ollama: OllamaState; skills: SkillInfo[]; onChat: () => void; onBack: () => void }) {
   const set = (patch: Partial<Agent>) => updateAgent(agent.id, patch);
   const chatModels = ollama.models.filter((m) => !(ollama.capabilities[m.name] ?? []).includes('embedding'));
   const caps = ollama.capabilities[agent.model] ?? [];
@@ -135,8 +190,9 @@ function AgentEditor({ agent, ollama, skills, onChat }: { agent: Agent; ollama: 
 
   return (
     <div className="editor">
+      <button className="link-btn back-link" onClick={onBack}>← All agents</button>
       <header className="page-head">
-        <AvatarPicker agent={agent} onChange={(avatar) => set({ avatar })} />
+        <AvatarPicker agent={agent} onChange={(avatar) => set({ avatar })} size={84} />
         <div className="editor-title">
           <input className="title-input" value={agent.name} onChange={(e) => set({ name: e.target.value })} aria-label="Agent name" />
           <input className="subtitle-input" value={agent.description} placeholder="Purpose: what is this agent for? (the orchestrator reads this)" onChange={(e) => set({ description: e.target.value })} aria-label="Purpose" />

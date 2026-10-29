@@ -753,13 +753,13 @@ function AgentPicker({ agents, value, orchestrator, onChange, onManage }: {
           { label: 'No agent (just the model)', icon: value || orchestrator ? undefined : Check, onClick: () => onChange(undefined) },
           { label: 'Orchestrator: plans and assigns tasks to agents', icon: orchestrator ? Check : Workflow, onClick: () => onChange(ORCHESTRATOR_ID) },
           agents.length > 0 && 'separator',
-          ...agents.map((a) => ({ label: `${a.name}${a.model ? `  ·  ${a.model}` : ''}`, icon: a.id === value?.id ? Check : ({ size }: { size?: number }) => <AgentAvatar agent={a} size={(size ?? 14) + 2} />, onClick: () => onChange(a.id) })),
+          ...agents.map((a) => ({ label: `${a.name}${a.model ? `  ·  ${a.model}` : ''}`, icon: a.id === value?.id ? Check : ({ size }: { size?: number }) => <AgentAvatar agent={a} size={(size ?? 14) + 6} />, onClick: () => onChange(a.id) })),
           'separator',
           { label: 'Manage agents…', icon: Pencil, onClick: onManage },
         ])
       }
     >
-      {orchestrator ? <Workflow size={14} /> : value ? <AgentAvatar agent={value} size={16} /> : <Bot size={14} />}
+      {orchestrator ? <Workflow size={14} /> : value ? <AgentAvatar agent={value} size={20} /> : <Bot size={14} />}
       <span>{orchestrator ? 'Orchestrator' : value ? value.name : 'No agent'}</span>
       <ChevronDown size={13} />
     </button>
@@ -935,7 +935,7 @@ function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete
   return (
     <div className={`msg ${msg.role}`} onContextMenu={onContextMenu}>
       <div className="msg-role">
-        {msg.role === 'user' ? 'You' : agentName ? <>{agent ? <AgentAvatar agent={agent} size={18} /> : <Bot size={12} />} {agentName} <span className="muted">· {msg.model}</span></> : msg.model ?? 'Assistant'}
+        {msg.role === 'user' ? 'You' : agentName ? <>{agent ? <AgentAvatar agent={agent} size={26} /> : <Bot size={12} />} {agentName} <span className="muted">· {msg.model}</span></> : msg.model ?? 'Assistant'}
       </div>
       {msg.images?.length ? (
         <div className="msg-images">

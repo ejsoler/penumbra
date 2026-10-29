@@ -1,8 +1,8 @@
-import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState, type ReactNode, type MouseEvent } from 'react';
+import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode, type MouseEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 export type MenuItem =
-  | { label: string; icon?: LucideIcon; onClick: () => void; danger?: boolean; disabled?: boolean; hint?: string }
+  | { label: string; icon?: LucideIcon | ComponentType<{ size?: number }>; onClick: () => void; danger?: boolean; disabled?: boolean; hint?: string }
   | 'separator';
 
 type OpenMenu = (e: MouseEvent, items: (MenuItem | false | null | undefined | '')[]) => void;

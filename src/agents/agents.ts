@@ -13,6 +13,8 @@ export interface Agent {
   description: string;
   /** A sentence or two on personality, communication style, and approach. */
   persona?: string;
+  /** An emoji, or a small image as a data URL. Missing means initials. */
+  avatar?: string;
   model: string;
   /** Optional extra rules, on top of the purpose and persona. */
   instructions: string;

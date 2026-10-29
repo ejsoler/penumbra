@@ -7,6 +7,7 @@ import {
 import { NEW_SKILL, refreshSkills, setSkillEnabled, useSkills } from '../agents/skills';
 import { host, type SkillInfo } from '../host';
 import { useContextMenu } from '../components/ContextMenu';
+import { AgentAvatar, AvatarPicker } from '../components/AgentAvatar';
 import {
   BookOpen, Bot, Copy, FolderOpen, MessageSquarePlus, Plus, Sparkles, Trash2, Upload, X,
 } from '../components/icons';
@@ -91,6 +92,7 @@ function AgentList({ agents, current, onSelect, onNew }: { agents: Agent[]; curr
             ])
           }
         >
+          <AgentAvatar agent={a} size={28} />
           <div className="conv-text">
             <span className="conv-title">{a.name}</span>
             <span className="conv-sub">{a.model || 'No model'}</span>
@@ -134,6 +136,7 @@ function AgentEditor({ agent, ollama, skills, onChat }: { agent: Agent; ollama: 
   return (
     <div className="editor">
       <header className="page-head">
+        <AvatarPicker agent={agent} onChange={(avatar) => set({ avatar })} />
         <div className="editor-title">
           <input className="title-input" value={agent.name} onChange={(e) => set({ name: e.target.value })} aria-label="Agent name" />
           <input className="subtitle-input" value={agent.description} placeholder="Purpose: what is this agent for? (the orchestrator reads this)" onChange={(e) => set({ description: e.target.value })} aria-label="Purpose" />
@@ -275,6 +278,8 @@ function NewAgentWizard({ template, ollama, agents, onClose, onCreated }: {
   const [purpose, setPurpose] = useState(template?.description ?? '');
   const [name, setName] = useState(template?.name ?? '');
   const [persona, setPersona] = useState(template?.persona ?? '');
+  const [avatar, setAvatar] = useState<string | undefined>();
+  const [draftId] = useState(() => `draft-${Date.now()}`);
   const chatModels = ollama.models
     .filter((m) => !(ollama.capabilities[m.name] ?? []).includes('embedding'))
     .sort((a, b) => Number(!!a.remote_host) - Number(!!b.remote_host));
@@ -296,6 +301,7 @@ function NewAgentWizard({ template, ollama, agents, onClose, onCreated }: {
       name: name.trim(),
       description: purpose.trim(),
       persona: persona.trim() || undefined,
+      avatar,
       model,
       instructions: template?.instructions ?? '',
       tools: template?.tools ?? ['skills'],
@@ -311,7 +317,10 @@ function NewAgentWizard({ template, ollama, agents, onClose, onCreated }: {
           <h3><Sparkles size={16} className="accent" /> {template ? `New agent from ${template.name}` : 'New agent'}</h3>
           <button className="icon-btn sm" onClick={onClose} title="Close"><X size={14} /></button>
         </div>
-        <p>Every agent shares the model’s knowledge. Give this one a purpose, a name, and a persona.</p>
+        <div className="wizard-intro">
+          <AvatarPicker agent={{ id: draftId, name: name || '?', avatar }} onChange={setAvatar} size={52} />
+          <p>Every agent shares the model’s knowledge. Give this one a purpose, a name, and a persona, and an avatar if you like.</p>
+        </div>
 
         <label className="wizard-field">
           <span>Purpose</span>

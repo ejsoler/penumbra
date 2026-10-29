@@ -625,3 +625,26 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 4px; }
 .persona-ideas .chip { font-family: inherit; font-size: 11.5px; cursor: pointer; }
 h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .modal-actions .flex { align-self: center; }
+
+/* ---- Agent avatars ---- */
+.agent-avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; object-fit: cover; color: #fff; font-weight: 600; line-height: 1; user-select: none; vertical-align: middle; }
+.agent-avatar.emoji { background: var(--bg-elev); border: 1px solid var(--border); }
+.conv-item:has(> .agent-avatar) { display: flex; align-items: center; gap: 10px; }
+.msg-role .agent-avatar { margin-right: 2px; }
+.agent-picker .agent-avatar { margin: -2px 0; }
+.ctx-menu .agent-avatar { margin: -1px; }
+.avatar-picker { position: relative; flex-shrink: 0; }
+.avatar-btn { position: relative; padding: 0; border: none; background: none; border-radius: 50%; cursor: pointer; display: block; }
+.avatar-btn .avatar-edit { position: absolute; inset: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 11px; font-weight: 600; opacity: 0; transition: opacity 0.12s; }
+.avatar-btn:hover .avatar-edit, .avatar-btn:focus-visible .avatar-edit { opacity: 1; }
+.avatar-pop { -webkit-app-region: no-drag; position: absolute; top: calc(100% + 8px); left: 0; z-index: 400; width: 300px; padding: 12px; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5); animation: ctx-in 0.1s ease-out; display: flex; flex-direction: column; gap: 10px; }
+.avatar-pop p { margin: 0; }
+.avatar-pop-row { display: flex; gap: 6px; }
+.avatar-emojis { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
+.avatar-emojis button { aspect-ratio: 1; border: none; background: none; border-radius: 6px; font-size: 17px; padding: 0; cursor: pointer; }
+.avatar-emojis button:hover { background: var(--bg-hover); }
+.avatar-emojis button.on { background: var(--accent-bg); outline: 1px solid var(--accent); }
+.page-head:has(> .avatar-picker) { justify-content: flex-start; gap: 16px; }
+.page-head:has(> .avatar-picker) > .editor-title { flex: 1; min-width: 0; }
+.wizard-intro { display: flex; align-items: center; gap: 14px; }
+.wizard-intro p { margin: 0; }

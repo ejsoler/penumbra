@@ -15,10 +15,18 @@ import {
 type Tab = 'agents' | 'skills';
 type Template = (typeof AGENT_TEMPLATES)[number];
 
-/** Installed models that can generate images (Ollama's "image" capability, or a known image model name). */
+/**
+ * Installed models that can generate images: Ollama's "image" capability. A known image model name only
+ * counts while its capabilities haven't loaded; a GGUF copy from Hugging Face reports "completion" and
+ * can't generate images in Ollama.
+ */
 const imageModelsOf = (ollama: OllamaState) =>
   ollama.models
-    .filter((m) => !m.remote_host && ((ollama.capabilities[m.name] ?? []).includes('image') || /(^|\/)(z-image|flux|stable-diffusion|sdxl)/i.test(m.name)))
+    .filter((m) => {
+      if (m.remote_host) return false;
+      const caps = ollama.capabilities[m.name];
+      return caps ? caps.includes('image') : /^x\/(z-image|flux)/i.test(m.name);
+    })
     .map((m) => m.name);
 
 export function AgentsView({ ollama, onChatWithAgent }: { ollama: OllamaState; onChatWithAgent: (agentId: string) => void }) {

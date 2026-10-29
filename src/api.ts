@@ -197,6 +197,10 @@ export function formatBytes(n: number): string {
   return `${(n / 1024 ** i).toFixed(i >= 3 ? 2 : 1)} ${units[i]}`;
 }
 
+/** A text model (or a GGUF copy of an image model) fails to load as an image generator; say so plainly. */
+const notAnImageModel = (e: unknown, model: string) =>
+  e instanceof Error && /unknown model architecture/i.test(e.message) ? new Error(`Ollama can't run ${model} as an image model. Use one from ollama.com, like x/z-image-turbo.`) : e;
+
 /**
  * Generates an image with an image model (Ollama's experimental image generation, e.g. x/z-image-turbo
  * on macOS). Streams step progress; resolves to a PNG data URL. Field names follow Ollama's API and
@@ -207,12 +211,21 @@ export async function generateImage(
   onProgress?: (completed: number, total: number) => void,
   signal?: AbortSignal,
 ): Promise<string> {
-  const res = await request('/api/generate', { method: 'POST', body: JSON.stringify({ model, prompt, width, height, stream: true }), signal });
+  let res: Response;
+  try {
+    res = await request('/api/generate', { method: 'POST', body: JSON.stringify({ model, prompt, width, height, stream: true }), signal });
+  } catch (e) {
+    throw notAnImageModel(e, model);
+  }
   let image = '';
-  for await (const chunk of readNdjson<{ image?: string; images?: string[]; completed?: number; total?: number; response?: string }>(res)) {
-    if (chunk.total) onProgress?.(chunk.completed ?? 0, chunk.total);
-    const found = chunk.image || chunk.images?.[0] || (/^(iVBOR|\/9j\/|UklGR)/.test(chunk.response ?? '') ? chunk.response : '');
-    if (found) image = found;
+  try {
+    for await (const chunk of readNdjson<{ image?: string; images?: string[]; completed?: number; total?: number; response?: string }>(res)) {
+      if (chunk.total) onProgress?.(chunk.completed ?? 0, chunk.total);
+      const found = chunk.image || chunk.images?.[0] || (/^(iVBOR|\/9j\/|UklGR)/.test(chunk.response ?? '') ? chunk.response : '');
+      if (found) image = found;
+    }
+  } catch (e) {
+    throw notAnImageModel(e, model);
   }
   if (!image) throw new Error("This model didn't return an image. Pick an image generation model, like x/z-image-turbo.");
   if (image.startsWith('data:')) return image;

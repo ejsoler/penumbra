@@ -1,7 +1,7 @@
 // Keeps Penumbra running in the menu bar (macOS) or system tray (Windows, Linux) while scheduled tasks
 // are on, so they run on time with the window closed. Closing the window then only hides it; Quit in
 // the menu (or ⌘Q) really quits. With no active tasks, or the option off, closing works as usual.
-const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage } = require('electron');
+const { app, Menu, Tray, ipcMain, nativeImage } = require('electron');
 const path = require('path');
 
 const BUILD = path.join(__dirname, '..', 'build');
@@ -9,7 +9,9 @@ let tray = null;
 let quitting = false;
 let status = { enabled: false, active: 0, next: null }; // sent by the app (src/scheduler.ts)
 
-const mainWindow = () => BrowserWindow.getAllWindows()[0] ?? null;
+// The main app window. Other windows (the demo) don't drive the menu bar.
+let primary = null;
+const mainWindow = () => (primary && !primary.isDestroyed() ? primary : null);
 
 function showWindow() {
   const win = mainWindow();
@@ -59,6 +61,7 @@ function updateTray() {
 
 /** Call for each new window: closing it hides it while tasks need the app. */
 function attachWindow(win) {
+  primary = win;
   win.on('close', (e) => {
     if (!keepRunning()) return;
     e.preventDefault();
@@ -71,7 +74,7 @@ function registerTray() {
     quitting = true;
   });
   ipcMain.on('tray:status', (e, s) => {
-    if (e.senderFrame !== e.sender.mainFrame || !s || typeof s !== 'object') return;
+    if (e.senderFrame !== e.sender.mainFrame || e.sender !== mainWindow()?.webContents || !s || typeof s !== 'object') return;
     status = {
       enabled: Boolean(s.enabled),
       active: Math.max(0, Number(s.active) || 0),
@@ -82,4 +85,4 @@ function registerTray() {
   ipcMain.on('app:show', (e) => e.senderFrame === e.sender.mainFrame && showWindow());
 }
 
-module.exports = { registerTray, attachWindow, showWindow };
+module.exports = { registerTray, attachWindow, showWindow, mainWindow };

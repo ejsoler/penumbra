@@ -4,12 +4,22 @@ const { app, dialog, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { AsyncLocalStorage } = require('async_hooks');
 
 const MAX_FILE = 1024 * 1024; // reference files the model may read
 const MAX_IMPORT = 20 * 1024 * 1024;
 
+// The demo window has its own skills folder, so the tour never touches yours (see demo.cjs).
+const rootFor = new Map(); // webContents id → skills folder
+const request = new AsyncLocalStorage();
+/** Gives a window its own skills folder instead of <userData>/skills. */
+function setSkillsFolder(webContents, dir) {
+  rootFor.set(webContents.id, dir);
+  webContents.once('destroyed', () => rootFor.delete(webContents.id));
+}
+
 const root = () => {
-  const dir = path.join(app.getPath('userData'), 'skills');
+  const dir = request.getStore() ?? path.join(app.getPath('userData'), 'skills');
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 };
@@ -181,7 +191,7 @@ async function importSkills(win) {
 function handle(channel, fn) {
   ipcMain.handle(channel, (e, ...args) => {
     if (e.senderFrame !== e.sender.mainFrame) throw new Error('Not allowed');
-    return fn(e, ...args);
+    return request.run(rootFor.get(e.sender.id), () => fn(e, ...args));
   });
 }
 
@@ -199,4 +209,4 @@ function registerSkills() {
   handle('skills:reveal', (_e, id) => shell.openPath(id ? inside(root(), String(id)) : root()));
 }
 
-module.exports = { registerSkills, frontmatter, readZip };
+module.exports = { setSkillsFolder, registerSkills, frontmatter, readZip };

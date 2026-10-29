@@ -5,7 +5,8 @@ const path = require('path');
 const { registerSkills } = require('./skills.cjs');
 const { registerTools } = require('./tools.cjs');
 const { registerUpdates } = require('./updates.cjs');
-const { registerTray, attachWindow, showWindow } = require('./tray.cjs');
+const { registerTray, attachWindow, showWindow, mainWindow } = require('./tray.cjs');
+const { registerDemo } = require('./demo.cjs');
 const { isLocalName, resolvesToPrivate } = require('./netsafe.cjs');
 
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
@@ -21,7 +22,8 @@ if (!fs.existsSync(app.getPath('userData')) && fs.existsSync(legacyData)) {
   }
 }
 
-function createWindow() {
+/** The app window. `partition` gives it separate storage (the demo window uses one). */
+function createWindow({ partition } = {}) {
   const win = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -39,9 +41,10 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       // Scheduled tasks run while the window is hidden in the menu bar; don't slow their timers down.
       backgroundThrottling: false,
+      ...(partition ? { partition } : {}),
     },
   });
-  attachWindow(win);
+  if (!partition) attachWindow(win);
 
   if (process.env.VITE_DEV_SERVER_URL) win.loadURL(process.env.VITE_DEV_SERVER_URL);
   else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
@@ -94,6 +97,7 @@ function createWindow() {
     shell.openExternal(url);
     return { action: 'deny' };
   });
+  return win;
 }
 
 // ---- Widget network policy -------------------------------------------------------------------
@@ -103,13 +107,15 @@ function createWindow() {
 
 const WIDGET_REFERER = 'https://github.com/ejsoler/penumbra';
 
-/** Set by the app (see src/widgets/network.ts). Until then, widgets get no network at all. */
-let widgetNet = { mode: 'ask', hosts: [], block: [] };
+/** Each window's policy, set by its page (see src/widgets/network.ts). Until then, widgets get no network. */
+const NO_NETWORK = { mode: 'ask', hosts: [], block: [] };
+const widgetNets = new Map(); // webContents id → policy
 
 ipcMain.on('widget-net:set', (e, policy) => {
   if (e.senderFrame !== e.sender.mainFrame || !policy || typeof policy !== 'object') return;
   const list = (v) => (Array.isArray(v) ? v.filter((h) => typeof h === 'string').map((h) => h.toLowerCase()) : []);
-  widgetNet = { mode: policy.mode === 'all' ? 'all' : 'ask', hosts: list(policy.hosts), block: list(policy.block) };
+  if (!widgetNets.has(e.sender.id)) e.sender.once('destroyed', () => widgetNets.delete(e.sender.id));
+  widgetNets.set(e.sender.id, { mode: policy.mode === 'all' ? 'all' : 'ask', hosts: list(policy.hosts), block: list(policy.block) });
 });
 
 const isWidgetRequest = (d) => Boolean(d.webContents) && d.resourceType !== 'mainFrame' && (!d.frame || Boolean(d.frame.parent));
@@ -118,6 +124,7 @@ const hostMatches = (host, pattern) => (pattern.startsWith('*.') ? host.endsWith
 
 /** Why a widget request is blocked, or null if it may go ahead. */
 async function widgetBlockReason(d) {
+  const widgetNet = widgetNets.get(d.webContents?.id) ?? NO_NETWORK;
   if (/^(data|blob|about):/.test(d.url)) return null;
   let url;
   try {
@@ -143,14 +150,9 @@ function logWidgetRequest(d, extra) {
   d.webContents.send('widget-net:request', { frame: d.frame?.name ?? '', method: d.method, url: d.url.slice(0, 2048), ...extra });
 }
 
-app.whenReady().then(() => {
-  registerSkills();
-  registerTools();
-  registerUpdates();
-  registerTray();
-  // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).
-  if (process.platform === 'darwin') app.dock?.setIcon(ICON);
-  const { webRequest } = session.defaultSession;
+/** The rules every app session gets: widget network limits, Ollama and Hugging Face headers, permissions. */
+function protectSession(ses) {
+  const { webRequest } = ses;
   // A session has one listener per event, so each handler below covers both the app and widgets.
   webRequest.onBeforeRequest((details, cb) => {
     if (!isWidgetRequest(details)) return cb({});
@@ -189,12 +191,23 @@ app.whenReady().then(() => {
     // ERR_ABORTED is the widget cancelling its own request (maps do this for tiles they no longer need).
     logWidgetRequest(details, details.error === 'net::ERR_ABORTED' ? { cancelled: true } : { failed: details.error });
   });
-  session.defaultSession.setPermissionRequestHandler((_wc, _permission, cb, details) => cb(details.isMainFrame));
-  session.defaultSession.setPermissionCheckHandler((_wc, _permission, _origin, details) => details.isMainFrame !== false);
+  ses.setPermissionRequestHandler((_wc, _permission, cb, details) => cb(details.isMainFrame));
+  ses.setPermissionCheckHandler((_wc, _permission, _origin, details) => details.isMainFrame !== false);
+}
+
+app.whenReady().then(() => {
+  registerSkills();
+  registerTools();
+  registerUpdates();
+  registerTray();
+  registerDemo({ createWindow, protectSession });
+  // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).
+  if (process.platform === 'darwin') app.dock?.setIcon(ICON);
+  protectSession(session.defaultSession);
 
   createWindow();
   // The Dock icon brings back a window hidden in the menu bar.
-  app.on('activate', () => (BrowserWindow.getAllWindows().length ? showWindow() : createWindow()));
+  app.on('activate', () => (mainWindow() ? showWindow() : createWindow()));
 });
 
 app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit());

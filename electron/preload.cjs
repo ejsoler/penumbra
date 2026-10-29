@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld('penumbraHost', {
     },
   },
   /** Tells the main process whether to stay in the menu bar, and what to show there. */
+  /** Opens the guided demo in its own window, using this model for every reply. */
+  startDemo: (model) => ipcRenderer.invoke('demo:start', model),
   setTrayStatus: (status) => ipcRenderer.send('tray:status', status),
   showWindow: () => ipcRenderer.send('app:show'),
   setWidgetNetwork: (policy) => ipcRenderer.send('widget-net:set', policy),

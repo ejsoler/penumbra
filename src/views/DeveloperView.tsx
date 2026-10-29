@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import * as api from '../api';
 import type { OllamaState } from '../store';
-import { Check, Copy, Loader2, RefreshCw, Server } from '../components/icons';
+import { Check, Copy, Loader2, Play, RefreshCw, Server } from '../components/icons';
 import { host as penumbraHost } from '../host';
 import { checkForUpdates, setUpdateSettings, useUpdates } from '../updates';
 
@@ -48,7 +48,7 @@ print(response.message.content)`,
       <header className="page-head">
         <div>
           <h1>Developer</h1>
-          <p className="muted">Server connection, API usage, and updates.</p>
+          <p className="muted">Server connection, API usage, the guided demo, and updates.</p>
         </div>
       </header>
 
@@ -73,6 +73,8 @@ print(response.message.content)`,
           </p>
         )}
       </section>
+
+      {penumbraHost() && <DemoPanel ollama={ollama} />}
 
       {penumbraHost() && <UpdatesPanel />}
 
@@ -124,6 +126,46 @@ function UpdatesPanel() {
         <input type="checkbox" checked={settings.auto} onChange={(e) => setUpdateSettings({ auto: e.target.checked })} />
         <span>Check for updates automatically <span className="muted">(asks GitHub for the latest release; nothing else is sent)</span></span>
       </label>
+    </section>
+  );
+}
+
+function DemoPanel({ ollama }: { ollama: OllamaState }) {
+  // Local models that can call tools: the tour uses agents and tools. Loaded ones first, so it starts fast.
+  const models = ollama.models
+    .filter((m) => !m.remote_host && (ollama.capabilities[m.name] ?? []).includes('tools') && !(ollama.capabilities[m.name] ?? []).includes('embedding'))
+    .sort((a, b) => Number(ollama.running.some((r) => r.name === b.name)) - Number(ollama.running.some((r) => r.name === a.name)));
+  const [choice, setChoice] = useState('');
+  const [state, setState] = useState<'idle' | 'starting' | 'open' | string>('idle');
+  const model = models.some((m) => m.name === choice) ? choice : models[0]?.name ?? '';
+  const start = async () => {
+    setState('starting');
+    try {
+      await penumbraHost()!.startDemo(model);
+      setState('open');
+    } catch (e) {
+      setState(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(e));
+    }
+  };
+  return (
+    <section className="panel">
+      <h4>Guided demo</h4>
+      <p className="muted small">
+        A step-by-step tour of Penumbra: interactive answers, internet widgets, agents and skills, tools, the orchestrator, and the scheduler. It opens in its own
+        window with demo chats, agents, and files, so yours aren’t touched. A panel shows each step; nothing happens until you click Next.
+      </p>
+      <div className="row gap" style={{ alignItems: 'center', marginTop: 10 }}>
+        <select className="wide-select" value={model} onChange={(e) => setChoice(e.target.value)} disabled={!models.length}>
+          {!models.length && <option value="">No local model with tool support installed</option>}
+          {models.map((m) => <option key={m.name} value={m.name}>{m.name}{m.details.parameter_size ? ` (${m.details.parameter_size})` : ''}</option>)}
+        </select>
+        <button className="btn primary" disabled={!model || state === 'starting'} onClick={start}>
+          {state === 'starting' ? <Loader2 size={14} className="spin" /> : <Play size={14} />} {state === 'open' ? 'Show demo' : 'Start demo'}
+        </button>
+      </div>
+      <p className="muted small" style={{ marginTop: 8 }}>
+        {state !== 'idle' && state !== 'starting' && state !== 'open' ? <span className="red">{state}</span> : 'Every reply uses this model. A model of about 7B or larger works best; the full tour takes about 25 minutes.'}
+      </p>
     </section>
   );
 }

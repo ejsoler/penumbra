@@ -57,6 +57,8 @@ export interface PenumbraHost {
     reveal: () => Promise<void>;
     onProgress: (cb: (p: { got: number; total: number }) => void) => () => void;
   };
+  /** Opens the guided demo in its own window (separate chats, agents, and skills). */
+  startDemo: (model: string) => Promise<'started' | 'focused'>;
   setTrayStatus: (status: { enabled: boolean; active: number; next: { name: string; when: string } | null }) => void;
   showWindow: () => void;
   setWidgetNetwork: (policy: { mode: NetMode; hosts: string[]; block: string[] }) => void;

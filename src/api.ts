@@ -197,9 +197,14 @@ export function formatBytes(n: number): string {
   return `${(n / 1024 ** i).toFixed(i >= 3 ? 2 : 1)} ${units[i]}`;
 }
 
-/** A text model (or a GGUF copy of an image model) fails to load as an image generator; say so plainly. */
-const notAnImageModel = (e: unknown, model: string) =>
-  e instanceof Error && /unknown model architecture/i.test(e.message) ? new Error(`Ollama can't run ${model} as an image model. Use one from ollama.com, like x/z-image-turbo.`) : e;
+/** Image generation can fail because of the model or the Ollama version; say which, plainly. */
+const notAnImageModel = (e: unknown, model: string) => {
+  if (!(e instanceof Error)) return e;
+  // Recent Ollama versions turned image generation off, even for its own image models.
+  if (/image generation models are not (currently )?supported/i.test(e.message)) return new Error("This version of Ollama can't generate images (it says image generation isn't supported right now). Upload an image or pick an emoji instead.");
+  if (/unknown model architecture/i.test(e.message)) return new Error(`Ollama can't run ${model} as an image model. Use one from ollama.com, like x/z-image-turbo.`);
+  return e;
+};
 
 /**
  * Generates an image with an image model (Ollama's experimental image generation, e.g. x/z-image-turbo

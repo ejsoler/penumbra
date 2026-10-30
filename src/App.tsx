@@ -78,7 +78,7 @@ export default function App() {
         ))}
         <span className="flex" />
         <UpdateButton />
-        <ProfileButton ollama={ollama} />
+        <ProfileButton />
         <div className={`rail-status ${ollama.connected ? 'on' : ollama.connected === false ? 'off' : ''}`} title={ollama.connected ? `Ollama v${ollama.version}` : 'Ollama not reachable'} />
       </nav>
 

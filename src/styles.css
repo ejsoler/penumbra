@@ -685,9 +685,6 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .tcard.new { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: none; border: 2px dashed var(--border-strong); box-shadow: none; color: var(--text-dim); font-size: 13.5px; transform: none; }
 .tcard.new:hover { border-color: var(--accent); color: var(--accent-strong); }
 .tcard-actions { display: flex; gap: 6px; }
-.avatar-gen { display: flex; flex-direction: column; gap: 8px; }
-.avatar-gen b { display: flex; align-items: center; gap: 6px; }
-.avatar-gen textarea { width: 100%; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .tcard { transform: none; transition: none; } }
 .back-link { margin-top: 18px; font-size: 12.5px; }
 .back-link + .page-head { padding-top: 10px; }

@@ -1,11 +1,10 @@
 // The sidebar's "you" button: your avatar, and a small card to set your name and avatar.
 import { useEffect, useRef, useState } from 'react';
-import type { OllamaState } from '../store';
 import { asAvatar, setProfile, useProfile } from '../profile';
-import { AgentAvatar, AvatarPicker, imageModelsOf } from './AgentAvatar';
+import { AgentAvatar, AvatarPicker } from './AgentAvatar';
 import { X } from './icons';
 
-export function ProfileButton({ ollama }: { ollama: OllamaState }) {
+export function ProfileButton() {
   const profile = useProfile();
   const me = asAvatar(profile);
   const [open, setOpen] = useState(false);
@@ -38,7 +37,7 @@ export function ProfileButton({ ollama }: { ollama: OllamaState }) {
             <button className="icon-btn sm" onClick={() => setOpen(false)} title="Close"><X size={14} /></button>
           </div>
           <div className="profile-row">
-            <AvatarPicker agent={me} onChange={(avatar) => setProfile({ avatar })} size={64} imageModels={imageModelsOf(ollama)} />
+            <AvatarPicker agent={me} onChange={(avatar) => setProfile({ avatar })} size={64} />
             <label className="wizard-field profile-name">
               <span>Your name</span>
               <input className="text plain" value={profile.name} placeholder="You" maxLength={40} onChange={(e) => setProfile({ name: e.target.value })} />

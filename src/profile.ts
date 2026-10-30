@@ -37,4 +37,4 @@ export function setProfile(patch: Partial<Profile>) {
 }
 
 /** The profile in the shape the avatar components take. */
-export const asAvatar = (p: Profile) => ({ id: 'me', name: p.name.trim() || 'You', avatar: p.avatar, description: '', persona: '' });
+export const asAvatar = (p: Profile) => ({ id: 'me', name: p.name.trim() || 'You', avatar: p.avatar });

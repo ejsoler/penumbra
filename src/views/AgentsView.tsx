@@ -7,7 +7,7 @@ import {
 import { NEW_SKILL, refreshSkills, setSkillEnabled, useSkills } from '../agents/skills';
 import { host, type SkillInfo } from '../host';
 import { useContextMenu } from '../components/ContextMenu';
-import { AgentAvatar, AvatarPicker, colorFor, imageModelsOf, initials, isImageAvatar } from '../components/AgentAvatar';
+import { AgentAvatar, AvatarPicker, colorFor, initials, isImageAvatar } from '../components/AgentAvatar';
 import {
   BookOpen, Bot, Copy, FileText, FolderOpen, Globe, MessageSquarePlus, Pencil, Plus, Sparkles, Terminal, Trash2, Upload, X,
 } from '../components/icons';
@@ -235,7 +235,7 @@ function AgentEditor({ agent, ollama, skills, onChat, onBack }: { agent: Agent; 
     <div className="editor">
       <button className="link-btn back-link" onClick={onBack}>← All agents</button>
       <header className="page-head">
-        <AvatarPicker agent={agent} onChange={(avatar) => set({ avatar })} size={84} imageModels={imageModelsOf(ollama)} />
+        <AvatarPicker agent={agent} onChange={(avatar) => set({ avatar })} size={84} />
         <div className="editor-title">
           <input className="title-input" value={agent.name} onChange={(e) => set({ name: e.target.value })} aria-label="Agent name" />
           <input className="subtitle-input" value={agent.description} placeholder="Purpose: what is this agent for? (the orchestrator reads this)" onChange={(e) => set({ description: e.target.value })} aria-label="Purpose" />
@@ -417,7 +417,7 @@ function NewAgentWizard({ template, ollama, agents, onClose, onCreated }: {
           <button className="icon-btn sm" onClick={onClose} title="Close"><X size={14} /></button>
         </div>
         <div className="wizard-intro">
-          <AvatarPicker agent={{ id: draftId, name: name || '?', avatar, description: purpose, persona }} onChange={setAvatar} size={52} imageModels={imageModelsOf(ollama)} />
+          <AvatarPicker agent={{ id: draftId, name: name || '?', avatar }} onChange={setAvatar} size={52} />
           <p>Every agent shares the model’s knowledge. Give this one a purpose, a name, and a persona, and an avatar if you like.</p>
         </div>
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0 (2026-10-30)
 
 ### Added
 - **Interactive answers.** The model can reply with small live apps (calculators, charts, diagrams, 3D views, quizzes) that run inside the chat. It decides on its own when an app helps more than text.

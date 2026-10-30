@@ -12,6 +12,10 @@
   <a href="https://ko-fi.com/O8O227N74P"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" /></a>
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/chat-widget.png" alt="A chat where the model answers with a live temperature converter" />
+</p>
+
 ---
 
 ## Features
@@ -36,12 +40,23 @@
 - Works best with 7B+ models. Interactive chats use at least a 16K context
 
 **Agents, skills & orchestration** *(new in 0.2.0)*
-- Create agents with their own model, instructions, skills, and tools, and pick one in any chat
+- Create agents with a short wizard: a purpose, a name, and a persona (personality and communication style). Every agent keeps the model's full knowledge; the persona shapes how it talks and works
+- Give each agent an avatar (an image or an emoji). The Agents tab shows them as trading cards
+- Each agent has its own model, skills, and tools, and can be picked in any chat
 - Skills use Claude's `SKILL.md` format: create them in the app or import folders and `.zip` files. The model loads a skill only when a task needs it
 - Tools: web search and pages, read and write files in a folder you choose, and terminal commands (each one asks you first). Every reply shows the tools it used
 - Attach text files to a message
 - The **Orchestrator** plans a goal into tasks, creates the agents it needs, lets you review and edit the plan, then runs each task on its agent and writes the final answer. Follow runs on a board with one column per agent
 - The **Scheduler** runs prompts, agents, orchestrator goals, or terminal commands at set times or on repeat, with a chat per task for the results. While tasks are on, Penumbra keeps running in the menu bar when you close the window
+
+**Screenshots**
+
+| | |
+|---|---|
+| ![Agents as trading cards](docs/screenshots/agents.png) | ![An agent's purpose, persona, and avatar](docs/screenshots/agent-editor.png) |
+| Agents as trading cards | Purpose, persona, and avatar |
+| ![An orchestrator run with two agents](docs/screenshots/orchestrator.png) | ![A scheduled task with its run log](docs/screenshots/scheduler.png) |
+| An orchestrator run | A scheduled task and its run log |
 
 **Models**
 - Model picker (<kbd>⌘L</kbd>) that loads the model into memory, with capability badges (vision, tools, reasoning)
@@ -54,6 +69,9 @@
 - Pause, resume, and retry downloads, with speed and time remaining; unfinished downloads survive restarts
 
 **Everywhere**
+- Your own name and avatar on your messages (set from the button at the bottom of the sidebar)
+- A quiet update check: a small icon in the sidebar when a new version is out, which downloads the installer for your computer
+- A guided demo of every feature (Developer → Guided demo), in its own window with sample data
 - Right-click menus for chats, messages, code blocks, models, and downloads
 - Keyboard shortcuts: <kbd>⌘N</kbd> new chat, <kbd>⌘L</kbd> model picker, <kbd>Enter</kbd> send, <kbd>Shift</kbd>+<kbd>Enter</kbd> newline
 

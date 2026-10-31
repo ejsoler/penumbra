@@ -1,4 +1,4 @@
-// The guided demo (docs/DEMO.md), started from the Developer tab. It opens a separate window with its own
+// The guided demo (docs/DEMO.md), started from the Options tab. It opens a separate window with its own
 // storage, skills folder, and demo files, so your chats, agents, and skills are never touched. A panel
 // in that window shows the next step; nothing happens until "Next" is clicked.
 const { app, ipcMain } = require('electron');
@@ -78,6 +78,7 @@ async function runDemo(win, model) {
     localStorage.setItem('ollama-gui.view', '"chat"');
     localStorage.setItem('ollama-gui.showSettings', 'false');
     localStorage.setItem('ollama-gui.interactiveNoticeSeen', 'true');
+    localStorage.setItem('ollama-gui.tutorial', 'hidden');
     localStorage.setItem('ollama-gui.params', JSON.stringify({ think: false }));
     localStorage.setItem('ollama-gui.workspaceModel', ${str(model)});
     localStorage.setItem('ollama-gui.updates', JSON.stringify({ auto: false, skipped: '' }));

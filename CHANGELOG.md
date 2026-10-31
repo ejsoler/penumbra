@@ -12,8 +12,8 @@
 - A "best with 7B+" hint when a small model is selected with interactive answers on.
 - **Internet for widgets:** maps (Leaflet with OpenStreetMap or Esri tiles), live public data (weather, earthquakes, exchange rates, Wikipedia, countries), and libraries from CDNs.
   - A built-in list of approved sites works right away. Any other site shows an Allow / Always allow / Run offline card on that widget first.
-  - Optional **Whole internet** mode in **Developer → Internet access**, with a warning before it turns on.
-  - **Your sites:** add your own sites to the approved list in **Developer → Internet access** (one list for all chats; each chat's settings panel shows a summary and a link to it) (`api.example.com`, `*.example.com` for every subdomain, or paste a link), and remove them there. Widgets and agents' web tools use them without asking. Local addresses and IPs can't be added.
+  - Optional **Whole internet** mode in **Options → Internet access**, with a warning before it turns on.
+  - **Your sites:** add your own sites to the approved list in **Options → Internet access** (one list for all chats; each chat's settings panel shows a summary and a link to it) (`api.example.com`, `*.example.com` for every subdomain, or paste a link), and remove them there. Widgets and agents' web tools use them without asking. Local addresses and IPs can't be added.
   - Every widget has a network log listing each request it made, including blocked ones.
   - If a widget tries a site it wasn't granted, a bar offers to allow it.
   - Errors a widget catches and logs with `console.error` also show the **Ask model to fix** button.
@@ -30,6 +30,7 @@
   - **Generate…** in the avatar menu (agents and your profile) makes an avatar with your image model.
   - **Images in chats and agents:** a new **Images** tool. Ask for a picture in any chat and the model creates it with your image model; it appears in the reply, with its size, seed, and a button to show the file. It's on for chats once an image model is installed, and agents get it with the **Images** checkbox. Orchestrator tasks can use it too.
   - **Where images are saved:** in **Pictures/Penumbra** by default, with readable names (date, time, and the start of the prompt). **Change…** in the Images tab picks another folder, and **Reset** goes back. In a chat with a folder, images are saved in that folder. Chats keep only a short reference to each image, and only images Penumbra made can be shown. Deleting one from the gallery moves it to the Trash.
+- **Tutorial.** A short guided tour opens when Penumbra starts: each step highlights part of the screen (the model picker, interactive answers, the orchestrator, scheduler, agents, images, profiles, options) and explains it. It shows at every start until you click **Don't show again**; that choice is per profile, so each new profile sees it once. **Options → Tutorial** opens it again and turns the startup display back on.
 - **Profiles.** Keep separate chats, agents, skills, settings, scheduled tasks, and image history for different people or uses (Work, Personal…). Create and switch profiles from the button at the bottom of the sidebar; downloaded models are shared. Your existing data becomes the first profile.
   - **Passwords:** a profile can have a password. Penumbra shows a lock screen until it's entered, and nothing in the profile starts before that. **Lock now** locks it right away. Passwords are stored only as a salted scrypt hash, and wrong guesses slow down after five. It's an app lock: it doesn't encrypt the files on disk (FileVault or BitLocker does).
   - Deleting a profile (its password is needed) removes its chats, settings, and skills; images it saved in folders stay.
@@ -58,10 +59,11 @@
   - While any task is on, closing the window keeps Penumbra in the menu bar (system tray on Windows and Linux) so tasks run on time. Quit from the menu bar icon. You can turn this off.
   - A **run log** on each task: every run with its start time, what triggered it (on schedule, Run now, or missed while Penumbra was quit), how long it took, the result or error, the tools it used, and any wait for your OK. It keeps the last 50 runs per task, and you can clear it.
   - A notification when a task finishes or needs you. Tasks run one at a time and wait while you're using the chat. A run missed while Penumbra was quit runs once when it opens.
-- **Guided demo.** **Developer → Guided demo → Start demo** opens the tour from `docs/DEMO.md` in its own window, with demo chats, agents, skills, and files, so yours aren't touched. A panel shows each step, and nothing happens until you click Next. Closing the window deletes the demo's files.
-- **Update check.** Penumbra asks GitHub for the latest release shortly after it opens and twice a day. A newer version shows as a small arrow icon at the bottom of the sidebar, with no pop-ups. Clicking it shows what's new and downloads the installer for your computer to the Downloads folder, checking it against the release's checksum. You can also skip that version. The **Developer** tab has **Check now** and a switch to turn the check off.
+- **Guided demo.** **Options → Guided demo → Start demo** opens the tour from `docs/DEMO.md` in its own window, with demo chats, agents, skills, and files, so yours aren't touched. A panel shows each step, and nothing happens until you click Next. Closing the window deletes the demo's files.
+- **Update check.** Penumbra asks GitHub for the latest release shortly after it opens and twice a day. A newer version shows as a small arrow icon at the bottom of the sidebar, with no pop-ups. Clicking it shows what's new and downloads the installer for your computer to the Downloads folder, checking it against the release's checksum. You can also skip that version. The **Options** tab has **Check now** and a switch to turn the check off.
 
 ### Changed
+- The **Developer** tab is now **Options** (with a gear icon): server, tutorial, internet access, guided demo, updates, and API examples.
 - Chats with interactive answers or tools use a context of at least 16K tokens, since widget replies and tool results are long.
 - Replies keep streaming when you switch to another tab.
 - Single line breaks in replies are kept, so addresses, lists, and memos read as written.

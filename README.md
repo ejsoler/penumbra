@@ -33,7 +33,7 @@
 - It decides on its own when an app helps more than text, and answers in plain text otherwise
 - Turn it on or off for each chat with the **Interactive** switch at the top (on by default)
 - Chart.js, D3, and Three.js are built in, so widgets work offline
-- Widgets can use the internet for maps and live public data (weather, earthquakes, exchange rates, Wikipedia). Approved sites work right away; any other site asks you first. A **Whole internet** option and your own approved sites are in the Developer tab
+- Widgets can use the internet for maps and live public data (weather, earthquakes, exchange rates, Wikipedia). Approved sites work right away; any other site asks you first. A **Whole internet** option and your own approved sites are in the Options tab
 - Open a widget full screen, save it as a standalone `.html` file, or view and copy its code
 - Widgets can suggest follow-up questions; they go into your message box, and you decide whether to send them
 - If a widget breaks, **Ask model to fix** sends the error back to the model for a corrected version
@@ -71,7 +71,7 @@
 **Everywhere**
 - Your own name and avatar on your messages (set from the button at the bottom of the sidebar)
 - A quiet update check: a small icon in the sidebar when a new version is out, which downloads the installer for your computer
-- A guided demo of every feature (Developer → Guided demo), in its own window with sample data
+- A guided demo of every feature (Options → Guided demo), in its own window with sample data
 - Right-click menus for chats, messages, code blocks, models, and downloads
 - Keyboard shortcuts: <kbd>⌘N</kbd> new chat, <kbd>⌘L</kbd> model picker, <kbd>Enter</kbd> send, <kbd>Shift</kbd>+<kbd>Enter</kbd> newline
 
@@ -129,7 +129,7 @@ This builds `Penumbra.app`, signs it for local use, and copies it to `/Applicati
 
 ## Configuration
 
-By default the app talks to Ollama at `http://127.0.0.1:11434`. You can change this in **Developer → Server URL**, for example to use Ollama on another machine. That server must allow the app's origin:
+By default the app talks to Ollama at `http://127.0.0.1:11434`. You can change this in **Options → Server URL**, for example to use Ollama on another machine. That server must allow the app's origin:
 
 ```bash
 OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve
@@ -140,7 +140,7 @@ OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve
 ```
 electron/         Electron main process, preload bridge, skills, tools (files, terminal, web), update check, menu bar
 src/
-  updates.ts      Update check state (the sidebar icon and Developer panel)
+  updates.ts      Update check state (the sidebar icon and Options panel)
   scheduler.ts    Scheduled tasks: timing, running them, menu bar status
   api.ts          Ollama REST client (streaming chat, pull, show, ps…)
   hf.ts           Hugging Face Hub search + GGUF quant listing
@@ -150,13 +150,13 @@ src/
   agents/         Agent loop, tools, skills, agents store, orchestrator planning
   components/     Model picker, Markdown renderer, widget frame, plan card, context menu, icons
   widgets/        Widget sandbox document, system prompt, bundled chart/3D libraries
-  views/          Chat, Orchestrator, Scheduler, Agents & Skills, My Models, Discover, Hugging Face, Developer
+  views/          Chat, Orchestrator, Scheduler, Agents & Skills, My Models, Discover, Hugging Face, Options
 build/            App icon source, icon generator, install script
 ```
 
 ## Privacy
 
-Everything runs locally. The app itself talks only to your Ollama server, plus the Hugging Face API when you browse the Hugging Face tab, and GitHub's release list to check for updates (turn that off in the Developer tab). Widgets and agents reach the internet only for what they're doing (a map, a weather forecast, a web search or page), under the rules below. Chats and settings are stored in the app's local storage on your machine.
+Everything runs locally. The app itself talks only to your Ollama server, plus the Hugging Face API when you browse the Hugging Face tab, and GitHub's release list to check for updates (turn that off in the Options tab). Widgets and agents reach the internet only for what they're doing (a map, a weather forecast, a web search or page), under the rules below. Chats and settings are stored in the app's local storage on your machine.
 
 If you use a cloud model from Ollama (names ending in `-cloud`), Ollama sends that chat to its servers. The orchestrator never picks a cloud model for new agents on its own.
 

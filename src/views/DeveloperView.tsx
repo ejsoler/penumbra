@@ -5,6 +5,7 @@ import { Check, Copy, Loader2, Play, RefreshCw, Server } from '../components/ico
 import { host as penumbraHost } from '../host';
 import { checkForUpdates, setUpdateSettings, useUpdates } from '../updates';
 import { InternetSettings } from '../components/InternetSettings';
+import { openTutorial, setTutorialAtStart, tutorialAtStart } from '../components/Tutorial';
 
 /** Set before switching to this tab to scroll to a section. */
 export const developerFocus = { section: '' };
@@ -56,8 +57,8 @@ print(response.message.content)`,
     <main className="page">
       <header className="page-head">
         <div>
-          <h1>Developer</h1>
-          <p className="muted">Server connection, internet access, API usage, the guided demo, and updates.</p>
+          <h1>Options</h1>
+          <p className="muted">Server connection, the tutorial, internet access, the guided demo, updates, and API usage.</p>
         </div>
       </header>
 
@@ -82,6 +83,8 @@ print(response.message.content)`,
           </p>
         )}
       </section>
+
+      <TutorialPanel />
 
       <InternetSettings />
 
@@ -177,6 +180,23 @@ function DemoPanel({ ollama }: { ollama: OllamaState }) {
       <p className="muted small" style={{ marginTop: 8 }}>
         {state !== 'idle' && state !== 'starting' && state !== 'open' ? <span className="red">{state}</span> : 'Every reply uses this model. A model of about 7B or larger works best; the full tour takes about 25 minutes.'}
       </p>
+    </section>
+  );
+}
+
+function TutorialPanel() {
+  const [atStart, setAtStart] = useState(tutorialAtStart());
+  return (
+    <section className="panel" id="tutorial">
+      <h4>Tutorial</h4>
+      <div className="row gap" style={{ alignItems: 'center' }}>
+        <span className="muted small flex">A short tour of Penumbra: each step points at part of the screen and explains it. About a minute.</span>
+        <button className="btn sm" onClick={openTutorial}>Show tutorial</button>
+      </div>
+      <label className="check-row">
+        <input type="checkbox" checked={atStart} onChange={(e) => { setTutorialAtStart(e.target.checked); setAtStart(e.target.checked); }} />
+        <span>Show it when Penumbra opens <span className="muted">(for this profile)</span></span>
+      </label>
     </section>
   );
 }

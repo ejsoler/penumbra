@@ -1,4 +1,4 @@
-// Internet access for widgets and agents' web tools, set once for all chats (shown in the Developer tab).
+// Internet access for widgets and agents' web tools, set once for all chats (shown in the Options tab).
 import { useState } from 'react';
 import { alwaysAllow, APPROVED_SITES, parseSite, removeAlwaysAllowed, setNetMode, useNetSettings } from '../widgets/network';
 import { Globe, TriangleAlert, X } from './icons';

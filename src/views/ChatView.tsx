@@ -59,7 +59,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   pendingAgent: string | null;
   onPendingHandled: () => void;
   onManageAgents: () => void;
-  /** Opens the internet access settings (the Developer tab). */
+  /** Opens the internet access settings (the Options tab). */
   onInternetSettings: () => void;
 }) {
   const agents = useAgents();
@@ -894,7 +894,7 @@ function GeneratedImages({ images, live }: { images: GeneratedRef[]; live: boole
   );
 }
 
-/** The chat panel's line about internet access, which is set once for all chats in the Developer tab. */
+/** The chat panel's line about internet access, which is set once for all chats in the Options tab. */
 function InternetSummary({ onManage }: { onManage: () => void }) {
   const net = useNetSettings();
   return (

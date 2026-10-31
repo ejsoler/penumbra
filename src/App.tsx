@@ -6,7 +6,7 @@ import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView, developerFocus } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
-import { Bot, CalendarClock, FolderOpen, ImageIcon, MessageSquare, Telescope, Terminal, Workflow } from './components/icons';
+import { Bot, CalendarClock, FolderOpen, ImageIcon, MessageSquare, Settings, Telescope, Workflow } from './components/icons';
 import { WorkspaceView } from './views/WorkspaceView';
 import { SchedulerView } from './views/SchedulerView';
 import { ImagesView } from './views/ImagesView';
@@ -20,6 +20,7 @@ import { UpdateButton } from './components/UpdateButton';
 import { ProfileButton } from './components/ProfileButton';
 import { LightboxHost } from './components/Lightbox';
 import { LockScreen } from './components/LockScreen';
+import { Tutorial } from './components/Tutorial';
 import { host, type ProfileInfo } from './host';
 import { syncProfile } from './profile';
 import { startUpdateChecks } from './updates';
@@ -32,7 +33,7 @@ const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'scheduler', label: 'Scheduler', icon: CalendarClock },
   { id: 'agents', label: 'Agents & Skills', icon: Bot },
   { id: 'images', label: 'Images', icon: ImageIcon },
-  { id: 'developer', label: 'Developer', icon: Terminal },
+  { id: 'developer', label: 'Options', icon: Settings },
   { id: 'models', label: 'My Models', icon: FolderOpen },
   { id: 'discover', label: 'Discover', icon: Telescope },
 ];
@@ -111,7 +112,7 @@ function Main() {
       <div className="content">
         {ollama.connected === false && showBanner && (
           <div className="banner error top">
-            Can't reach the Ollama server. Is it running? Check the URL in <button className="link" onClick={() => setView('developer')}>Developer</button>.
+            Can't reach the Ollama server. Is it running? Check the URL in <button className="link" onClick={() => setView('developer')}>Options</button>.
             <button className="link" onClick={() => setShowBanner(false)}>Dismiss</button>
           </div>
         )}
@@ -145,6 +146,7 @@ function Main() {
         </div>
       </div>
     <LightboxHost />
+    <Tutorial setView={(v) => setView(v as View)} />
     </div>
     </ContextMenuProvider>
   );

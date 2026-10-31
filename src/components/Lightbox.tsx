@@ -1,7 +1,7 @@
 // A full-window image viewer. Any image in the app opens it with openLightbox(); it zooms with the wheel
 // or a trackpad pinch (toward the pointer), pans by dragging, and steps through a set with the arrow keys.
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ChevronLeft, ChevronRight, FolderOpen, Maximize2, X, ZoomIn, ZoomOut } from './icons';
+import { Check, ChevronLeft, ChevronRight, Copy, FolderOpen, Maximize2, X, ZoomIn, ZoomOut } from './icons';
 import { host } from '../host';
 
 export interface LightboxImage {
@@ -143,7 +143,23 @@ function Viewer({ images, index }: { images: LightboxImage[]; index: number }) {
 
       {index > 0 && <button className="lightbox-nav prev" title="Previous (←)" onClick={() => go(-1)}><ChevronLeft size={26} /></button>}
       {index < images.length - 1 && <button className="lightbox-nav next" title="Next (→)" onClick={() => go(1)}><ChevronRight size={26} /></button>}
-      {(img.caption || img.alt) && <div className="lightbox-caption">{img.caption || img.alt}</div>}
+      {(img.caption || img.alt) && <Caption text={(img.caption || img.alt)!} />}
+    </div>
+  );
+}
+
+/** The prompt under the image: scrolls when long, with a button to copy it. */
+function Caption({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <div className="lightbox-caption" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="lightbox-caption-text">{text}</div>
+      <button className="icon-btn sm" title={copied ? 'Copied' : 'Copy prompt'} onClick={copy}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>
     </div>
   );
 }

@@ -766,5 +766,7 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .lightbox-nav:hover { background: rgba(60, 54, 90, 0.9); }
 .lightbox-nav.prev { left: 18px; }
 .lightbox-nav.next { right: 18px; }
-.lightbox-caption { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: min(900px, calc(100vw - 80px)); padding: 8px 14px; border-radius: 10px; background: rgba(30, 28, 40, 0.8); color: #d8d5e8; font-size: 12.5px; line-height: 1.4; text-align: center; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; pointer-events: none; }
+.lightbox-caption { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); width: max-content; max-width: min(900px, calc(100vw - 80px)); display: flex; align-items: flex-start; gap: 8px; padding: 8px 8px 8px 14px; border-radius: 10px; background: rgba(30, 28, 40, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); color: #d8d5e8; font-size: 12.5px; line-height: 1.45; }
+.lightbox-caption-text { flex: 1; min-width: 0; max-height: 7.3em; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; padding-right: 4px; }
+.lightbox-caption .icon-btn { flex-shrink: 0; color: #e8e6f3; }
 .images-thumb .thumb-reuse { right: 32px; font-size: 13px; }

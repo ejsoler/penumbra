@@ -2,6 +2,7 @@
 // Runs outside Ollama, with stable-diffusion.cpp (see electron/images.cjs).
 import { useEffect, useState } from 'react';
 import { usePersistent } from '../store';
+import { openLightbox } from '../components/Lightbox';
 import { host, type GeneratedImage, type ImageModel, type SaveDir } from '../host';
 import { compact, listQuants, searchModels, type HfModel, type HfQuant } from '../hf';
 import { formatBytes } from '../api';
@@ -200,7 +201,7 @@ function Create({ models }: { models: ImageModel[] }) {
 
       {result && (
         <section className="panel images-result">
-          <img src={result.image} alt={result.prompt ?? ''} />
+          <img src={result.image} alt={result.prompt ?? ''} title="Click to enlarge" className="zoomable" onClick={() => openLightbox([{ src: result.image, alt: result.prompt, caption: result.prompt, file: result.file }])} />
           <div className="row gap">
             <span className="muted small flex">{result.width}×{result.height} · {result.steps} steps · seed {result.seed}</span>
             <button className="btn sm" onClick={() => setSeed(String(result.seed))} title="Use this seed again">Reuse seed</button>
@@ -215,7 +216,8 @@ function Create({ models }: { models: ImageModel[] }) {
           <div className="images-gallery">
             {gallery.map((g) => (
               <div key={g.file} className="images-thumb">
-                <img src={g.image} alt={g.prompt ?? ''} title={g.prompt} onClick={() => { setResult(g); if (g.prompt) setPrompt(g.prompt); }} />
+                <img src={g.image} alt={g.prompt ?? ''} title={g.prompt} onClick={() => openLightbox(gallery.map((x) => ({ src: x.image, alt: x.prompt, caption: x.prompt, file: x.file })), gallery.indexOf(g))} />
+                <button className="icon-btn sm thumb-reuse" title="Use this prompt and seed" onClick={() => { setResult(g); if (g.prompt) setPrompt(g.prompt); if (g.seed !== undefined) setSeed(String(g.seed)); }}>↺</button>
                 <button className="icon-btn sm" title="Delete" onClick={async () => { await host()!.images.deleteOutput(g.file); loadGallery(); if (result?.file === g.file) setResult(null); }}><Trash2 size={12} /></button>
               </div>
             ))}

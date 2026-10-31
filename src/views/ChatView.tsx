@@ -4,6 +4,7 @@ import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, t
 import { INTERACTIVE_MIN_CTX } from '../widgets/prompt';
 import { createAgent, getAgent, useAgents, type Agent } from '../agents/agents';
 import { AgentAvatar } from '../components/AgentAvatar';
+import { openLightbox } from '../components/Lightbox';
 import { hasImageModel, imageUrl, useImages } from '../images';
 import type { GeneratedRef } from '../agents/tools';
 import { asAvatar, useProfile } from '../profile';
@@ -785,7 +786,17 @@ function GeneratedImages({ images, live }: { images: GeneratedRef[]; live: boole
           {broken.includes(g.file) ? (
             <div className="gen-missing muted small">This image was deleted from the Images folder.</div>
           ) : (
-            <img src={imageUrl(g.file)} alt={g.prompt} title={g.prompt} onError={() => setBroken((b) => [...b, g.file])} />
+            <img
+              src={imageUrl(g.file)}
+              alt={g.prompt}
+              title="Click to enlarge"
+              className="zoomable"
+              onError={() => setBroken((b) => [...b, g.file])}
+              onClick={() => {
+                const shown = images.filter((x) => !broken.includes(x.file));
+                openLightbox(shown.map((x) => ({ src: imageUrl(x.file), alt: x.prompt, caption: x.prompt, file: x.file })), shown.indexOf(g));
+              }}
+            />
           )}
           <figcaption>
             <span className="muted small flex" title={g.prompt}>{g.width}×{g.height} · seed {g.seed}</span>
@@ -978,7 +989,7 @@ function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete
       {msg.images?.length ? (
         <div className="msg-images">
           {msg.images.map((b64, i) => (
-            <img key={i} src={`data:image/*;base64,${b64}`} alt="" />
+            <img key={i} src={`data:image/*;base64,${b64}`} alt="" className="zoomable" onClick={() => openLightbox(msg.images!.map((b) => ({ src: `data:image/*;base64,${b}` })), i)} />
           ))}
         </div>
       ) : null}

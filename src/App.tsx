@@ -18,6 +18,7 @@ import { Logo } from './components/Logo';
 import { isElectron, isMac } from './platform';
 import { UpdateButton } from './components/UpdateButton';
 import { ProfileButton } from './components/ProfileButton';
+import { LightboxHost } from './components/Lightbox';
 import { startUpdateChecks } from './updates';
 
 type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer';
@@ -121,6 +122,7 @@ export default function App() {
           {view === 'developer' && <DeveloperView ollama={ollama} />}
         </div>
       </div>
+    <LightboxHost />
     </div>
     </ContextMenuProvider>
   );

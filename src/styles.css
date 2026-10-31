@@ -707,7 +707,9 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .profile-card p { margin: 0; }
 .profile-row { display: flex; align-items: center; gap: 14px; }
 .profile-name { flex: 1; margin-top: 0; }
-.profile-card .avatar-pop { top: auto; bottom: -14px; left: 356px; }
+/* The card scrolls, which would cut off a menu beside it: open the avatar menu inside the card, under the avatar. */
+.profile-card .avatar-picker { position: static; }
+.profile-card .avatar-pop { top: 130px; bottom: auto; left: 16px; right: 16px; width: auto; }
 .msg.user .msg-role:has(.agent-avatar) { display: flex; align-items: center; gap: 7px; }
 
 /* ---- Images ---- */

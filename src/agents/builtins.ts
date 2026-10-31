@@ -1,13 +1,14 @@
-// Built-in agent tools: web search and pages, the chat's folder (read and write), and the terminal.
+// Built-in agent tools: web search and pages, the chat's folder (read and write), the terminal, and images.
 // The main process enforces hard limits (electron/tools.cjs); here we ask the user first where the
 // action is risky: any site outside the approved list (unless "Whole internet" is on) and every command.
 import { host } from '../host';
 import { alwaysAllow, APPROVED_HOSTS, getNetSettings, hostMatches } from '../widgets/network';
 import { uid } from '../store';
+import { generateImage, hasImageModel, imageModelFor, modelLabel } from '../images';
 import { Declined, type Tool, type ToolArgs, type ToolContext } from './tools';
 
 /** Tool groups an agent or chat can be given. */
-export type ToolGroup = 'skills' | 'web' | 'files' | 'write' | 'terminal';
+export type ToolGroup = 'skills' | 'web' | 'files' | 'write' | 'terminal' | 'images';
 
 export const TOOL_GROUPS: { id: ToolGroup; label: string; description: string; needsFolder?: boolean; risky?: boolean }[] = [
   { id: 'skills', label: 'Skills', description: 'Load skills when a task matches them' },
@@ -15,6 +16,7 @@ export const TOOL_GROUPS: { id: ToolGroup; label: string; description: string; n
   { id: 'files', label: 'Read files', description: "List and read files in the chat's folder", needsFolder: true },
   { id: 'write', label: 'Write files', description: "Create and change files in the chat's folder. Replaced files go to the Trash", needsFolder: true },
   { id: 'terminal', label: 'Terminal', description: "Run commands in the chat's folder. Each command asks you first", needsFolder: true, risky: true },
+  { id: 'images', label: 'Images', description: 'Create images with your local image model (download one in the Images tab)' },
 ];
 
 export interface ToolEnv {
@@ -181,9 +183,53 @@ function terminalTools(env: ToolEnv): Tool[] {
 }
 
 /** The built-in tools for these groups (skills are added separately, see skills.ts). */
+const SHAPES = { square: [1024, 1024], portrait: [768, 1024], landscape: [1024, 768] } as const;
+
+/** generate_image: makes a picture with the local image model and shows it in the reply. */
+function imageTools(): Tool[] {
+  return [
+    {
+      name: 'generate_image',
+      label: 'Create image',
+      description: "Create an image from a text description with the user's local image model. The image is shown to the user in your reply.",
+      parameters: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', description: 'A detailed visual description in English: subject, setting, style, lighting, composition. No text in the image unless asked.' },
+          shape: { type: 'string', enum: ['square', 'portrait', 'landscape'], description: 'Image shape (default square)' },
+        },
+        required: ['prompt'],
+      },
+      summary: (a) => String(a.prompt ?? '').slice(0, 80),
+      run: async (a, ctx) => {
+        const asked = String(a.prompt ?? '').trim();
+        if (!asked) throw new Error('Describe the image to create');
+        // Image models like to invent lettering (often in the wrong language); ask for none unless the image is about text.
+        const wantsText = /\b(text|words?|letters?|lettering|sign|logo|title|caption|label|quote|says|typography|poster|headline|banner)\b|["“].+["”]/i.test(asked);
+        const prompt = wantsText || /no (text|letters|words)/i.test(asked) ? asked : `${asked.replace(/[.\s]+$/, '')}. No text, no letters, no words.`;
+        const model = await imageModelFor();
+        if (!model) throw new Error('No image model is installed. Tell the user they can download one in the Images tab.');
+        const [width, height] = SHAPES[(a.shape as keyof typeof SHAPES) ?? 'square'] ?? SHAPES.square;
+        if (ctx.signal.aborted) throw new Error('Stopped');
+        const stop = () => host()?.images.stop();
+        ctx.signal.addEventListener('abort', stop, { once: true });
+        try {
+          const r = await generateImage({ id: model.id, prompt, width, height });
+          ctx.onImage?.({ file: r.file, prompt, width: r.width ?? width, height: r.height ?? height, seed: r.seed ?? 0, model: model.id });
+          return `Created a ${r.width}×${r.height} image with ${modelLabel(model)} (seed ${r.seed}). It is shown to the user with your reply. You can't see it, so don't describe details beyond the prompt.`;
+        } finally {
+          ctx.signal.removeEventListener('abort', stop);
+        }
+      },
+    },
+  ];
+}
+
 export function builtinTools(groups: ToolGroup[], env: ToolEnv): Tool[] {
   if (!host()) return [];
   const tools: Tool[] = [];
+  // Only offered when an image model is installed, so models don't call a tool that can't work.
+  if (groups.includes('images') && hasImageModel()) tools.push(...imageTools());
   if (groups.includes('web')) tools.push(...webTools());
   if (groups.includes('files') || groups.includes('write')) tools.push(...fileTools(env, groups.includes('write')));
   if (groups.includes('terminal')) tools.push(...terminalTools(env));
@@ -199,5 +245,6 @@ export function toolsPrompt(groups: ToolGroup[], env: ToolEnv): string {
   }
   if (groups.includes('write')) lines.push('- write_file replaces the whole file. Read a file before changing it.');
   if (groups.includes('terminal')) lines.push('- Every run_command needs the user\'s approval. Run one command at a time.');
+  if (groups.includes('images') && hasImageModel()) lines.push('- You can create images with generate_image when the user asks for a picture, drawing, photo, illustration, logo, or avatar. Write a detailed visual prompt in English. The image appears with your reply; just say briefly what you made.');
   return lines.length ? `# Tools\n${lines.join('\n')}` : '';
 }

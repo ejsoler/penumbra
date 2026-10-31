@@ -172,7 +172,7 @@ export function AvatarPicker({ agent, onChange, size = 56 }: {
               {busy && generating && (
                 <div className="update-progress">
                   <div className="progress"><div style={{ width: `${pct}%` }} /></div>
-                  <span className="muted small">{generating.phase === 'loading' ? 'Loading the model…' : generating.phase === 'decoding' ? 'Finishing…' : `Step ${generating.step} of ${generating.steps}`}</span>
+                  <span className="muted small">{generating.phase === 'loading' ? `Loading the model${generating.steps ? ` ${Math.round((generating.step / generating.steps) * 100)}%` : '…'}` : generating.phase === 'decoding' ? 'Finishing…' : `Step ${generating.step} of ${generating.steps}`}</span>
                 </div>
               )}
               <div className="avatar-pop-row">

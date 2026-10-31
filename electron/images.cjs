@@ -3,7 +3,8 @@
 // needed. Each model family needs a few shared files (a VAE and text encoders), downloaded once.
 // Everything lives in <userData>/images. Downloads come only from huggingface.co and the engine's GitHub
 // releases, and are checked against the hashes those sites publish.
-const { app, ipcMain, shell } = require('electron');
+const { app, ipcMain, net, protocol, session, shell } = require('electron');
+const { pathToFileURL } = require('url');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -130,6 +131,20 @@ async function fetchFile({ url, dest, size, sha256, onBytes, signal }) {
     }
   }
   fs.renameSync(part, dest);
+}
+
+// Generated images are shown in chats as penumbra-image://out/<file name>, served only from the outputs
+// folder, so chats store a short reference instead of megabytes of image data. Must run before app ready.
+protocol.registerSchemesAsPrivileged([{ scheme: 'penumbra-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+
+function serveImages() {
+  session.defaultSession.protocol.handle('penumbra-image', (req) => {
+    const name = decodeURIComponent(new URL(req.url).pathname.replace(/^\//, ''));
+    if (!/^[\w.-]+\.png$/.test(name)) return new Response('Not found', { status: 404 });
+    const p = path.join(dirs().outputs, name);
+    if (!fs.existsSync(p)) return new Response('Not found', { status: 404 });
+    return net.fetch(pathToFileURL(p).toString());
+  });
 }
 
 // ---- the engine -----------------------------------------------------------------------------------
@@ -353,14 +368,24 @@ async function generate(sender, { id, prompt, width, height, steps, seed }) {
     current = child;
     let tail = '';
     let sampling = false;
+    let stepsDone = false;
     const onData = (d) => {
       const text = d.toString();
       tail = (tail + text).slice(-4000);
       if (/sampling|denois/i.test(text)) sampling = true;
       // "decoder" also shows up while loading; only count decoding after the steps.
       if (sampling && /decod/i.test(text)) send({ phase: 'decoding', step: S, steps: S });
+      // The same progress bar shows loading the model and the image steps; a bar with exactly our step
+      // count is the image, any other is loading.
       const m2 = [...text.matchAll(/\|\s*(\d+)\/(\d+)\s*-/g)].pop();
-      if (m2 && sampling) send({ phase: 'sampling', step: Number(m2[1]), steps: Number(m2[2]) });
+      if (m2) {
+        const [step, total] = [Number(m2[1]), Number(m2[2])];
+        if (total === S && sampling) {
+          send({ phase: 'sampling', step, steps: S });
+          if (step === S) stepsDone = true;
+        } else if (stepsDone) send({ phase: 'decoding', step: S, steps: S }); // turning the result into an image
+        else if (total !== S) send({ phase: 'loading', step, steps: total });
+      }
     };
     child.stdout.on('data', onData);
     child.stderr.on('data', onData);
@@ -413,6 +438,7 @@ const insideOutputs = (file) => {
 };
 
 function registerImages() {
+  serveImages();
   const handle = (channel, fn) =>
     ipcMain.handle(channel, (e, ...args) => {
       if (e.senderFrame !== e.sender.mainFrame) throw new Error('Not allowed');

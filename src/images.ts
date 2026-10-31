@@ -37,7 +37,8 @@ export async function refreshImages() {
 }
 
 let started = false;
-function start() {
+/** Starts listening for downloads and image progress (once); also called at app start. */
+export function start() {
   const h = host();
   if (started || !h) return;
   started = true;
@@ -65,6 +66,25 @@ export async function generateImage(req: { id: string; prompt: string; width?: n
     set({ generating: null });
   }
 }
+
+/** True when an image model is ready (as of the last status check). */
+export const hasImageModel = () => readyModels(state.status).length > 0;
+
+/** The image model tools use: the one picked in the Images tab, else the first ready one. */
+export async function imageModelFor() {
+  if (!state.status) await refreshImages();
+  const ready = readyModels(state.status);
+  let picked = '';
+  try {
+    picked = JSON.parse(localStorage.getItem('ollama-gui.imageModel') || '""');
+  } catch {
+    /* none picked */
+  }
+  return ready.find((m) => m.id === picked) ?? ready[0] ?? null;
+}
+
+/** Address of a generated image file (served by the main process from Penumbra's images folder). */
+export const imageUrl = (file: string) => `penumbra-image://out/${encodeURIComponent(file.split(/[\\/]/).pop() ?? '')}`;
 
 /** Ready-to-use image models, for menus. */
 export const readyModels = (s: ImagesStatus | null) => (s?.models ?? []).filter((m) => m.ready);

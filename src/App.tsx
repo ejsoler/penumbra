@@ -11,6 +11,7 @@ import { WorkspaceView } from './views/WorkspaceView';
 import { SchedulerView } from './views/SchedulerView';
 import { ImagesView } from './views/ImagesView';
 import { startScheduler, useScheduler } from './scheduler';
+import { start as startImages } from './images';
 import { chatController, openChatRequest, streaming } from './session';
 import { ContextMenuProvider } from './components/ContextMenu';
 import { Logo } from './components/Logo';
@@ -52,6 +53,7 @@ export default function App() {
   const running = !!streaming.use();
   useEffect(startUpdateChecks, []);
   useEffect(startScheduler, []);
+  useEffect(startImages, []);
   const scheduler = useScheduler();
   const openChat = (convId: string) => {
     chatController.current?.openChat(convId);

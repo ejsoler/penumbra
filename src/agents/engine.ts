@@ -1,7 +1,7 @@
 // The agent loop: ask the model, run the tools it calls, give it the results, repeat until it answers
 // without calling a tool. Used by chats (with or without an agent) and by the orchestrator.
 import * as api from '../api';
-import { Declined, toolDefinition, type Approval, type ApprovalRequest, type Tool } from './tools';
+import { Declined, toolDefinition, type Approval, type ApprovalRequest, type GeneratedRef, type Tool } from './tools';
 
 export interface Step {
   id: string;
@@ -38,6 +38,8 @@ export interface RunOptions {
   /** Called when a step starts and again when it finishes (same id). */
   onStep?: (step: Step) => void;
   approve?: (req: ApprovalRequest) => Promise<Approval>;
+  /** An image tool made a picture for this reply. */
+  onImage?: (img: GeneratedRef) => void;
 }
 
 export interface RunResult {
@@ -133,7 +135,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
       } else {
         try {
           const request = [...o.messages].reverse().find((m) => m.role === 'user')?.content;
-          result = await tool.run(args, { signal: o.signal, approve: o.approve ?? (async () => false), request });
+          result = await tool.run(args, { signal: o.signal, approve: o.approve ?? (async () => false), request, onImage: o.onImage });
         } catch (e) {
           if (o.signal.aborted) throw e;
           if (e instanceof Declined) {

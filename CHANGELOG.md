@@ -27,6 +27,8 @@
   - Models marked "not for all audiences" are hidden unless you choose to show them, labeled 18+, and ask before downloading.
   - Choose size, steps, and seed; recent images are kept with their settings.
   - **Generate…** in the avatar menu (agents and your profile) makes an avatar with your image model.
+  - **Images in chats and agents:** a new **Images** tool. Ask for a picture in any chat and the model creates it with your image model; it appears in the reply, with its size, seed, and a button to show the file. It's on for chats once an image model is installed, and agents get it with the **Images** checkbox. Orchestrator tasks can use it too.
+  - Chats keep only a short reference to each image; the image stays a file in Penumbra's images folder.
 - **Agent trading cards.** The Agents tab shows each agent as a trading card in its own color: name and model size, the avatar as card art, its purpose, its tools as abilities, and its persona as flavor text. Cards tilt and shine under the pointer. **Edit** and **Chat** sit under each card; **All agents** (or **← All agents**) brings you back.
 - **Your profile.** The new button at the bottom of the sidebar sets your name and avatar (an image or an emoji). They appear on your messages instead of "You". Both stay on your computer and aren't sent to the models.
 - **Skills** in the same format Claude uses: a folder with a `SKILL.md` and optional reference files. Create and edit them in the app, import folders or `.zip` files, and turn each one on or off. The model only sees each skill's name and description, and loads the full skill when a task matches it.

@@ -5,7 +5,8 @@ import { builtinTools, toolsPrompt, type ToolGroup } from './builtins';
 import { enabledSkills, skillsPrompt, skillTools } from './skills';
 import type { Tool } from './tools';
 
-export const DEFAULT_CHAT_TOOLS: ToolGroup[] = ['skills'];
+/** Chats without an agent: skills, and images once an image model is installed. */
+export const DEFAULT_CHAT_TOOLS: ToolGroup[] = ['skills', 'images'];
 
 /** Who the agent is. The persona changes its manner, never its knowledge or abilities. */
 export function agentPrompt(agent: Agent): string {

@@ -736,3 +736,10 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .avatar-gen { display: flex; flex-direction: column; gap: 8px; }
 .avatar-gen b { display: flex; align-items: center; gap: 6px; }
 .avatar-gen textarea { width: 100%; font-size: 12px; }
+/* Images made in a reply */
+.msg-images-gen { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+.gen-image { margin: 0; width: min(420px, 100%); background: var(--bg-side); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.gen-image img { display: block; width: 100%; height: auto; }
+.gen-image figcaption { display: flex; align-items: center; gap: 6px; padding: 6px 10px; }
+.gen-missing { padding: 30px 14px; text-align: center; }
+.gen-progress { width: min(420px, 100%); display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--bg-side); border: 1px dashed var(--border-strong); border-radius: 12px; }

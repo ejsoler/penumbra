@@ -3,6 +3,7 @@ import * as api from './api';
 import type { Step } from './agents/engine';
 import type { ToolGroup } from './agents/builtins';
 import type { Orchestration } from './agents/orchestrator';
+import type { GeneratedRef } from './agents/tools';
 
 export interface UiMessage {
   id: string;
@@ -22,6 +23,8 @@ export interface UiMessage {
   agentId?: string;
   /** For orchestrator replies: the plan and how its tasks went. */
   orchestration?: Orchestration;
+  /** Images a tool created for this reply. */
+  generated?: GeneratedRef[];
 }
 
 export interface Conversation {

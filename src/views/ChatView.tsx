@@ -4,6 +4,8 @@ import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, t
 import { INTERACTIVE_MIN_CTX } from '../widgets/prompt';
 import { createAgent, getAgent, useAgents, type Agent } from '../agents/agents';
 import { AgentAvatar } from '../components/AgentAvatar';
+import { hasImageModel, imageUrl, useImages } from '../images';
+import type { GeneratedRef } from '../agents/tools';
 import { asAvatar, useProfile } from '../profile';
 import {
   normalizePlan, ORCHESTRATOR_ID, parsePlanText, planningPrompt, PROPOSE_PLAN, synthesisMessages, taskMessage,
@@ -87,7 +89,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   const interactive = isInteractive(current);
   // Widgets are long; make sure the model has room for them.
   // Widgets and tool results are long; make sure the model has room for them (generate() does the same).
-  const usesTools = caps.includes('tools') && (agent ? agent.tools : current?.tools ?? DEFAULT_CHAT_TOOLS).some((t) => t !== 'skills' || enabledSkills().length > 0);
+  const usesTools = caps.includes('tools') && (agent ? agent.tools : current?.tools ?? DEFAULT_CHAT_TOOLS).some((t) => (t === 'skills' ? enabledSkills().length > 0 : t === 'images' ? hasImageModel() : true));
   const numCtx = interactive || usesTools ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx;
 
   const sorted = useMemo(() => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt), [conversations]);
@@ -307,6 +309,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
             ...(caps.includes('thinking') ? { think: params.think } : {}),
             signal: ac.signal,
             approve,
+            onImage: (img) => patchMessage(conv.id, msgId, (m) => ({ ...m, generated: [...(m.generated ?? []), img] })),
             onText: (piece) => {
               task.output = (task.output ?? '') + piece;
               patchTask(conv.id, msgId, task.id, (t) => ({ ...t, output: (t.output ?? '') + piece }));
@@ -407,6 +410,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         ...(modelCaps.includes('thinking') ? { think: params.think } : {}),
         signal: ac.signal,
         approve: approver(ac, conv.id, run.preApproved),
+        onImage: (img) => patch((m) => ({ ...m, generated: [...(m.generated ?? []), img] })),
         onText: (piece) => patch((m) => ({ ...m, content: m.content + piece })),
         onThinking: (piece) => patch((m) => ({ ...m, thinking: (m.thinking ?? '') + piece })),
         onStep: (step) =>
@@ -767,6 +771,38 @@ function AgentPicker({ agents, value, orchestrator, onChange, onManage }: {
   );
 }
 
+/** Images a tool made for a reply, and the progress of one being made. Files stay on disk. */
+function GeneratedImages({ images, live }: { images: GeneratedRef[]; live: boolean }) {
+  const { generating } = useImages();
+  const [broken, setBroken] = useState<string[]>([]);
+  const making = live && generating;
+  if (!images.length && !making) return null;
+  const pct = generating?.phase === 'sampling' && generating.steps ? (generating.step / generating.steps) * 100 : generating?.phase === 'decoding' ? 100 : 3;
+  return (
+    <div className="msg-images-gen">
+      {images.map((g) => (
+        <figure key={g.file} className="gen-image">
+          {broken.includes(g.file) ? (
+            <div className="gen-missing muted small">This image was deleted from the Images folder.</div>
+          ) : (
+            <img src={imageUrl(g.file)} alt={g.prompt} title={g.prompt} onError={() => setBroken((b) => [...b, g.file])} />
+          )}
+          <figcaption>
+            <span className="muted small flex" title={g.prompt}>{g.width}×{g.height} · seed {g.seed}</span>
+            {!broken.includes(g.file) && <button className="icon-btn sm" title="Show in folder" onClick={() => host()?.images.reveal(g.file)}><FolderOpen size={13} /></button>}
+          </figcaption>
+        </figure>
+      ))}
+      {making && (
+        <div className="gen-progress">
+          <div className="progress"><div style={{ width: `${pct}%` }} /></div>
+          <span className="muted small">{generating.phase === 'loading' ? `Creating image: loading the model${generating.steps ? ` ${Math.round((generating.step / generating.steps) * 100)}%` : '…'}` : generating.phase === 'decoding' ? 'Creating image: finishing…' : `Creating image: step ${generating.step} of ${generating.steps}`}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Parses Ollama's parameter_size ("7.6B", "350M") into billions. */
 function billions(size?: string): number | null {
   const m = /^([\d.]+)\s*([BM])$/i.exec(size ?? '');
@@ -980,6 +1016,7 @@ function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete
           {live && answer && <span className="cursor" />}
         </div>
       )}
+      {msg.role === 'assistant' && (msg.generated?.length || live) ? <GeneratedImages images={msg.generated ?? []} live={live} /> : null}
       {msg.error && <div className="msg-error">⚠ {msg.error}</div>}
       {!live && !editing && (
         <div className="msg-footer">

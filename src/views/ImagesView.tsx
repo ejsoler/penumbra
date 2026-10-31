@@ -165,7 +165,7 @@ function Create({ models }: { models: ImageModel[] }) {
               <div className="flex update-progress">
                 <div className="progress"><div style={{ width: `${pct}%` }} /></div>
                 <span className="muted small">
-                  {generating.phase === 'loading' ? 'Loading the model… (the first image takes longest)' : generating.phase === 'decoding' ? 'Finishing…' : `Step ${generating.step} of ${generating.steps}`}
+                  {generating.phase === 'loading' ? `Loading the model${generating.steps ? ` ${Math.round((generating.step / generating.steps) * 100)}%` : '…'} (the first image takes longest)` : generating.phase === 'decoding' ? 'Finishing…' : `Step ${generating.step} of ${generating.steps}`}
                 </span>
               </div>
               <button className="btn" onClick={() => host()!.images.stop()}><Square size={12} fill="currentColor" /> Stop</button>

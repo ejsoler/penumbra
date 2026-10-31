@@ -27,6 +27,18 @@ export interface ToolContext {
   request?: string;
   /** Asks the user to allow an action. Resolves false if they decline or the run is stopped. */
   approve: (req: ApprovalRequest) => Promise<Approval>;
+  /** Shows an image a tool made in the reply. */
+  onImage?: (img: GeneratedRef) => void;
+}
+
+/** An image made during a reply. It stays a file on disk; chats keep only this reference. */
+export interface GeneratedRef {
+  file: string;
+  prompt: string;
+  width: number;
+  height: number;
+  seed: number;
+  model: string;
 }
 
 export interface Tool {

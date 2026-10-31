@@ -166,6 +166,8 @@ Widgets can download from a list of approved sites (map tiles, script CDNs, and 
 
 Scheduled tasks run unattended, so they only skip the usual questions for what you allow in each task (opening websites, running commands); everything else waits for you. A command task runs its command without asking each time, since you wrote it.
 
+Profiles keep their data apart, and a profile's password is an app lock: Penumbra won't open the profile without it, but the files on disk aren't encrypted, so use FileVault or BitLocker if others can access your computer. Passwords are stored only as a salted hash.
+
 Agents follow the same internet rules. Their file tools only work inside the folder you choose for a chat, replaced files go to the Trash, and every terminal command waits for your approval. Approved commands run with your user account's permissions, so read them before you allow them. Skills are stored in Penumbra's data folder (open it from the Skills tab).
 
 ## Support

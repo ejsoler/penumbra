@@ -30,7 +30,16 @@ const dirs = () => ({
 // Penumbra keeps a list of the images it made (history.json): the gallery reads it, and chats may only
 // show images on it.
 
-const settingsPath = () => path.join(base(), 'settings.json');
+// Each profile has its own image list and save folder (models stay shared). The default profile uses base().
+const profileDirs = new Map(); // webContents id → that window's profile folder for images
+/** Gives a window's profile its own image list and settings folder. */
+function setImagesFolder(webContents, dir) {
+  profileDirs.set(webContents.id, dir);
+  webContents.once('destroyed', () => profileDirs.delete(webContents.id));
+}
+const dirFor = (sender) => (sender && profileDirs.get(sender.id)) || base();
+
+const settingsPath = (d) => path.join(d, 'settings.json');
 const readJson = (p, fallback) => {
   try {
     return JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -39,33 +48,34 @@ const readJson = (p, fallback) => {
   }
 };
 const defaultSaveDir = () => path.join(app.getPath('pictures'), 'Penumbra');
-const saveDir = () => readJson(settingsPath(), {}).saveDir || defaultSaveDir();
-const setSaveDir = (dir) => {
-  fs.mkdirSync(base(), { recursive: true });
-  fs.writeFileSync(settingsPath(), JSON.stringify({ ...readJson(settingsPath(), {}), saveDir: dir || undefined }));
+const saveDir = (d) => readJson(settingsPath(d), {}).saveDir || defaultSaveDir();
+const setSaveDir = (d, dir) => {
+  fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(settingsPath(d), JSON.stringify({ ...readJson(settingsPath(d), {}), saveDir: dir || undefined }));
 };
 
-const historyPath = () => path.join(base(), 'history.json');
+const historyPath = (d) => path.join(d, 'history.json');
 const MAX_HISTORY = 1000;
-function readHistory() {
-  const h = readJson(historyPath(), null);
+function readHistory(dir) {
+  const h = readJson(historyPath(dir), null);
   if (h) return h;
-  // First run with a history: list images made before, in the old outputs folder, with their settings files.
+  if (dir !== base()) return [];
+  // First run with a history (default profile): list images made before, in the old outputs folder.
   const d = dirs().outputs;
   const old = fs.existsSync(d)
     ? fs.readdirSync(d).filter((f) => f.endsWith('.png')).map((f) => ({ file: path.join(d, f), ...readJson(path.join(d, f.replace(/\.png$/, '.json')), {}) }))
     : [];
-  writeHistory(old.sort((a, b) => (b.at ?? 0) - (a.at ?? 0)));
+  writeHistory(dir, old.sort((a, b) => (b.at ?? 0) - (a.at ?? 0)));
   return old;
 }
-function writeHistory(list) {
-  fs.mkdirSync(base(), { recursive: true });
-  fs.writeFileSync(historyPath(), JSON.stringify(list.slice(0, MAX_HISTORY)));
+function writeHistory(dir, list) {
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(historyPath(dir), JSON.stringify(list.slice(0, MAX_HISTORY)));
 }
-/** The path, if it's an image Penumbra made (and still exists). */
-const madeByUs = (file) => {
+/** The path, if it's an image this profile made (and still exists). */
+const madeByUs = (dir, file) => {
   const p = path.resolve(String(file ?? ''));
-  return p.endsWith('.png') && fs.existsSync(p) && readHistory().some((h) => h.file === p) ? p : null;
+  return p.endsWith('.png') && fs.existsSync(p) && readHistory(dir).some((h) => h.file === p) ? p : null;
 };
 
 /** "2026-10-31 18.20 cozy lighthouse on a cliff.png", numbered if taken. */
@@ -193,10 +203,11 @@ async function fetchFile({ url, dest, size, sha256, onBytes, signal }) {
 // so chats store a short reference instead of megabytes of image data. Must run before app ready.
 protocol.registerSchemesAsPrivileged([{ scheme: 'penumbra-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
-function serveImages() {
-  session.defaultSession.protocol.handle('penumbra-image', (req) => {
+/** Serves a profile's images on its session (each profile has its own session). */
+function serveImages(ses = session.defaultSession, dir = base()) {
+  ses.protocol.handle('penumbra-image', (req) => {
     // penumbra-image://img/<encoded full path>, only for images on Penumbra's list.
-    const p = madeByUs(decodeURIComponent(new URL(req.url).pathname.replace(/^\//, '')));
+    const p = madeByUs(dir, decodeURIComponent(new URL(req.url).pathname.replace(/^\//, '')));
     if (!p) return new Response('Not found', { status: 404 });
     return net.fetch(pathToFileURL(p).toString());
   });
@@ -413,7 +424,8 @@ async function generate(sender, { id, prompt, width, height, steps, seed, folder
   const S = clamp(steps, 1, 60, fam.steps(m));
   const seedNum = Number.isInteger(seed) && seed >= 0 ? seed : Math.floor(Math.random() * 2 ** 31);
   // A chat's folder (checked like the file tools' folder), else the chosen or default save folder.
-  const dir = folder ? checkRoot(folder) : saveDir();
+  const pdir = dirFor(sender);
+  const dir = folder ? checkRoot(folder) : saveDir(pdir);
   fs.mkdirSync(dir, { recursive: true });
   const out = imageName(dir, prompt);
   const args = ['--diffusion-model', m.path, ...fam.args(shared), '-p', String(prompt).slice(0, 4000), '-W', String(W), '-H', String(H), '--steps', String(S), '-s', String(seedNum), '-o', out];
@@ -462,15 +474,15 @@ async function generate(sender, { id, prompt, width, height, steps, seed, folder
       }
       // The settings are also inside the PNG (stable-diffusion.cpp writes them); the list is for the gallery.
       const meta = { prompt: String(prompt).slice(0, 4000), model: m.id, width: W, height: H, steps: S, seed: seedNum, at: Date.now() };
-      writeHistory([{ file: out, ...meta }, ...readHistory().filter((h) => h.file !== out)]);
+      writeHistory(pdir, [{ file: out, ...meta }, ...readHistory(pdir).filter((h) => h.file !== out)]);
       resolve({ image: `data:image/png;base64,${fs.readFileSync(out).toString('base64')}`, file: out, ...meta });
     });
   });
 }
 
 /** The newest generated images that still exist, with their settings. */
-function gallery(limit = 12) {
-  return readHistory()
+function gallery(dir, limit = 12) {
+  return readHistory(dir)
     .filter((h) => fs.existsSync(h.file))
     .slice(0, Math.min(48, limit))
     .map((h) => ({ ...h, image: `data:image/png;base64,${fs.readFileSync(h.file).toString('base64')}` }));
@@ -490,38 +502,45 @@ function registerImages() {
   handle('images:delete', (_e, id) => remove(String(id)));
   handle('images:generate', (e, req) => generate(e.sender, req ?? {}));
   handle('images:stop', () => current?.kill());
-  handle('images:gallery', (_e, limit) => gallery(Number(limit) || 12));
+  handle('images:gallery', (e, limit) => gallery(dirFor(e.sender), Number(limit) || 12));
   // Generated images may be in the user's own folders: deleting moves them to the Trash.
-  handle('images:deleteOutput', async (_e, file) => {
-    const p = madeByUs(file);
+  handle('images:deleteOutput', async (e, file) => {
+    const d = dirFor(e.sender);
+    const p = madeByUs(d, file);
     if (!p) throw new Error('Not an image Penumbra made');
     await shell.trashItem(p);
-    writeHistory(readHistory().filter((h) => h.file !== p));
+    writeHistory(d, readHistory(d).filter((h) => h.file !== p));
   });
-  handle('images:reveal', (_e, file) => {
-    const p = file ? madeByUs(file) : null;
+  handle('images:reveal', (e, file) => {
+    const d = dirFor(e.sender);
+    const p = file ? madeByUs(d, file) : null;
     if (p) shell.showItemInFolder(p);
     else {
-      fs.mkdirSync(saveDir(), { recursive: true });
-      shell.openPath(saveDir());
+      fs.mkdirSync(saveDir(d), { recursive: true });
+      shell.openPath(saveDir(d));
     }
   });
   handle('images:openModels', () => shell.openPath(fs.existsSync(base()) ? base() : app.getPath('userData')));
-  handle('images:saveDir', () => ({ dir: saveDir(), isDefault: saveDir() === defaultSaveDir() }));
+  handle('images:saveDir', (e) => {
+    const d = dirFor(e.sender);
+    return { dir: saveDir(d), isDefault: saveDir(d) === defaultSaveDir() };
+  });
   handle('images:chooseSaveDir', async (e) => {
     const { canceled, filePaths } = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
       title: 'Save generated images in',
       buttonLabel: 'Use folder',
-      defaultPath: saveDir(),
+      defaultPath: saveDir(dirFor(e.sender)),
       properties: ['openDirectory', 'createDirectory'],
     });
-    if (!canceled && filePaths[0]) setSaveDir(checkRoot(filePaths[0]));
-    return { dir: saveDir(), isDefault: saveDir() === defaultSaveDir() };
+    const d = dirFor(e.sender);
+    if (!canceled && filePaths[0]) setSaveDir(d, checkRoot(filePaths[0]));
+    return { dir: saveDir(d), isDefault: saveDir(d) === defaultSaveDir() };
   });
-  handle('images:resetSaveDir', () => {
-    setSaveDir(undefined);
-    return { dir: saveDir(), isDefault: true };
+  handle('images:resetSaveDir', (e) => {
+    const d = dirFor(e.sender);
+    setSaveDir(d, undefined);
+    return { dir: saveDir(d), isDefault: true };
   });
 }
 
-module.exports = { registerImages };
+module.exports = { registerImages, setImagesFolder, serveImages };

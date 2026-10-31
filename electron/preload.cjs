@@ -64,6 +64,17 @@ contextBridge.exposeInMainWorld('penumbraHost', {
       return () => ipcRenderer.removeListener('images:gen', l);
     },
   },
+  profiles: {
+    current: () => ipcRenderer.invoke('profiles:current'),
+    list: () => ipcRenderer.invoke('profiles:list'),
+    unlock: (password) => ipcRenderer.invoke('profiles:unlock', password),
+    update: (patch) => ipcRenderer.invoke('profiles:update', patch),
+    create: (req) => ipcRenderer.invoke('profiles:create', req),
+    switchTo: (id) => ipcRenderer.invoke('profiles:switch', id),
+    lock: () => ipcRenderer.invoke('profiles:lock'),
+    setPassword: (req) => ipcRenderer.invoke('profiles:setPassword', req),
+    remove: (req) => ipcRenderer.invoke('profiles:delete', req),
+  },
   /** Opens the guided demo in its own window, using this model for every reply. */
   startDemo: (model) => ipcRenderer.invoke('demo:start', model),
   setTrayStatus: (status) => ipcRenderer.send('tray:status', status),

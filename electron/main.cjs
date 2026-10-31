@@ -8,6 +8,7 @@ const { registerUpdates } = require('./updates.cjs');
 const { registerTray, attachWindow, showWindow, mainWindow } = require('./tray.cjs');
 const { registerDemo } = require('./demo.cjs');
 const { registerImages } = require('./images.cjs');
+const { registerProfiles, openProfile, activeProfile } = require('./profiles.cjs');
 const { isLocalName, resolvesToPrivate } = require('./netsafe.cjs');
 
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
@@ -23,8 +24,11 @@ if (!fs.existsSync(app.getPath('userData')) && fs.existsSync(legacyData)) {
   }
 }
 
-/** The app window. `partition` gives it separate storage (the demo window uses one). */
-function createWindow({ partition } = {}) {
+/**
+ * An app window. `partition` gives it separate storage (a profile, or the demo); `primary` marks the main
+ * window, which drives the menu bar.
+ */
+function createWindow({ partition, primary = !partition } = {}) {
   const win = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -45,7 +49,7 @@ function createWindow({ partition } = {}) {
       ...(partition ? { partition } : {}),
     },
   });
-  if (!partition) attachWindow(win);
+  if (primary) attachWindow(win);
 
   if (process.env.VITE_DEV_SERVER_URL) win.loadURL(process.env.VITE_DEV_SERVER_URL);
   else win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
@@ -202,14 +206,15 @@ app.whenReady().then(() => {
   registerUpdates();
   registerTray();
   registerImages();
+  registerProfiles({ createWindow, protectSession });
   registerDemo({ createWindow, protectSession });
   // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).
   if (process.platform === 'darwin') app.dock?.setIcon(ICON);
   protectSession(session.defaultSession);
 
-  createWindow();
+  openProfile(activeProfile());
   // The Dock icon brings back a window hidden in the menu bar.
-  app.on('activate', () => (mainWindow() ? showWindow() : createWindow()));
+  app.on('activate', () => (mainWindow() ? showWindow() : openProfile(activeProfile())));
 });
 
 app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit());

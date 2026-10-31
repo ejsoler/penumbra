@@ -19,6 +19,9 @@ import { isElectron, isMac } from './platform';
 import { UpdateButton } from './components/UpdateButton';
 import { ProfileButton } from './components/ProfileButton';
 import { LightboxHost } from './components/Lightbox';
+import { LockScreen } from './components/LockScreen';
+import { host, type ProfileInfo } from './host';
+import { syncProfile } from './profile';
 import { startUpdateChecks } from './updates';
 
 type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer';
@@ -35,7 +38,22 @@ const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
 ];
 
 
+/** Opens the app, or the lock screen first when this window's profile has a password. */
 export default function App() {
+  const [gate, setGate] = useState<{ profile: ProfileInfo; locked: boolean } | null>(null);
+  const [ready, setReady] = useState(!host());
+  useEffect(() => {
+    host()?.profiles.current().then((p) => {
+      setGate({ profile: p, locked: p.locked });
+      setReady(true);
+    }).catch(() => setReady(true));
+  }, []);
+  if (!ready) return null;
+  if (gate?.locked) return <LockScreen profile={gate.profile} onUnlocked={() => setGate({ ...gate, locked: false })} />;
+  return <Main />;
+}
+
+function Main() {
   const [view, setView] = usePersistent<View>('ollama-gui.view', 'chat');
   const ollama = useOllama();
   const dl = useDownloads(ollama.refresh);
@@ -55,6 +73,9 @@ export default function App() {
   useEffect(startUpdateChecks, []);
   useEffect(startScheduler, []);
   useEffect(startImages, []);
+  useEffect(() => {
+    syncProfile();
+  }, []);
   const scheduler = useScheduler();
   const openChat = (convId: string) => {
     chatController.current?.openChat(convId);

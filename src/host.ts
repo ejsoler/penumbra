@@ -71,6 +71,15 @@ export interface ImageProgress {
   error?: string;
 }
 
+export interface ProfileInfo {
+  id: string;
+  name: string;
+  avatar?: string;
+  hasPassword: boolean;
+  /** This window's profile. */
+  current: boolean;
+}
+
 export interface PenumbraHost {
   skills: {
     list: () => Promise<SkillInfo[]>;
@@ -129,6 +138,22 @@ export interface PenumbraHost {
     resetSaveDir: () => Promise<SaveDir>;
     onProgress: (cb: (p: ImageProgress) => void) => () => void;
     onGenerate: (cb: (p: { phase: 'loading' | 'sampling' | 'decoding'; step: number; steps: number }) => void) => () => void;
+  };
+  /** Profiles: separate data, optionally behind a password (an app lock, not disk encryption). */
+  profiles: {
+    current: () => Promise<ProfileInfo & { locked: boolean }>;
+    list: () => Promise<ProfileInfo[]>;
+    /** True if the password was right; this window's profile is then unlocked. */
+    unlock: (password: string) => Promise<boolean>;
+    update: (patch: { name?: string; avatar?: string | null }) => Promise<void>;
+    create: (req: { name: string; password?: string }) => Promise<string>;
+    /** Reopens the window on another profile. */
+    switchTo: (id: string) => Promise<void>;
+    /** Reopens the window on this profile, locked. */
+    lock: () => Promise<void>;
+    /** `next` empty removes the password; `current` is needed when one is set. */
+    setPassword: (req: { current?: string; next: string }) => Promise<{ hasPassword: boolean }>;
+    remove: (req: { id: string; password?: string }) => Promise<void>;
   };
   /** Opens the guided demo in its own window (separate chats, agents, and skills). */
   startDemo: (model: string) => Promise<'started' | 'focused'>;

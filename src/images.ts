@@ -56,7 +56,7 @@ export const dismissDownload = (id: string) => {
 };
 
 /** Generates an image; resolves to its data URL. */
-export async function generateImage(req: { id: string; prompt: string; width?: number; height?: number; steps?: number; seed?: number }) {
+export async function generateImage(req: { id: string; prompt: string; width?: number; height?: number; steps?: number; seed?: number; folder?: string }) {
   const h = host();
   if (!h) throw new Error('Image generation needs the desktop app');
   set({ generating: { phase: 'loading', step: 0, steps: req.steps ?? 0 } });
@@ -83,8 +83,8 @@ export async function imageModelFor() {
   return ready.find((m) => m.id === picked) ?? ready[0] ?? null;
 }
 
-/** Address of a generated image file (served by the main process from Penumbra's images folder). */
-export const imageUrl = (file: string) => `penumbra-image://out/${encodeURIComponent(file.split(/[\\/]/).pop() ?? '')}`;
+/** Address of an image Penumbra made, wherever it was saved (the main process only serves those). */
+export const imageUrl = (file: string) => `penumbra-image://img/${encodeURIComponent(file)}`;
 
 /** Ready-to-use image models, for menus. */
 export const readyModels = (s: ImagesStatus | null) => (s?.models ?? []).filter((m) => m.ready);

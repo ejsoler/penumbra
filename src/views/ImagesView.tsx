@@ -2,13 +2,16 @@
 // Runs outside Ollama, with stable-diffusion.cpp (see electron/images.cjs).
 import { useEffect, useState } from 'react';
 import { usePersistent } from '../store';
-import { host, type GeneratedImage, type ImageModel } from '../host';
+import { host, type GeneratedImage, type ImageModel, type SaveDir } from '../host';
 import { compact, listQuants, searchModels, type HfModel, type HfQuant } from '../hf';
 import { formatBytes } from '../api';
 import { cleanError, dismissDownload, generateImage, modelLabel, readyModels, refreshImages, useImages } from '../images';
 import { ChevronDown, ChevronRight, Download, FolderOpen, ImageIcon, Loader2, Search, Sparkles, Square, Trash2, X } from '../components/icons';
 
 type Tab = 'create' | 'models' | 'find';
+
+/** "~/Pictures/Penumbra" instead of the full home path. */
+const tidyPath = (p: string) => p.replace(/^\/Users\/[^/]+|^\/home\/[^/]+|^[A-Z]:\\Users\\[^\\]+/, '~');
 
 /** Extra downloads the first model of each family brings: the engine and the family's shared files. */
 const FAMILY_EXTRA: Record<string, string> = { zimage: 'about 2.9 GB', flux: 'about 5.7 GB' };
@@ -104,6 +107,10 @@ function Create({ models }: { models: ImageModel[] }) {
   const [error, setError] = useState('');
   const [gallery, setGallery] = useState<GeneratedImage[]>([]);
   const loadGallery = () => host()!.images.gallery(12).then(setGallery).catch(() => {});
+  const [saveDir, setSaveDir] = useState<SaveDir | null>(null);
+  useEffect(() => {
+    host()!.images.saveDir().then(setSaveDir).catch(() => {});
+  }, []);
   useEffect(() => {
     loadGallery();
   }, []);
@@ -179,6 +186,18 @@ function Create({ models }: { models: ImageModel[] }) {
         </div>
       </section>
 
+      <section className="panel save-dir">
+        <div className="row gap">
+          <FolderOpen size={15} className="muted" />
+          <div className="save-dir-text">
+            <span className="small">Saves to <button className="link-btn mono save-dir-path" title={saveDir ? `${saveDir.dir} (open)` : ''} onClick={() => host()!.images.reveal()}>{saveDir ? tidyPath(saveDir.dir) : '…'}</button></span>
+            <span className="muted small">In a chat with a folder, images go to that folder instead.</span>
+          </div>
+          {saveDir && !saveDir.isDefault && <button className="btn ghost sm" onClick={async () => setSaveDir(await host()!.images.resetSaveDir())}>Reset</button>}
+          <button className="btn sm" onClick={async () => setSaveDir(await host()!.images.chooseSaveDir())}>Change…</button>
+        </div>
+      </section>
+
       {result && (
         <section className="panel images-result">
           <img src={result.image} alt={result.prompt ?? ''} />
@@ -224,7 +243,7 @@ function Models({ models, engine }: { models: ImageModel[]; engine?: string }) {
       ))}
       <div className="row gap img-foot">
         <span className="muted small flex">Image engine: stable-diffusion.cpp {engine ?? '(not installed yet)'}. Shared files (VAE and text encoders) are kept for all models of a family.</span>
-        <button className="btn sm" onClick={() => host()!.images.reveal()}><FolderOpen size={13} /> Open folder</button>
+        <button className="btn sm" onClick={() => host()!.images.openModels()}><FolderOpen size={13} /> Open folder</button>
       </div>
     </section>
   );

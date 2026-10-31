@@ -3,13 +3,14 @@
 // needed. Each model family needs a few shared files (a VAE and text encoders), downloaded once.
 // Everything lives in <userData>/images. Downloads come only from huggingface.co and the engine's GitHub
 // releases, and are checked against the hashes those sites publish.
-const { app, ipcMain, net, protocol, session, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, net, protocol, session, shell } = require('electron');
 const { pathToFileURL } = require('url');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { readZip } = require('./skills.cjs');
+const { checkRoot } = require('./tools.cjs');
 
 const HF = 'https://huggingface.co';
 const ENGINE_REPO = 'leejet/stable-diffusion.cpp';
@@ -23,6 +24,61 @@ const dirs = () => ({
   engine: path.join(base(), 'engine'),
   outputs: path.join(base(), 'outputs'),
 });
+
+// ---- where images are saved ---------------------------------------------------------------------------
+// By default in Pictures/Penumbra; the Images tab can change that, and a chat with a folder saves there.
+// Penumbra keeps a list of the images it made (history.json): the gallery reads it, and chats may only
+// show images on it.
+
+const settingsPath = () => path.join(base(), 'settings.json');
+const readJson = (p, fallback) => {
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch {
+    return fallback;
+  }
+};
+const defaultSaveDir = () => path.join(app.getPath('pictures'), 'Penumbra');
+const saveDir = () => readJson(settingsPath(), {}).saveDir || defaultSaveDir();
+const setSaveDir = (dir) => {
+  fs.mkdirSync(base(), { recursive: true });
+  fs.writeFileSync(settingsPath(), JSON.stringify({ ...readJson(settingsPath(), {}), saveDir: dir || undefined }));
+};
+
+const historyPath = () => path.join(base(), 'history.json');
+const MAX_HISTORY = 1000;
+function readHistory() {
+  const h = readJson(historyPath(), null);
+  if (h) return h;
+  // First run with a history: list images made before, in the old outputs folder, with their settings files.
+  const d = dirs().outputs;
+  const old = fs.existsSync(d)
+    ? fs.readdirSync(d).filter((f) => f.endsWith('.png')).map((f) => ({ file: path.join(d, f), ...readJson(path.join(d, f.replace(/\.png$/, '.json')), {}) }))
+    : [];
+  writeHistory(old.sort((a, b) => (b.at ?? 0) - (a.at ?? 0)));
+  return old;
+}
+function writeHistory(list) {
+  fs.mkdirSync(base(), { recursive: true });
+  fs.writeFileSync(historyPath(), JSON.stringify(list.slice(0, MAX_HISTORY)));
+}
+/** The path, if it's an image Penumbra made (and still exists). */
+const madeByUs = (file) => {
+  const p = path.resolve(String(file ?? ''));
+  return p.endsWith('.png') && fs.existsSync(p) && readHistory().some((h) => h.file === p) ? p : null;
+};
+
+/** "2026-10-31 18.20 cozy lighthouse on a cliff.png", numbered if taken. */
+function imageName(dir, prompt) {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}.${pad(d.getMinutes())}`;
+  const words = String(prompt).toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, ' ').split(/\s+/).filter((w) => w && !['a', 'an', 'the', 'of', 'and', 'with', 'in', 'on'].includes(w)).slice(0, 6).join(' ');
+  const baseName = `${stamp} ${words || 'image'}`.slice(0, 80).trim();
+  let name = `${baseName}.png`;
+  for (let i = 2; fs.existsSync(path.join(dir, name)); i++) name = `${baseName} ${i}.png`;
+  return path.join(dir, name);
+}
 
 // ---- model families -------------------------------------------------------------------------------
 
@@ -133,16 +189,15 @@ async function fetchFile({ url, dest, size, sha256, onBytes, signal }) {
   fs.renameSync(part, dest);
 }
 
-// Generated images are shown in chats as penumbra-image://out/<file name>, served only from the outputs
-// folder, so chats store a short reference instead of megabytes of image data. Must run before app ready.
+// Generated images are shown in chats as penumbra-image://img/<path>, served only for images Penumbra made,
+// so chats store a short reference instead of megabytes of image data. Must run before app ready.
 protocol.registerSchemesAsPrivileged([{ scheme: 'penumbra-image', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
 function serveImages() {
   session.defaultSession.protocol.handle('penumbra-image', (req) => {
-    const name = decodeURIComponent(new URL(req.url).pathname.replace(/^\//, ''));
-    if (!/^[\w.-]+\.png$/.test(name)) return new Response('Not found', { status: 404 });
-    const p = path.join(dirs().outputs, name);
-    if (!fs.existsSync(p)) return new Response('Not found', { status: 404 });
+    // penumbra-image://img/<encoded full path>, only for images on Penumbra's list.
+    const p = madeByUs(decodeURIComponent(new URL(req.url).pathname.replace(/^\//, '')));
+    if (!p) return new Response('Not found', { status: 404 });
     return net.fetch(pathToFileURL(p).toString());
   });
 }
@@ -342,7 +397,7 @@ function remove(id) {
 
 let current = null; // the running engine process
 
-async function generate(sender, { id, prompt, width, height, steps, seed }) {
+async function generate(sender, { id, prompt, width, height, steps, seed, folder }) {
   if (current) throw new Error('An image is already being generated');
   const m = readManifest().find((x) => x.id === id);
   if (!m || !fs.existsSync(m.path)) throw new Error('That image model isn’t installed');
@@ -357,8 +412,10 @@ async function generate(sender, { id, prompt, width, height, steps, seed }) {
   const H = clamp(height, 256, 1536, 1024) & ~15;
   const S = clamp(steps, 1, 60, fam.steps(m));
   const seedNum = Number.isInteger(seed) && seed >= 0 ? seed : Math.floor(Math.random() * 2 ** 31);
-  fs.mkdirSync(dirs().outputs, { recursive: true });
-  const out = path.join(dirs().outputs, `${new Date().toISOString().replace(/[:.]/g, '-')}-${seedNum}.png`);
+  // A chat's folder (checked like the file tools' folder), else the chosen or default save folder.
+  const dir = folder ? checkRoot(folder) : saveDir();
+  fs.mkdirSync(dir, { recursive: true });
+  const out = imageName(dir, prompt);
   const args = ['--diffusion-model', m.path, ...fam.args(shared), '-p', String(prompt).slice(0, 4000), '-W', String(W), '-H', String(H), '--steps', String(S), '-s', String(seedNum), '-o', out];
   const send = (p) => !sender.isDestroyed() && sender.send('images:gen', p);
   send({ phase: 'loading', step: 0, steps: S });
@@ -403,39 +460,21 @@ async function generate(sender, { id, prompt, width, height, steps, seed }) {
         const why = tail.split('\n').map((l) => l.trim()).filter((l) => /error|fail|out of memory|not support/i.test(l)).pop();
         return reject(new Error(why ? `The image engine stopped: ${why.slice(0, 300)}` : `The image engine stopped (code ${code})`));
       }
+      // The settings are also inside the PNG (stable-diffusion.cpp writes them); the list is for the gallery.
       const meta = { prompt: String(prompt).slice(0, 4000), model: m.id, width: W, height: H, steps: S, seed: seedNum, at: Date.now() };
-      fs.writeFileSync(out.replace(/\.png$/, '.json'), JSON.stringify(meta));
+      writeHistory([{ file: out, ...meta }, ...readHistory().filter((h) => h.file !== out)]);
       resolve({ image: `data:image/png;base64,${fs.readFileSync(out).toString('base64')}`, file: out, ...meta });
     });
   });
 }
 
-/** The newest generated images, with their settings. */
+/** The newest generated images that still exist, with their settings. */
 function gallery(limit = 12) {
-  const d = dirs().outputs;
-  if (!fs.existsSync(d)) return [];
-  return fs
-    .readdirSync(d)
-    .filter((f) => f.endsWith('.png'))
-    .sort()
-    .reverse()
+  return readHistory()
+    .filter((h) => fs.existsSync(h.file))
     .slice(0, Math.min(48, limit))
-    .map((f) => {
-      const p = path.join(d, f);
-      let meta = {};
-      try {
-        meta = JSON.parse(fs.readFileSync(p.replace(/\.png$/, '.json'), 'utf8'));
-      } catch {
-        /* no settings saved */
-      }
-      return { file: p, image: `data:image/png;base64,${fs.readFileSync(p).toString('base64')}`, ...meta };
-    });
+    .map((h) => ({ ...h, image: `data:image/png;base64,${fs.readFileSync(h.file).toString('base64')}` }));
 }
-
-const insideOutputs = (file) => {
-  const p = path.resolve(String(file));
-  return p.startsWith(dirs().outputs + path.sep) && p.endsWith('.png') ? p : null;
-};
 
 function registerImages() {
   serveImages();
@@ -452,16 +491,36 @@ function registerImages() {
   handle('images:generate', (e, req) => generate(e.sender, req ?? {}));
   handle('images:stop', () => current?.kill());
   handle('images:gallery', (_e, limit) => gallery(Number(limit) || 12));
-  handle('images:deleteOutput', (_e, file) => {
-    const p = insideOutputs(file);
-    if (!p) throw new Error('Not a generated image');
-    fs.rmSync(p, { force: true });
-    fs.rmSync(p.replace(/\.png$/, '.json'), { force: true });
+  // Generated images may be in the user's own folders: deleting moves them to the Trash.
+  handle('images:deleteOutput', async (_e, file) => {
+    const p = madeByUs(file);
+    if (!p) throw new Error('Not an image Penumbra made');
+    await shell.trashItem(p);
+    writeHistory(readHistory().filter((h) => h.file !== p));
   });
   handle('images:reveal', (_e, file) => {
-    const p = file ? insideOutputs(file) : null;
+    const p = file ? madeByUs(file) : null;
     if (p) shell.showItemInFolder(p);
-    else shell.openPath(fs.existsSync(base()) ? base() : app.getPath('userData'));
+    else {
+      fs.mkdirSync(saveDir(), { recursive: true });
+      shell.openPath(saveDir());
+    }
+  });
+  handle('images:openModels', () => shell.openPath(fs.existsSync(base()) ? base() : app.getPath('userData')));
+  handle('images:saveDir', () => ({ dir: saveDir(), isDefault: saveDir() === defaultSaveDir() }));
+  handle('images:chooseSaveDir', async (e) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
+      title: 'Save generated images in',
+      buttonLabel: 'Use folder',
+      defaultPath: saveDir(),
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (!canceled && filePaths[0]) setSaveDir(checkRoot(filePaths[0]));
+    return { dir: saveDir(), isDefault: saveDir() === defaultSaveDir() };
+  });
+  handle('images:resetSaveDir', () => {
+    setSaveDir(undefined);
+    return { dir: saveDir(), isDefault: true };
   });
 }
 

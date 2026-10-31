@@ -186,7 +186,7 @@ function terminalTools(env: ToolEnv): Tool[] {
 const SHAPES = { square: [1024, 1024], portrait: [768, 1024], landscape: [1024, 768] } as const;
 
 /** generate_image: makes a picture with the local image model and shows it in the reply. */
-function imageTools(): Tool[] {
+function imageTools(env: ToolEnv): Tool[] {
   return [
     {
       name: 'generate_image',
@@ -214,9 +214,10 @@ function imageTools(): Tool[] {
         const stop = () => host()?.images.stop();
         ctx.signal.addEventListener('abort', stop, { once: true });
         try {
-          const r = await generateImage({ id: model.id, prompt, width, height });
+          // A chat with a folder keeps its images there.
+          const r = await generateImage({ id: model.id, prompt, width, height, ...(env.folder ? { folder: env.folder } : {}) });
           ctx.onImage?.({ file: r.file, prompt, width: r.width ?? width, height: r.height ?? height, seed: r.seed ?? 0, model: model.id });
-          return `Created a ${r.width}×${r.height} image with ${modelLabel(model)} (seed ${r.seed}). It is shown to the user with your reply. You can't see it, so don't describe details beyond the prompt.`;
+          return `Created a ${r.width}×${r.height} image with ${modelLabel(model)} (seed ${r.seed}), saved as ${r.file}. It is shown to the user with your reply. You can't see it, so don't describe details beyond the prompt.`;
         } finally {
           ctx.signal.removeEventListener('abort', stop);
         }
@@ -229,7 +230,7 @@ export function builtinTools(groups: ToolGroup[], env: ToolEnv): Tool[] {
   if (!host()) return [];
   const tools: Tool[] = [];
   // Only offered when an image model is installed, so models don't call a tool that can't work.
-  if (groups.includes('images') && hasImageModel()) tools.push(...imageTools());
+  if (groups.includes('images') && hasImageModel()) tools.push(...imageTools(env));
   if (groups.includes('web')) tools.push(...webTools());
   if (groups.includes('files') || groups.includes('write')) tools.push(...fileTools(env, groups.includes('write')));
   if (groups.includes('terminal')) tools.push(...terminalTools(env));

@@ -250,4 +250,4 @@ function registerTools() {
   handle('tools:reveal', (_e, root) => shell.openPath(checkRoot(root)));
 }
 
-module.exports = { registerTools, htmlToText };
+module.exports = { registerTools, htmlToText, checkRoot };

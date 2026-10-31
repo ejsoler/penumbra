@@ -49,6 +49,10 @@ contextBridge.exposeInMainWorld('penumbraHost', {
     gallery: (limit) => ipcRenderer.invoke('images:gallery', limit),
     deleteOutput: (file) => ipcRenderer.invoke('images:deleteOutput', file),
     reveal: (file) => ipcRenderer.invoke('images:reveal', file),
+    openModels: () => ipcRenderer.invoke('images:openModels'),
+    saveDir: () => ipcRenderer.invoke('images:saveDir'),
+    chooseSaveDir: () => ipcRenderer.invoke('images:chooseSaveDir'),
+    resetSaveDir: () => ipcRenderer.invoke('images:resetSaveDir'),
     onProgress: (cb) => {
       const l = (_e, p) => cb(p);
       ipcRenderer.on('images:progress', l);

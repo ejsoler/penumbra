@@ -45,6 +45,11 @@ export interface ImagesStatus {
   folder: string;
 }
 
+export interface SaveDir {
+  dir: string;
+  isDefault: boolean;
+}
+
 export interface GeneratedImage {
   image: string;
   file: string;
@@ -109,11 +114,19 @@ export interface PenumbraHost {
     download: (req: { repo: string; file: string; nsfw?: boolean }) => Promise<string>;
     cancel: (id: string) => Promise<void>;
     remove: (id: string) => Promise<void>;
-    generate: (req: { id: string; prompt: string; width?: number; height?: number; steps?: number; seed?: number }) => Promise<GeneratedImage>;
+    /** `folder`: a chat's folder to save in, instead of the chosen save folder. */
+    generate: (req: { id: string; prompt: string; width?: number; height?: number; steps?: number; seed?: number; folder?: string }) => Promise<GeneratedImage>;
     stop: () => Promise<void>;
     gallery: (limit?: number) => Promise<GeneratedImage[]>;
     deleteOutput: (file: string) => Promise<void>;
+    /** Shows an image in its folder; with no file, opens the save folder. */
     reveal: (file?: string) => Promise<void>;
+    /** Opens the folder with models, the engine, and shared files. */
+    openModels: () => Promise<void>;
+    saveDir: () => Promise<SaveDir>;
+    /** Asks the user for a folder; returns the (possibly unchanged) setting. */
+    chooseSaveDir: () => Promise<SaveDir>;
+    resetSaveDir: () => Promise<SaveDir>;
     onProgress: (cb: (p: ImageProgress) => void) => () => void;
     onGenerate: (cb: (p: { phase: 'loading' | 'sampling' | 'decoding'; step: number; steps: number }) => void) => () => void;
   };

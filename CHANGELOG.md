@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.0 (2026-10-31)
+
+### Added
+- **Images tab (local image generation).** Make images on your computer, outside Ollama:
+  - Search Hugging Face for GGUF image models, see each repo's files and sizes, and download one. Penumbra reads each file's type first: Z-Image and FLUX.1 are supported; others show as not supported yet.
+  - Images are made by [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp), downloaded from its GitHub releases the first time (Apple Silicon Macs, and x64 Windows and Linux). Each model family's shared files (VAE and text encoders) are downloaded once.
+  - Downloads resume if interrupted and are checked against the hashes Hugging Face and GitHub publish.
+  - Models marked "not for all audiences" are hidden unless you choose to show them, labeled 18+, and ask before downloading.
+  - Choose size, steps, and seed; recent images are kept with their settings.
+  - **Generate…** in the avatar menu (agents and your profile) makes an avatar with your image model.
+  - **Images in chats and agents:** a new **Images** tool. Ask for a picture in any chat and the model creates it with your image model; it appears in the reply, with its size, seed, and a button to show the file. It's on for chats once an image model is installed, and agents get it with the **Images** checkbox. Orchestrator tasks can use it too.
+  - **Where images are saved:** in **Pictures/Penumbra** by default, with readable names (date, time, and the start of the prompt). **Change…** in the Images tab picks another folder, and **Reset** goes back. In a chat with a folder, images are saved in that folder. Chats keep only a short reference to each image, and only images Penumbra made can be shown. Deleting one from the gallery moves it to the Trash.
+- **Image lightbox.** Click any image (in a reply, one you attached, or in the Images tab) to see it full-window. Zoom with the wheel or a pinch toward the pointer, drag to move around, double-click to zoom in or fit, and use the arrow keys to step through a set. The prompt shows underneath, scrolls when it's long, and has a button to copy it. **Show in folder** opens the file, and Esc closes.
+- **Profiles.** Keep separate chats, agents, skills, settings, scheduled tasks, and image history for different people or uses (Work, Personal…). Create and switch profiles from the button at the bottom of the sidebar; downloaded models are shared. Your existing data becomes the first profile.
+  - **Passwords:** a profile can have a password. Penumbra shows a lock screen until it's entered, and nothing in the profile starts before that. **Lock now** locks it right away. Passwords are stored only as a salted scrypt hash, and wrong guesses slow down after five. It's an app lock: it doesn't encrypt the files on disk (FileVault or BitLocker does).
+  - Deleting a profile (its password is needed) removes its chats, settings, and skills; images it saved in folders stay.
+  - **Move a chat to another profile:** right-click it → **Move to profile…**. A profile with a password asks for it. The chat's agents come along if the other profile doesn't have them, and its generated images still show there.
+  - **Default profile:** ★ in the profile list picks the profile Penumbra opens at startup. The default profile can't be deleted until another one is the default.
+- **Tutorial.** A guided tour of every tab opens when Penumbra starts: chat (chats, agent picker, model, interactive answers, message box, settings), the orchestrator, the scheduler, agents and skills, images, My Models and Discover, your profile, and Options. Each step switches to its tab, highlights the feature, and explains it. It shows at every start until you click **Don't show again**; that choice is per profile, so each new profile sees it once. **Options → Tutorial** opens it again and turns the startup display back on.
+- **Your own approved sites:** add your own sites to the approved list in **Options → Internet access** (one list for all chats; each chat's settings panel shows a summary and a link to it) (`api.example.com`, `*.example.com` for every subdomain, or paste a link), and remove them there. Widgets and agents' web tools use them without asking. Local addresses and IPs can't be added.
+
+### Changed
+- The **Developer** tab is now **Options** (with a gear icon): server, tutorial, internet access, guided demo, updates, and API examples.
+- Internet access is set once for all chats in **Options → Internet access**; each chat's settings panel shows a summary with a link there.
+
 ## 0.2.0 (2026-10-30)
 
 ### Added
@@ -12,8 +37,7 @@
 - A "best with 7B+" hint when a small model is selected with interactive answers on.
 - **Internet for widgets:** maps (Leaflet with OpenStreetMap or Esri tiles), live public data (weather, earthquakes, exchange rates, Wikipedia, countries), and libraries from CDNs.
   - A built-in list of approved sites works right away. Any other site shows an Allow / Always allow / Run offline card on that widget first.
-  - Optional **Whole internet** mode in **Options → Internet access**, with a warning before it turns on.
-  - **Your sites:** add your own sites to the approved list in **Options → Internet access** (one list for all chats; each chat's settings panel shows a summary and a link to it) (`api.example.com`, `*.example.com` for every subdomain, or paste a link), and remove them there. Widgets and agents' web tools use them without asking. Local addresses and IPs can't be added.
+  - Optional **Whole internet** mode in the settings panel, with a warning before it turns on.
   - Every widget has a network log listing each request it made, including blocked ones.
   - If a widget tries a site it wasn't granted, a bar offers to allow it.
   - Errors a widget catches and logs with `console.error` also show the **Ask model to fix** button.
@@ -21,22 +45,6 @@
 - **Agents.** A new **Agents & Skills** tab to create agents: a name, a model, instructions, and the skills and tools each one may use. Start from a template (Researcher, Writer, Coder, Analyst) or a blank agent, and pick an agent in any chat.
 - **Personas.** **New agent** opens a short wizard: a **Purpose**, an **Agent name**, and a **Persona** (a sentence or two on personality, communication style, and approach, with a few ideas to start from). Every agent keeps the model's full knowledge and abilities; the persona shapes how it talks, reasons, and works, for the whole conversation. Templates come with personas, the orchestrator gives new agents one, and **Instructions** are now optional extra rules.
 - **Agent avatars.** Give an agent an image (upload or drop one; it's cropped to a square and kept small) or an emoji, in the wizard or on its page. Agents without one show colored initials. Avatars appear in the agent list, the chat's agent picker, and next to the agent's replies.
-- **Images tab (local image generation).** Make images on your computer, outside Ollama:
-  - Search Hugging Face for GGUF image models, see each repo's files and sizes, and download one. Penumbra reads each file's type first: Z-Image and FLUX.1 are supported; others show as not supported yet.
-  - Images are made by [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp), downloaded from its GitHub releases the first time (Apple Silicon Macs, and x64 Windows and Linux). Each model family's shared files (VAE and text encoders) are downloaded once.
-  - Downloads resume if interrupted and are checked against the hashes Hugging Face and GitHub publish.
-  - Models marked "not for all audiences" are hidden unless you choose to show them, labeled 18+, and ask before downloading.
-  - Choose size, steps, and seed; recent images are kept with their settings.
-  - **Generate…** in the avatar menu (agents and your profile) makes an avatar with your image model.
-  - **Images in chats and agents:** a new **Images** tool. Ask for a picture in any chat and the model creates it with your image model; it appears in the reply, with its size, seed, and a button to show the file. It's on for chats once an image model is installed, and agents get it with the **Images** checkbox. Orchestrator tasks can use it too.
-  - **Where images are saved:** in **Pictures/Penumbra** by default, with readable names (date, time, and the start of the prompt). **Change…** in the Images tab picks another folder, and **Reset** goes back. In a chat with a folder, images are saved in that folder. Chats keep only a short reference to each image, and only images Penumbra made can be shown. Deleting one from the gallery moves it to the Trash.
-- **Tutorial.** A guided tour of every tab opens when Penumbra starts: chat (chats, agent picker, model, interactive answers, message box, settings), the orchestrator, the scheduler, agents and skills, images, My Models and Discover, your profile, and Options. Each step switches to its tab, highlights the feature, and explains it. It shows at every start until you click **Don't show again**; that choice is per profile, so each new profile sees it once. **Options → Tutorial** opens it again and turns the startup display back on.
-- **Profiles.** Keep separate chats, agents, skills, settings, scheduled tasks, and image history for different people or uses (Work, Personal…). Create and switch profiles from the button at the bottom of the sidebar; downloaded models are shared. Your existing data becomes the first profile.
-  - **Passwords:** a profile can have a password. Penumbra shows a lock screen until it's entered, and nothing in the profile starts before that. **Lock now** locks it right away. Passwords are stored only as a salted scrypt hash, and wrong guesses slow down after five. It's an app lock: it doesn't encrypt the files on disk (FileVault or BitLocker does).
-  - Deleting a profile (its password is needed) removes its chats, settings, and skills; images it saved in folders stay.
-  - **Move a chat to another profile:** right-click it → **Move to profile…**. A profile with a password asks for it. The chat's agents come along if the other profile doesn't have them, and its generated images still show there.
-  - **Default profile:** ★ in the profile list picks the profile Penumbra opens at startup. The default profile can't be deleted until another one is the default.
-- **Image lightbox.** Click any image (in a reply, one you attached, or in the Images tab) to see it full-window. Zoom with the wheel or a pinch toward the pointer, drag to move around, double-click to zoom in or fit, and use the arrow keys to step through a set. The prompt shows underneath, scrolls when it's long, and has a button to copy it. **Show in folder** opens the file, and Esc closes.
 - **Agent trading cards.** The Agents tab shows each agent as a trading card in its own color: name and model size, the avatar as card art, its purpose, its tools as abilities, and its persona as flavor text. Cards tilt and shine under the pointer. **Edit** and **Chat** sit under each card; **All agents** (or **← All agents**) brings you back.
 - **Your profile.** The new button at the bottom of the sidebar sets your name and avatar (an image or an emoji). They appear on your messages instead of "You". Both stay on your computer and aren't sent to the models.
 - **Skills** in the same format Claude uses: a folder with a `SKILL.md` and optional reference files. Create and edit them in the app, import folders or `.zip` files, and turn each one on or off. The model only sees each skill's name and description, and loads the full skill when a task matches it.
@@ -59,11 +67,10 @@
   - While any task is on, closing the window keeps Penumbra in the menu bar (system tray on Windows and Linux) so tasks run on time. Quit from the menu bar icon. You can turn this off.
   - A **run log** on each task: every run with its start time, what triggered it (on schedule, Run now, or missed while Penumbra was quit), how long it took, the result or error, the tools it used, and any wait for your OK. It keeps the last 50 runs per task, and you can clear it.
   - A notification when a task finishes or needs you. Tasks run one at a time and wait while you're using the chat. A run missed while Penumbra was quit runs once when it opens.
-- **Guided demo.** **Options → Guided demo → Start demo** opens the tour from `docs/DEMO.md` in its own window, with demo chats, agents, skills, and files, so yours aren't touched. A panel shows each step, and nothing happens until you click Next. Closing the window deletes the demo's files.
-- **Update check.** Penumbra asks GitHub for the latest release shortly after it opens and twice a day. A newer version shows as a small arrow icon at the bottom of the sidebar, with no pop-ups. Clicking it shows what's new and downloads the installer for your computer to the Downloads folder, checking it against the release's checksum. You can also skip that version. The **Options** tab has **Check now** and a switch to turn the check off.
+- **Guided demo.** **Developer → Guided demo → Start demo** opens the tour from `docs/DEMO.md` in its own window, with demo chats, agents, skills, and files, so yours aren't touched. A panel shows each step, and nothing happens until you click Next. Closing the window deletes the demo's files.
+- **Update check.** Penumbra asks GitHub for the latest release shortly after it opens and twice a day. A newer version shows as a small arrow icon at the bottom of the sidebar, with no pop-ups. Clicking it shows what's new and downloads the installer for your computer to the Downloads folder, checking it against the release's checksum. You can also skip that version. The **Developer** tab has **Check now** and a switch to turn the check off.
 
 ### Changed
-- The **Developer** tab is now **Options** (with a gear icon): server, tutorial, internet access, guided demo, updates, and API examples.
 - Chats with interactive answers or tools use a context of at least 16K tokens, since widget replies and tool results are long.
 - Replies keep streaming when you switch to another tab.
 - Single line breaks in replies are kept, so addresses, lists, and memos read as written.

@@ -49,6 +49,16 @@
 - The **Orchestrator** plans a goal into tasks, creates the agents it needs, lets you review and edit the plan, then runs each task on its agent and writes the final answer. Follow runs on a board with one column per agent
 - The **Scheduler** runs prompts, agents, orchestrator goals, or terminal commands at set times or on repeat, with a chat per task for the results. While tasks are on, Penumbra keeps running in the menu bar when you close the window
 
+**Images** *(new in 0.3.0)*
+- An **Images** tab to make pictures on your computer, outside Ollama: search Hugging Face for image models (Z-Image and FLUX.1 today), download one, and generate with [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp)
+- Ask for a picture in any chat, or give an agent the **Images** tool; images appear in the reply and are saved in Pictures/Penumbra (or the chat's folder)
+- Click any image to open it full-window: zoom, pan, step through a set, and copy its prompt
+- Make agent and profile avatars with your image model
+
+**Profiles** *(new in 0.3.0)*
+- Separate profiles, each with its own chats, agents, skills, settings, scheduled tasks, and images; downloaded models are shared
+- Lock a profile with a password, move chats between profiles, and pick the one that opens at startup
+
 **Screenshots**
 
 | | |
@@ -57,6 +67,10 @@
 | Agents as trading cards | Purpose, persona, and avatar |
 | ![An orchestrator run with two agents](docs/screenshots/orchestrator.png) | ![A scheduled task with its run log](docs/screenshots/scheduler.png) |
 | An orchestrator run | A scheduled task and its run log |
+| ![Finding image models on Hugging Face](docs/screenshots/images.png) | ![An image in the zoomable viewer](docs/screenshots/lightbox.png) |
+| Finding image models | The image viewer |
+| ![A locked profile](docs/screenshots/profile-lock.png) | |
+| A locked profile | |
 
 **Models**
 - Model picker (<kbd>⌘L</kbd>) that loads the model into memory, with capability badges (vision, tools, reasoning)
@@ -69,6 +83,7 @@
 - Pause, resume, and retry downloads, with speed and time remaining; unfinished downloads survive restarts
 
 **Everywhere**
+- A guided tutorial of every tab the first time you open Penumbra (and in each new profile), until you choose not to see it again; Options → Tutorial shows it any time
 - Your own name and avatar on your messages (set from the button at the bottom of the sidebar)
 - A quiet update check: a small icon in the sidebar when a new version is out, which downloads the installer for your computer
 - A guided demo of every feature (Options → Guided demo), in its own window with sample data
@@ -138,10 +153,12 @@ OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve
 ## Project structure
 
 ```
-electron/         Electron main process, preload bridge, skills, tools (files, terminal, web), update check, menu bar
+electron/         Electron main process, preload bridge, skills, tools (files, terminal, web), update check, menu bar, image generation, profiles
 src/
   updates.ts      Update check state (the sidebar icon and Options panel)
   scheduler.ts    Scheduled tasks: timing, running them, menu bar status
+  images.ts       Image models, downloads, and generation state
+  profile.ts      Your name and avatar, synced with the profile list
   api.ts          Ollama REST client (streaming chat, pull, show, ps…)
   hf.ts           Hugging Face Hub search + GGUF quant listing
   downloads.ts    Download queue with pause/resume
@@ -150,7 +167,7 @@ src/
   agents/         Agent loop, tools, skills, agents store, orchestrator planning
   components/     Model picker, Markdown renderer, widget frame, plan card, context menu, icons
   widgets/        Widget sandbox document, system prompt, bundled chart/3D libraries
-  views/          Chat, Orchestrator, Scheduler, Agents & Skills, My Models, Discover, Hugging Face, Options
+  views/          Chat, Orchestrator, Scheduler, Images, Agents & Skills, My Models, Discover, Hugging Face, Options
 build/            App icon source, icon generator, install script
 ```
 
@@ -165,6 +182,8 @@ Interactive widgets are code written by the model, so Penumbra treats them as un
 Widgets can download from a list of approved sites (map tiles, script CDNs, and keyless public data). Any other site needs your OK for that widget, unless you turn on **Whole internet** in the settings panel. In every mode, widgets can only make https GET requests: they can't upload or post data, send cookies, or reach your computer, local network, or Ollama. Each widget's network log shows every request it made.
 
 Scheduled tasks run unattended, so they only skip the usual questions for what you allow in each task (opening websites, running commands); everything else waits for you. A command task runs its command without asking each time, since you wrote it.
+
+Image models and the image engine are downloaded only when you choose a model in the Images tab, from Hugging Face and stable-diffusion.cpp's GitHub releases, and checked against the hashes they publish.
 
 Profiles keep their data apart, and a profile's password is an app lock: Penumbra won't open the profile without it, but the files on disk aren't encrypted, so use FileVault or BitLocker if others can access your computer. Passwords are stored only as a salted hash.
 

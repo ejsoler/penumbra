@@ -410,6 +410,9 @@ input[type='range'] { width: 100%; accent-color: var(--accent); height: 4px; }
 .link-btn:hover { text-decoration: underline; }
 .net-list { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; color: var(--text-dim); }
 .net-list b { color: var(--text); font-weight: 600; }
+.net-add { margin-top: 2px; }
+.net-add .text { font-size: 12px; padding: 5px 8px; min-width: 0; }
+.net-error { color: #ffb3b3; }
 .net-allowed { gap: 6px; }
 .btn.danger { background: rgba(242, 109, 109, 0.14); border-color: rgba(242, 109, 109, 0.4); color: #ffb3b3; }
 .btn.danger:hover { background: rgba(242, 109, 109, 0.24); }

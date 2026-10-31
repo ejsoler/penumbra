@@ -83,6 +83,28 @@ export function widgetId(code: string): string {
 
 const HOST_RE = /^(\*\.)?([a-z0-9-]+\.)+[a-z]{2,}$/;
 
+/**
+ * Turns what the user typed ("api.example.com", "*.example.com", or a pasted link) into a site pattern,
+ * or explains why it can't be added.
+ */
+export function parseSite(input: string): { site: string } | { error: string } {
+  let s = input.trim().toLowerCase();
+  if (!s) return { error: 'Type a site, like api.example.com' };
+  const wildcard = s.startsWith('*.');
+  if (wildcard) s = s.slice(2);
+  try {
+    if (/^[a-z][a-z0-9+.-]*:\/\//.test(s)) s = new URL(s).hostname;
+  } catch {
+    return { error: "That isn't a valid web address" };
+  }
+  s = s.replace(/\/.*$/, '').replace(/:\d+$/, '').replace(/\.$/, '');
+  if (isLocalHost(s)) return { error: 'Your computer, the local network, and IP addresses are always blocked' };
+  const site = (wildcard ? '*.' : '') + s;
+  if (!HOST_RE.test(site)) return { error: 'Use a site name like api.example.com or *.example.com' };
+  if (APPROVED_HOSTS.includes(site)) return { error: `${site} is already on the approved list` };
+  return { site };
+}
+
 /** Does `host` match a pattern like "example.com" or "*.example.com"? */
 export const hostMatches = (host: string, pattern: string) =>
   pattern.startsWith('*.') ? host.endsWith(pattern.slice(1)) && host.length > pattern.length - 1 : host === pattern;

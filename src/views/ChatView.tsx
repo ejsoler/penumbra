@@ -20,7 +20,7 @@ import { TOOL_GROUPS, type ToolGroup } from '../agents/builtins';
 import type { Approval, ApprovalRequest } from '../agents/tools';
 import { host } from '../host';
 import { approval as approvalStore, chatController, getConversations, streaming, useConversations, type RunOptions } from '../session';
-import { APPROVED_SITES, removeAlwaysAllowed, setNetMode, useNetSettings } from '../widgets/network';
+import { alwaysAllow, APPROVED_SITES, parseSite, removeAlwaysAllowed, setNetMode, useNetSettings } from '../widgets/network';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
 import { shortcut } from '../platform';
@@ -1327,6 +1327,16 @@ function WidgetInternet() {
   const net = useNetSettings();
   const [confirmAll, setConfirmAll] = useState(false);
   const [showList, setShowList] = useState(false);
+  const [site, setSite] = useState('');
+  const [siteError, setSiteError] = useState('');
+  const addSite = () => {
+    const r = parseSite(site);
+    if ('error' in r) return setSiteError(r.error);
+    if (net.alwaysAllow.includes(r.site)) return setSiteError(`${r.site} is already on your list`);
+    alwaysAllow([r.site]);
+    setSite('');
+    setSiteError('');
+  };
   return (
     <section>
       <h4>Internet access</h4>
@@ -1352,15 +1362,27 @@ function WidgetInternet() {
           ))}
         </div>
       )}
-      {net.alwaysAllow.length > 0 && (
+      {net.mode === 'ask' && (
         <div className="net-list">
-          <b>Always allowed by you</b>
+          <b>Your sites</b>
           {net.alwaysAllow.map((h) => (
             <div key={h} className="row net-allowed">
               <span className="mono flex">{h}</span>
-              <button className="icon-btn sm" title={`Stop always allowing ${h}`} onClick={() => removeAlwaysAllowed(h)}><X size={12} /></button>
+              <button className="icon-btn sm" title={`Remove ${h}`} onClick={() => removeAlwaysAllowed(h)}><X size={12} /></button>
             </div>
           ))}
+          <div className="row gap net-add">
+            <input
+              className="text"
+              value={site}
+              placeholder="api.example.com or *.example.com"
+              aria-label="Add a site"
+              onChange={(e) => { setSite(e.target.value); setSiteError(''); }}
+              onKeyDown={(e) => e.key === 'Enter' && addSite()}
+            />
+            <button className="btn sm" disabled={!site.trim()} onClick={addSite}>Add</button>
+          </div>
+          {siteError ? <span className="net-error">{siteError}</span> : <span>Widgets and agents can use these without asking. Still download-only: no uploads, cookies, or local network.</span>}
         </div>
       )}
       {confirmAll && (

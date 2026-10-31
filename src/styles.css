@@ -706,3 +706,33 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .profile-name { flex: 1; margin-top: 0; }
 .profile-card .avatar-pop { top: auto; bottom: -14px; left: 356px; }
 .msg.user .msg-role:has(.agent-avatar) { display: flex; align-items: center; gap: 7px; }
+
+/* ---- Images ---- */
+.images-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 36px 18px; }
+.images-empty h3 { margin: 6px 0 0; }
+.images-empty p { margin: 0 0 8px; max-width: 520px; }
+.images-opts { display: grid; grid-template-columns: 2fr auto auto auto; gap: 14px; align-items: end; margin-top: 6px; }
+.images-opts .field { margin-bottom: 0; }
+.images-go { align-items: center; margin-top: 14px; }
+.images-result img { display: block; max-width: 100%; max-height: 640px; margin: 0 auto 12px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); }
+.images-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.images-thumb { position: relative; }
+.images-thumb img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); }
+.images-thumb img:hover { border-color: var(--accent); }
+.images-thumb .icon-btn { position: absolute; top: 4px; right: 4px; background: rgba(0, 0, 0, 0.55); opacity: 0; }
+.images-thumb:hover .icon-btn { opacity: 1; }
+.img-model { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.img-foot { align-items: center; margin-top: 12px; }
+.img-find-opts { align-items: center; margin: 10px 0 6px; }
+.img-results { display: flex; flex-direction: column; gap: 6px; }
+.img-result { border: 1px solid var(--border); border-radius: 9px; }
+.img-result.open { border-color: var(--border-strong); }
+.img-result-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: none; border: none; color: var(--text); text-align: left; }
+.img-result-head:hover { background: var(--bg-hover); border-radius: 9px; }
+.img-files { padding: 2px 14px 12px 34px; display: flex; flex-direction: column; gap: 6px; }
+.img-files p { margin: 2px 0 4px; }
+.img-file { display: flex; align-items: center; gap: 12px; }
+.img-dl-head { align-items: center; margin-bottom: 6px; }
+.avatar-gen { display: flex; flex-direction: column; gap: 8px; }
+.avatar-gen b { display: flex; align-items: center; gap: 6px; }
+.avatar-gen textarea { width: 100%; font-size: 12px; }

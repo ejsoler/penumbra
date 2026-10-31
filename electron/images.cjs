@@ -1,0 +1,441 @@
+// Local image generation, outside Ollama. Image models are GGUF files downloaded from Hugging Face and run
+// by stable-diffusion.cpp (github.com/leejet/stable-diffusion.cpp), which is downloaded the first time it's
+// needed. Each model family needs a few shared files (a VAE and text encoders), downloaded once.
+// Everything lives in <userData>/images. Downloads come only from huggingface.co and the engine's GitHub
+// releases, and are checked against the hashes those sites publish.
+const { app, ipcMain, shell } = require('electron');
+const { spawn } = require('child_process');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const { readZip } = require('./skills.cjs');
+
+const HF = 'https://huggingface.co';
+const ENGINE_REPO = 'leejet/stable-diffusion.cpp';
+const USER_AGENT = `Penumbra/${app.getVersion()} (+https://github.com/ejsoler/penumbra)`;
+const TRUSTED = ['api.github.com', 'huggingface.co', 'cdn-lfs.huggingface.co', 'cdn-lfs-us-1.huggingface.co', 'cas-bridge.xethub.hf.co', 'github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'];
+
+const base = () => path.join(app.getPath('userData'), 'images');
+const dirs = () => ({
+  models: path.join(base(), 'models'),
+  shared: path.join(base(), 'shared'),
+  engine: path.join(base(), 'engine'),
+  outputs: path.join(base(), 'outputs'),
+});
+
+// ---- model families -------------------------------------------------------------------------------
+
+const AE = { repo: 'Comfy-Org/z_image_turbo', file: 'split_files/vae/ae.safetensors', name: 'ae.safetensors' };
+const FAMILIES = {
+  zimage: {
+    label: 'Z-Image',
+    archs: ['lumina2', 'z_image', 'zimage'],
+    shared: {
+      vae: AE,
+      llm: { repo: 'unsloth/Qwen3-4B-Instruct-2507-GGUF', file: 'Qwen3-4B-Instruct-2507-Q4_K_M.gguf', name: 'Qwen3-4B-Instruct-2507-Q4_K_M.gguf' },
+    },
+    steps: () => 8,
+    args: (s) => ['--vae', s.vae, '--llm', s.llm, '--cfg-scale', '1.0'],
+  },
+  flux: {
+    label: 'FLUX.1',
+    archs: ['flux'],
+    shared: {
+      vae: AE,
+      clip_l: { repo: 'comfyanonymous/flux_text_encoders', file: 'clip_l.safetensors', name: 'clip_l.safetensors' },
+      t5xxl: { repo: 'city96/t5-v1_1-xxl-encoder-gguf', file: 't5-v1_1-xxl-encoder-Q8_0.gguf', name: 't5-v1_1-xxl-encoder-Q8_0.gguf' },
+    },
+    // FLUX.1 schnell is made for a few steps; dev needs more.
+    steps: (m) => (/schnell/i.test(m.repo + m.file) ? 4 : 20),
+    args: (s) => ['--vae', s.vae, '--clip_l', s.clip_l, '--t5xxl', s.t5xxl, '--cfg-scale', '1.0', '--sampling-method', 'euler', '--clip-on-cpu'],
+  },
+};
+const familyOf = (arch) => Object.entries(FAMILIES).find(([, f]) => f.archs.includes(String(arch).toLowerCase()))?.[0] ?? null;
+
+// ---- downloads ------------------------------------------------------------------------------------
+
+const trusted = (url) => {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && (TRUSTED.includes(u.hostname) || u.hostname.endsWith('.huggingface.co') || u.hostname.endsWith('.hf.co'));
+  } catch {
+    return false;
+  }
+};
+const safeRepo = (repo) => /^[\w.-]+\/[\w.-]+$/.test(String(repo));
+const safeFile = (file) => typeof file === 'string' && !file.split('/').some((p) => p === '..' || p === '') && !path.isAbsolute(file);
+const hfUrl = (repo, file) => `${HF}/${repo}/resolve/main/${file.split('/').map(encodeURIComponent).join('/')}`;
+
+/** Follows redirects by hand, so every hop is checked against the trusted hosts. */
+async function get(url, init = {}) {
+  for (let hops = 0; hops < 6; hops++) {
+    if (!trusted(url)) throw new Error(`Refusing to download from ${new URL(url).hostname}`);
+    const res = await fetch(url, { ...init, redirect: 'manual', headers: { 'User-Agent': USER_AGENT, ...init.headers } });
+    if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+      url = new URL(res.headers.get('location'), url).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error('Too many redirects');
+}
+
+/** A Hugging Face file's size and sha256, from the repo listing. */
+async function hfInfo(repo, file) {
+  const dir = file.includes('/') ? file.slice(0, file.lastIndexOf('/')) : '';
+  const res = await get(`${HF}/api/models/${repo}/tree/main${dir ? '/' + dir.split('/').map(encodeURIComponent).join('/') : ''}`);
+  if (res.status === 401 || res.status === 403) throw new Error(`${repo} is gated or private. Accept its terms on huggingface.co first.`);
+  if (!res.ok) throw new Error(`Couldn't list ${repo} (${res.status})`);
+  const entry = (await res.json()).find((e) => e.path === file);
+  if (!entry) throw new Error(`${file} isn't in ${repo}`);
+  return { size: entry.lfs?.size ?? entry.size, sha256: entry.lfs?.oid ?? null };
+}
+
+const jobs = new Map(); // id → { controller, cancelled }
+
+/** Downloads one file to `dest`, resuming a .part file, and checks its size and hash. */
+async function fetchFile({ url, dest, size, sha256, onBytes, signal }) {
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  if (fs.existsSync(dest) && (!size || fs.statSync(dest).size === size)) return;
+  const part = dest + '.part';
+  let have = fs.existsSync(part) ? fs.statSync(part).size : 0;
+  if (size && have > size) {
+    fs.rmSync(part);
+    have = 0;
+  }
+  const res = await get(url, { signal, headers: have ? { Range: `bytes=${have}-` } : {} });
+  if (have && res.status !== 206) have = 0; // the server ignored the range: start over
+  if (!res.ok || !res.body) throw new Error(`Download failed (${res.status})`);
+  const out = fs.createWriteStream(part, { flags: have ? 'a' : 'w' });
+  let got = have;
+  onBytes(got);
+  try {
+    for await (const chunk of res.body) {
+      if (!out.write(chunk)) await new Promise((r) => out.once('drain', r));
+      got += chunk.length;
+      onBytes(got);
+    }
+    await new Promise((resolve, reject) => out.end((e) => (e ? reject(e) : resolve())));
+  } catch (e) {
+    out.destroy();
+    throw signal?.aborted ? new Error('Download cancelled') : e;
+  }
+  if (size && fs.statSync(part).size !== size) throw new Error(`${path.basename(dest)} is incomplete. Try again.`);
+  if (sha256) {
+    const hash = crypto.createHash('sha256');
+    await new Promise((resolve, reject) => fs.createReadStream(part).on('data', (d) => hash.update(d)).on('end', resolve).on('error', reject));
+    if (hash.digest('hex') !== sha256) {
+      fs.rmSync(part, { force: true });
+      throw new Error(`${path.basename(dest)} doesn't match its published checksum, so it was deleted. Try again.`);
+    }
+  }
+  fs.renameSync(part, dest);
+}
+
+// ---- the engine -----------------------------------------------------------------------------------
+
+const ENGINE_EXE = process.platform === 'win32' ? 'sd-cli.exe' : 'sd-cli';
+
+/** stable-diffusion.cpp publishes builds for Apple Silicon Macs, and x64 Windows and Linux. */
+const engineSupported = () => (process.platform === 'darwin' ? process.arch === 'arm64' : ['win32', 'linux'].includes(process.platform) && process.arch === 'x64');
+
+/** The release file for this computer, preferring a GPU build. */
+function pickEngineAsset(assets) {
+  const by = (re) => assets.find((a) => re.test(a.name));
+  if (process.platform === 'darwin') return process.arch === 'arm64' ? by(/Darwin-macOS-.*-arm64\.zip$/) : null;
+  if (process.platform === 'win32') return process.arch === 'x64' ? by(/win-vulkan-x64\.zip$/) ?? by(/win-cpu-x64\.zip$/) : null;
+  if (process.platform === 'linux') return process.arch === 'x64' ? by(/Linux-.*x86_64-vulkan\.zip$/) ?? by(/Linux-.*x86_64\.zip$/) : null;
+  return null;
+}
+
+function installedEngine() {
+  const d = dirs().engine;
+  try {
+    const meta = JSON.parse(fs.readFileSync(path.join(d, 'engine.json'), 'utf8'));
+    const exe = path.join(d, meta.version, ENGINE_EXE);
+    return fs.existsSync(exe) ? { ...meta, exe } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function installEngine(send, signal) {
+  const res = await get(`https://api.github.com/repos/${ENGINE_REPO}/releases/latest`, { signal, headers: { Accept: 'application/vnd.github+json' } });
+  if (!res.ok) throw new Error(`Couldn't reach GitHub for the image engine (${res.status})`);
+  const release = await res.json();
+  const asset = pickEngineAsset(release.assets ?? []);
+  if (!asset) throw new Error("There's no image engine build for this computer yet.");
+  const version = String(release.tag_name).replace(/[^\w.-]/g, '');
+  const d = dirs().engine;
+  const zip = path.join(d, `${version}.zip`);
+  const sha256 = String(asset.digest ?? '').replace(/^sha256:/, '') || null;
+  await fetchFile({ url: asset.browser_download_url, dest: zip, size: asset.size, sha256, signal, onBytes: (got) => send({ file: 'Image engine', got, total: asset.size }) });
+  const files = readZip(zip, 600 * 1024 * 1024);
+  const into = path.join(d, version);
+  fs.rmSync(into, { recursive: true, force: true });
+  for (const [name, data] of Object.entries(files)) {
+    if (!safeFile(name)) continue;
+    const p = path.join(into, name);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, data);
+    if (process.platform !== 'win32' && (/^sd-/.test(path.basename(name)) || /\.(dylib|so)/.test(name))) fs.chmodSync(p, 0o755);
+  }
+  fs.rmSync(zip, { force: true });
+  if (!fs.existsSync(path.join(into, ENGINE_EXE))) throw new Error('The image engine download is missing its program');
+  fs.writeFileSync(path.join(d, 'engine.json'), JSON.stringify({ version, asset: asset.name, installedAt: Date.now() }));
+}
+
+// ---- installed models -----------------------------------------------------------------------------
+
+const manifestPath = () => path.join(base(), 'models.json');
+const readManifest = () => {
+  try {
+    return JSON.parse(fs.readFileSync(manifestPath(), 'utf8'));
+  } catch {
+    return [];
+  }
+};
+const writeManifest = (list) => {
+  fs.mkdirSync(base(), { recursive: true });
+  fs.writeFileSync(manifestPath(), JSON.stringify(list, null, 1));
+};
+const modelId = (repo, file) => `${repo}:${file}`;
+const sharedPath = (s) => path.join(dirs().shared, s.name);
+
+function status() {
+  const engine = installedEngine();
+  const models = readManifest()
+    .filter((m) => fs.existsSync(m.path))
+    .map((m) => {
+      const fam = FAMILIES[m.family];
+      const missing = fam ? Object.values(fam.shared).filter((s) => !fs.existsSync(sharedPath(s))).map((s) => s.name) : [];
+      return { id: m.id, repo: m.repo, file: m.file, family: m.family, familyLabel: fam?.label ?? m.family, size: m.size, nsfw: !!m.nsfw, addedAt: m.addedAt, ready: missing.length === 0, missing };
+    });
+  return {
+    supported: engineSupported(),
+    engine: engine ? { version: engine.version } : null,
+    models,
+    families: Object.fromEntries(Object.entries(FAMILIES).map(([k, f]) => [k, f.label])),
+    folder: base(),
+  };
+}
+
+/** Reads a GGUF file's architecture from its first bytes (a range request), without downloading it. */
+async function inspect(repo, file) {
+  if (!safeRepo(repo) || !safeFile(file)) throw new Error('Not a Hugging Face file');
+  if (!/\.gguf$/i.test(file)) return { arch: null, family: null, reason: 'Only GGUF image models are supported for now' };
+  const res = await get(hfUrl(repo, file), { headers: { Range: 'bytes=0-262143' } });
+  if (!res.ok) throw new Error(`Couldn't read ${file} (${res.status})`);
+  const b = Buffer.from(await res.arrayBuffer());
+  if (b.toString('latin1', 0, 4) !== 'GGUF') return { arch: null, family: null, reason: "This file isn't a GGUF model" };
+  let o = 8;
+  const u64 = () => { const v = Number(b.readBigUInt64LE(o)); o += 8; return v; };
+  const str = () => { const n = u64(); const s = b.toString('utf8', o, o + n); o += n; return s; };
+  const SIZES = { 0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8 };
+  const skip = (t) => {
+    if (t === 8) return void str();
+    if (t === 9) {
+      const at = b.readUInt32LE(o); o += 4;
+      const n = u64();
+      for (let i = 0; i < n; i++) skip(at);
+      return;
+    }
+    o += SIZES[t] ?? 0;
+  };
+  const tensors = u64();
+  const kvs = u64();
+  let arch = null;
+  for (let i = 0; i < kvs && o < b.length - 16; i++) {
+    const key = str();
+    const t = b.readUInt32LE(o); o += 4;
+    if (key === 'general.architecture' && t === 8) arch = str();
+    else skip(t);
+  }
+  // stable-diffusion.cpp's own converter writes no architecture; the tensor names still tell.
+  if (!arch) {
+    const names = [];
+    try {
+      for (let i = 0; i < Math.min(tensors, 400) && o < b.length - 64; i++) {
+        names.push(str());
+        const dims = b.readUInt32LE(o); o += 4 + dims * 8 + 4 + 8;
+      }
+    } catch {
+      /* ran past the bytes we read */
+    }
+    const strip = (n) => n.replace(/^(model\.)?diffusion_model\./, '');
+    if (names.some((n) => /^(cap_embedder|context_refiner|noise_refiner)\./.test(strip(n)))) arch = 'lumina2';
+    // FLUX.2 also has double and single blocks, plus shared "stream modulation" layers FLUX.1 doesn't.
+    else if (names.some((n) => /^(double|single)_stream_modulation/.test(strip(n)))) arch = 'flux2';
+    else if (names.some((n) => /^(double_blocks|single_blocks)\.\d+\./.test(strip(n)))) arch = 'flux';
+  }
+  const family = arch ? familyOf(arch) : null;
+  return { arch, family, familyLabel: family ? FAMILIES[family].label : null, reason: family ? null : arch ? `${arch} models aren't supported yet` : "Couldn't tell what kind of model this is" };
+}
+
+/** Downloads a model, the engine, and the model family's shared files, as one job with combined progress. */
+async function download(sender, { repo, file, nsfw }) {
+  if (!safeRepo(repo) || !safeFile(file)) throw new Error('Not a Hugging Face file');
+  const info = await inspect(repo, file);
+  if (!info.family) throw new Error(info.reason);
+  const fam = FAMILIES[info.family];
+  const id = modelId(repo, file);
+  if (jobs.has(id)) return id;
+  const controller = new AbortController();
+  jobs.set(id, { controller });
+  const send = (p) => !sender.isDestroyed() && sender.send('images:progress', { id, ...p });
+  (async () => {
+    try {
+      const list = [];
+      const main = await hfInfo(repo, file);
+      const dest = path.join(dirs().models, repo.replace('/', '__'), file);
+      list.push({ label: file.split('/').pop(), url: hfUrl(repo, file), dest, ...main });
+      for (const s of Object.values(fam.shared)) {
+        if (fs.existsSync(sharedPath(s))) continue;
+        list.push({ label: s.name, url: hfUrl(s.repo, s.file), dest: sharedPath(s), ...(await hfInfo(s.repo, s.file)) });
+      }
+      // Bytes for the whole job, so the bar doesn't restart for each file.
+      const total = list.reduce((n, f) => n + (f.size || 0), 0);
+      let before = 0;
+      if (!installedEngine()) await installEngine((p) => send({ phase: 'engine', ...p }), controller.signal);
+      for (const f of list) {
+        await fetchFile({ ...f, signal: controller.signal, onBytes: (got) => send({ phase: 'downloading', file: f.label, got: before + got, total }) });
+        before += f.size || 0;
+      }
+      const entry = { id, repo, file, family: info.family, size: main.size, path: dest, nsfw: !!nsfw, addedAt: Date.now() };
+      writeManifest([...readManifest().filter((m) => m.id !== id), entry]);
+      send({ phase: 'done' });
+    } catch (e) {
+      send({ phase: controller.signal.aborted ? 'cancelled' : 'error', error: e.message });
+    } finally {
+      jobs.delete(id);
+    }
+  })();
+  return id;
+}
+
+function remove(id) {
+  const list = readManifest();
+  const m = list.find((x) => x.id === id);
+  if (!m) return;
+  fs.rmSync(m.path, { force: true });
+  fs.rmSync(m.path + '.part', { force: true });
+  writeManifest(list.filter((x) => x.id !== id));
+  // Shared files stay: other models of the same family use them.
+}
+
+// ---- generating -----------------------------------------------------------------------------------
+
+let current = null; // the running engine process
+
+async function generate(sender, { id, prompt, width, height, steps, seed }) {
+  if (current) throw new Error('An image is already being generated');
+  const m = readManifest().find((x) => x.id === id);
+  if (!m || !fs.existsSync(m.path)) throw new Error('That image model isn’t installed');
+  const fam = FAMILIES[m.family];
+  const engine = installedEngine();
+  if (!engine) throw new Error('The image engine isn’t installed. Download a model again to get it.');
+  const shared = Object.fromEntries(Object.entries(fam.shared).map(([k, s]) => [k, sharedPath(s)]));
+  const missing = Object.values(shared).filter((p) => !fs.existsSync(p));
+  if (missing.length) throw new Error(`Missing ${missing.map((p) => path.basename(p)).join(', ')}. Download the model again to get them.`);
+  const clamp = (v, lo, hi, d) => Math.min(hi, Math.max(lo, Math.round(Number(v) || d)));
+  const W = clamp(width, 256, 1536, 1024) & ~15;
+  const H = clamp(height, 256, 1536, 1024) & ~15;
+  const S = clamp(steps, 1, 60, fam.steps(m));
+  const seedNum = Number.isInteger(seed) && seed >= 0 ? seed : Math.floor(Math.random() * 2 ** 31);
+  fs.mkdirSync(dirs().outputs, { recursive: true });
+  const out = path.join(dirs().outputs, `${new Date().toISOString().replace(/[:.]/g, '-')}-${seedNum}.png`);
+  const args = ['--diffusion-model', m.path, ...fam.args(shared), '-p', String(prompt).slice(0, 4000), '-W', String(W), '-H', String(H), '--steps', String(S), '-s', String(seedNum), '-o', out];
+  const send = (p) => !sender.isDestroyed() && sender.send('images:gen', p);
+  send({ phase: 'loading', step: 0, steps: S });
+  return new Promise((resolve, reject) => {
+    // No shell: the prompt is passed as one argument, never interpreted.
+    const child = spawn(engine.exe, args, { cwd: path.dirname(engine.exe), windowsHide: true });
+    current = child;
+    let tail = '';
+    let sampling = false;
+    const onData = (d) => {
+      const text = d.toString();
+      tail = (tail + text).slice(-4000);
+      if (/sampling|denois/i.test(text)) sampling = true;
+      if (/decod/i.test(text)) send({ phase: 'decoding', step: S, steps: S });
+      const m2 = [...text.matchAll(/\|\s*(\d+)\/(\d+)\s*-/g)].pop();
+      if (m2 && sampling) send({ phase: 'sampling', step: Number(m2[1]), steps: Number(m2[2]) });
+    };
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
+    const timer = setTimeout(() => child.kill(), 20 * 60 * 1000);
+    child.on('error', (e) => {
+      clearTimeout(timer);
+      current = null;
+      reject(new Error(`Couldn't start the image engine: ${e.message}`));
+    });
+    child.on('close', (code, signal) => {
+      clearTimeout(timer);
+      current = null;
+      if (signal) return reject(new Error('Stopped'));
+      if (code !== 0 || !fs.existsSync(out)) {
+        const why = tail.split('\n').map((l) => l.trim()).filter((l) => /error|fail|out of memory|not support/i.test(l)).pop();
+        return reject(new Error(why ? `The image engine stopped: ${why.slice(0, 300)}` : `The image engine stopped (code ${code})`));
+      }
+      const meta = { prompt: String(prompt).slice(0, 4000), model: m.id, width: W, height: H, steps: S, seed: seedNum, at: Date.now() };
+      fs.writeFileSync(out.replace(/\.png$/, '.json'), JSON.stringify(meta));
+      resolve({ image: `data:image/png;base64,${fs.readFileSync(out).toString('base64')}`, file: out, ...meta });
+    });
+  });
+}
+
+/** The newest generated images, with their settings. */
+function gallery(limit = 12) {
+  const d = dirs().outputs;
+  if (!fs.existsSync(d)) return [];
+  return fs
+    .readdirSync(d)
+    .filter((f) => f.endsWith('.png'))
+    .sort()
+    .reverse()
+    .slice(0, Math.min(48, limit))
+    .map((f) => {
+      const p = path.join(d, f);
+      let meta = {};
+      try {
+        meta = JSON.parse(fs.readFileSync(p.replace(/\.png$/, '.json'), 'utf8'));
+      } catch {
+        /* no settings saved */
+      }
+      return { file: p, image: `data:image/png;base64,${fs.readFileSync(p).toString('base64')}`, ...meta };
+    });
+}
+
+const insideOutputs = (file) => {
+  const p = path.resolve(String(file));
+  return p.startsWith(dirs().outputs + path.sep) && p.endsWith('.png') ? p : null;
+};
+
+function registerImages() {
+  const handle = (channel, fn) =>
+    ipcMain.handle(channel, (e, ...args) => {
+      if (e.senderFrame !== e.sender.mainFrame) throw new Error('Not allowed');
+      return fn(e, ...args);
+    });
+  handle('images:status', () => status());
+  handle('images:inspect', (_e, repo, file) => inspect(repo, file));
+  handle('images:download', (e, req) => download(e.sender, req ?? {}));
+  handle('images:cancel', (_e, id) => jobs.get(String(id))?.controller.abort());
+  handle('images:delete', (_e, id) => remove(String(id)));
+  handle('images:generate', (e, req) => generate(e.sender, req ?? {}));
+  handle('images:stop', () => current?.kill());
+  handle('images:gallery', (_e, limit) => gallery(Number(limit) || 12));
+  handle('images:deleteOutput', (_e, file) => {
+    const p = insideOutputs(file);
+    if (!p) throw new Error('Not a generated image');
+    fs.rmSync(p, { force: true });
+    fs.rmSync(p.replace(/\.png$/, '.json'), { force: true });
+  });
+  handle('images:reveal', (_e, file) => {
+    const p = file ? insideOutputs(file) : null;
+    if (p) shell.showItemInFolder(p);
+    else shell.openPath(fs.existsSync(base()) ? base() : app.getPath('userData'));
+  });
+}
+
+module.exports = { registerImages };

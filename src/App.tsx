@@ -6,9 +6,10 @@ import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
-import { Bot, CalendarClock, FolderOpen, MessageSquare, Telescope, Terminal, Workflow } from './components/icons';
+import { Bot, CalendarClock, FolderOpen, ImageIcon, MessageSquare, Telescope, Terminal, Workflow } from './components/icons';
 import { WorkspaceView } from './views/WorkspaceView';
 import { SchedulerView } from './views/SchedulerView';
+import { ImagesView } from './views/ImagesView';
 import { startScheduler, useScheduler } from './scheduler';
 import { chatController, openChatRequest, streaming } from './session';
 import { ContextMenuProvider } from './components/ContextMenu';
@@ -18,13 +19,14 @@ import { UpdateButton } from './components/UpdateButton';
 import { ProfileButton } from './components/ProfileButton';
 import { startUpdateChecks } from './updates';
 
-type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'models' | 'discover' | 'developer';
+type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer';
 
 const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
   { id: 'orchestrator', label: 'Orchestrator', icon: Workflow },
   { id: 'scheduler', label: 'Scheduler', icon: CalendarClock },
   { id: 'agents', label: 'Agents & Skills', icon: Bot },
+  { id: 'images', label: 'Images', icon: ImageIcon },
   { id: 'developer', label: 'Developer', icon: Terminal },
   { id: 'models', label: 'My Models', icon: FolderOpen },
   { id: 'discover', label: 'Discover', icon: Telescope },
@@ -110,6 +112,7 @@ export default function App() {
             />
           )}
           {view === 'scheduler' && <SchedulerView ollama={ollama} onOpenChat={openChat} />}
+          {view === 'images' && <ImagesView />}
           {view === 'agents' && <AgentsView ollama={ollama} onChatWithAgent={chatWithAgent} />}
           {view === 'models' && <ModelsView ollama={ollama} onChatWith={chatWith} />}
           {view === 'discover' && <DiscoverView ollama={ollama} dl={dl} />}

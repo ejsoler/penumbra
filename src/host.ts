@@ -22,6 +22,50 @@ export interface UpdateInfo {
   file?: { name: string; size: number } | null;
 }
 
+export interface ImageModel {
+  id: string;
+  repo: string;
+  file: string;
+  family: string;
+  familyLabel: string;
+  size: number;
+  nsfw: boolean;
+  addedAt: number;
+  /** Its family's shared files are all downloaded. */
+  ready: boolean;
+  missing: string[];
+}
+
+export interface ImagesStatus {
+  /** stable-diffusion.cpp has a build for this computer. */
+  supported: boolean;
+  engine: { version: string } | null;
+  models: ImageModel[];
+  families: Record<string, string>;
+  folder: string;
+}
+
+export interface GeneratedImage {
+  image: string;
+  file: string;
+  prompt?: string;
+  model?: string;
+  width?: number;
+  height?: number;
+  steps?: number;
+  seed?: number;
+  at?: number;
+}
+
+export interface ImageProgress {
+  id: string;
+  phase: 'engine' | 'downloading' | 'done' | 'error' | 'cancelled';
+  file?: string;
+  got?: number;
+  total?: number;
+  error?: string;
+}
+
 export interface PenumbraHost {
   skills: {
     list: () => Promise<SkillInfo[]>;
@@ -56,6 +100,22 @@ export interface PenumbraHost {
     install: (file: string) => Promise<'opened' | 'shown'>;
     reveal: () => Promise<void>;
     onProgress: (cb: (p: { got: number; total: number }) => void) => () => void;
+  };
+  images: {
+    status: () => Promise<ImagesStatus>;
+    /** Reads a Hugging Face GGUF file's architecture without downloading it. */
+    inspect: (repo: string, file: string) => Promise<{ arch: string | null; family: string | null; familyLabel?: string | null; reason: string | null }>;
+    /** Downloads the model (plus the engine and shared files it needs); resolves to the job id. */
+    download: (req: { repo: string; file: string; nsfw?: boolean }) => Promise<string>;
+    cancel: (id: string) => Promise<void>;
+    remove: (id: string) => Promise<void>;
+    generate: (req: { id: string; prompt: string; width?: number; height?: number; steps?: number; seed?: number }) => Promise<GeneratedImage>;
+    stop: () => Promise<void>;
+    gallery: (limit?: number) => Promise<GeneratedImage[]>;
+    deleteOutput: (file: string) => Promise<void>;
+    reveal: (file?: string) => Promise<void>;
+    onProgress: (cb: (p: ImageProgress) => void) => () => void;
+    onGenerate: (cb: (p: { phase: 'loading' | 'sampling' | 'decoding'; step: number; steps: number }) => void) => () => void;
   };
   /** Opens the guided demo in its own window (separate chats, agents, and skills). */
   startDemo: (model: string) => Promise<'started' | 'focused'>;

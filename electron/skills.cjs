@@ -97,7 +97,8 @@ function save(id, content) {
 // ---- import --------------------------------------------------------------------------------------
 
 /** Reads a .zip into { 'path/in/zip': Buffer }. Handles stored and deflated entries (no ZIP64). */
-function readZip(file) {
+/** Reads a zip's files into memory; `limit` caps the total unpacked size. */
+function readZip(file, limit = MAX_IMPORT) {
   const buf = fs.readFileSync(file);
   let eocd = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
@@ -120,7 +121,7 @@ function readZip(file) {
     const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
     p += 46 + nameLen + extraLen + commentLen;
     if (name.endsWith('/') || name.startsWith('__MACOSX/') || /(^|\/)\./.test(name)) continue;
-    if ((total += size) > MAX_IMPORT) throw new Error('Zip is too large (over 20 MB)');
+    if ((total += size) > limit) throw new Error(`Zip is too large (over ${Math.round(limit / 1e6)} MB)`);
     const dataStart = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
     const data = buf.subarray(dataStart, dataStart + compSize);
     if (method === 0) out[name] = Buffer.from(data);

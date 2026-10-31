@@ -417,7 +417,7 @@ function NewAgentWizard({ template, ollama, agents, onClose, onCreated }: {
           <button className="icon-btn sm" onClick={onClose} title="Close"><X size={14} /></button>
         </div>
         <div className="wizard-intro">
-          <AvatarPicker agent={{ id: draftId, name: name || '?', avatar }} onChange={setAvatar} size={52} />
+          <AvatarPicker agent={{ id: draftId, name: name || '?', avatar, description: purpose, persona }} onChange={setAvatar} size={52} />
           <p>Every agent shares the model’s knowledge. Give this one a purpose, a name, and a persona, and an avatar if you like.</p>
         </div>
 

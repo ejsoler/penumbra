@@ -28,8 +28,10 @@ interface TreeEntry {
   lfs?: { size: number };
 }
 
-export async function searchModels(query: string, sort: HfSort = 'trendingScore', limit = 40): Promise<HfModel[]> {
+/** `pipelineTag` narrows the search, e.g. 'text-to-image' for image models. */
+export async function searchModels(query: string, sort: HfSort = 'trendingScore', limit = 40, pipelineTag?: string): Promise<HfModel[]> {
   const params = new URLSearchParams({ filter: 'gguf', sort, direction: '-1', limit: String(limit) });
+  if (pipelineTag) params.set('pipeline_tag', pipelineTag);
   if (query.trim()) params.set('search', query.trim());
   const res = await fetch(`${HUB}/api/models?${params}`);
   if (!res.ok) throw new Error(`Hugging Face search failed (${res.status})`);

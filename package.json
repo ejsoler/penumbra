@@ -80,6 +80,7 @@
       "electron/updates.cjs",
       "electron/tray.cjs",
       "electron/demo.cjs",
+      "electron/images.cjs",
       "docs/demo/**",
       "build/trayTemplate.png",
       "build/trayTemplate@2x.png",

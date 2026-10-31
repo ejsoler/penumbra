@@ -7,6 +7,7 @@ const { registerTools } = require('./tools.cjs');
 const { registerUpdates } = require('./updates.cjs');
 const { registerTray, attachWindow, showWindow, mainWindow } = require('./tray.cjs');
 const { registerDemo } = require('./demo.cjs');
+const { registerImages } = require('./images.cjs');
 const { isLocalName, resolvesToPrivate } = require('./netsafe.cjs');
 
 const ICON = path.join(__dirname, '..', 'build', 'icon.png');
@@ -200,6 +201,7 @@ app.whenReady().then(() => {
   registerTools();
   registerUpdates();
   registerTray();
+  registerImages();
   registerDemo({ createWindow, protectSession });
   // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).
   if (process.platform === 'darwin') app.dock?.setIcon(ICON);

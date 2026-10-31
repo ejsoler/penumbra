@@ -38,6 +38,28 @@ contextBridge.exposeInMainWorld('penumbraHost', {
     },
   },
   /** Tells the main process whether to stay in the menu bar, and what to show there. */
+  images: {
+    status: () => ipcRenderer.invoke('images:status'),
+    inspect: (repo, file) => ipcRenderer.invoke('images:inspect', repo, file),
+    download: (req) => ipcRenderer.invoke('images:download', req),
+    cancel: (id) => ipcRenderer.invoke('images:cancel', id),
+    remove: (id) => ipcRenderer.invoke('images:delete', id),
+    generate: (req) => ipcRenderer.invoke('images:generate', req),
+    stop: () => ipcRenderer.invoke('images:stop'),
+    gallery: (limit) => ipcRenderer.invoke('images:gallery', limit),
+    deleteOutput: (file) => ipcRenderer.invoke('images:deleteOutput', file),
+    reveal: (file) => ipcRenderer.invoke('images:reveal', file),
+    onProgress: (cb) => {
+      const l = (_e, p) => cb(p);
+      ipcRenderer.on('images:progress', l);
+      return () => ipcRenderer.removeListener('images:progress', l);
+    },
+    onGenerate: (cb) => {
+      const l = (_e, p) => cb(p);
+      ipcRenderer.on('images:gen', l);
+      return () => ipcRenderer.removeListener('images:gen', l);
+    },
+  },
   /** Opens the guided demo in its own window, using this model for every reply. */
   startDemo: (model) => ipcRenderer.invoke('demo:start', model),
   setTrayStatus: (status) => ipcRenderer.send('tray:status', status),

@@ -78,6 +78,8 @@ export interface ProfileInfo {
   hasPassword: boolean;
   /** This window's profile. */
   current: boolean;
+  /** The profile Penumbra opens at startup. */
+  isDefault: boolean;
 }
 
 export interface PenumbraHost {
@@ -154,6 +156,10 @@ export interface PenumbraHost {
     /** `next` empty removes the password; `current` is needed when one is set. */
     setPassword: (req: { current?: string; next: string }) => Promise<{ hasPassword: boolean }>;
     remove: (req: { id: string; password?: string }) => Promise<void>;
+    /** Makes a profile the one Penumbra opens at startup. */
+    setDefault: (id: string) => Promise<void>;
+    /** Copies a chat (and agents it uses) into another profile; resolves to its id there. */
+    moveChat: (req: { target: string; password?: string; conversation: unknown; agents: unknown[] }) => Promise<string>;
   };
   /** Opens the guided demo in its own window (separate chats, agents, and skills). */
   startDemo: (model: string) => Promise<'started' | 'focused'>;

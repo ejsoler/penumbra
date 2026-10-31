@@ -74,6 +74,8 @@ contextBridge.exposeInMainWorld('penumbraHost', {
     lock: () => ipcRenderer.invoke('profiles:lock'),
     setPassword: (req) => ipcRenderer.invoke('profiles:setPassword', req),
     remove: (req) => ipcRenderer.invoke('profiles:delete', req),
+    setDefault: (id) => ipcRenderer.invoke('profiles:setDefault', id),
+    moveChat: (req) => ipcRenderer.invoke('profiles:moveChat', req),
   },
   /** Opens the guided demo in its own window, using this model for every reply. */
   startDemo: (model) => ipcRenderer.invoke('demo:start', model),

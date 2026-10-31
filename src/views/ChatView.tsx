@@ -18,7 +18,7 @@ import { DEFAULT_CHAT_TOOLS, replySetup } from '../agents/setup';
 import { enabledSkills, useSkills } from '../agents/skills';
 import { TOOL_GROUPS, type ToolGroup } from '../agents/builtins';
 import type { Approval, ApprovalRequest } from '../agents/tools';
-import { host } from '../host';
+import { host, type ProfileInfo } from '../host';
 import { approval as approvalStore, chatController, getConversations, streaming, useConversations, type RunOptions } from '../session';
 import { useNetSettings } from '../widgets/network';
 import { ModelPicker } from '../components/ModelPicker';
@@ -29,7 +29,7 @@ import { Steps } from '../components/Steps';
 import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
-  ArrowUp, Bot, Brain, Check, ChevronDown, FileText, FolderOpen, ShieldAlert, Workflow, ChevronRight, Copy, Download, Eraser, GitBranch, PanelRight, PanelRightClose, Paperclip, Pencil,
+  ArrowUp, ArrowRightLeft, Bot, Brain, Loader2, Lock, Check, ChevronDown, FileText, FolderOpen, ShieldAlert, Workflow, ChevronRight, Copy, Download, Eraser, GitBranch, PanelRight, PanelRightClose, Paperclip, Pencil,
   Plus, RefreshCw, Sparkles, Square, Trash2, TriangleAlert, X,
 } from '../components/icons';
 
@@ -75,6 +75,8 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   const setStreamingId = streaming.set;
   const abortRef = useRef<AbortController | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  // The chat being moved to another profile.
+  const [moving, setMoving] = useState<Conversation | null>(null);
   const [noticeSeen, setNoticeSeen] = usePersistent('ollama-gui.interactiveNoticeSeen', false);
   const [pendingSend, setPendingSend] = useState<{ text: string; images: string[]; files: Attachment[] } | null>(null);
   // A tool waiting for the user's OK (a command, a site). Shared, so the Orchestrator page shows it too.
@@ -145,6 +147,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     menu(e, [
       { label: 'Rename', icon: Pencil, onClick: () => setRenamingId(c.id) },
       { label: 'Duplicate', icon: Copy, onClick: () => duplicateChat(c) },
+      ...(host() ? [{ label: 'Move to profile…', icon: ArrowRightLeft, onClick: () => setMoving(c), disabled: streamingId === c.id }] : []),
       'separator',
       { label: 'Copy as Markdown', icon: Copy, onClick: () => copyText(toMarkdown(c)), disabled: !c.messages.length },
       { label: 'Export as Markdown…', icon: Download, onClick: () => downloadFile(`${fileSlug(c.title)}.md`, toMarkdown(c)), disabled: !c.messages.length },
@@ -506,6 +509,17 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
 
   return (
     <>
+      {moving && (
+        <MoveChatDialog
+          conv={moving}
+          agents={agents.filter((a) => a.id === moving.agentId || moving.messages.some((m) => m.agentId === a.id))}
+          onClose={() => setMoving(null)}
+          onMoved={() => {
+            deleteChat(moving.id);
+            setMoving(null);
+          }}
+        />
+      )}
       <aside className="sidebar">
         <div className="sidebar-head">
           <span className="sidebar-title">Chats</span>
@@ -772,6 +786,69 @@ function AgentPicker({ agents, value, orchestrator, onChange, onManage }: {
       <span>{orchestrator ? 'Orchestrator' : value ? value.name : 'No agent'}</span>
       <ChevronDown size={13} />
     </button>
+  );
+}
+
+/** Moves a chat to another profile, asking for that profile's password if it has one. */
+function MoveChatDialog({ conv, agents, onClose, onMoved }: { conv: Conversation; agents: Agent[]; onClose: () => void; onMoved: () => void }) {
+  const [profiles, setProfiles] = useState<ProfileInfo[] | null>(null);
+  const [target, setTarget] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    host()!.profiles.list().then((l) => {
+      const others = l.filter((p) => !p.current);
+      setProfiles(others);
+      setTarget(others[0]?.id ?? '');
+    }).catch((e) => setError(String(e)));
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const chosen = profiles?.find((p) => p.id === target);
+  const move = async () => {
+    if (!chosen || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await host()!.profiles.moveChat({ target: chosen.id, ...(chosen.hasPassword ? { password } : {}), conversation: conv, agents });
+      onMoved();
+    } catch (e) {
+      setError((e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <form className="modal move-chat" role="dialog" aria-label="Move chat" onSubmit={(e) => { e.preventDefault(); move(); }}>
+        <h3>Move “{conv.title}”</h3>
+        {profiles && !profiles.length ? (
+          <p>There's no other profile yet. Create one from the profile button at the bottom of the sidebar.</p>
+        ) : (
+          <>
+            <p>It leaves this profile and appears in the other one{agents.length ? `, with its agent${agents.length > 1 ? 's' : ''} (${agents.map((a) => a.name).join(', ')}) if that profile doesn't have ${agents.length > 1 ? 'them' : 'it'}` : ''}.</p>
+            <div className="move-targets">
+              {(profiles ?? []).map((p) => (
+                <button type="button" key={p.id} className={`move-target ${target === p.id ? 'on' : ''}`} onClick={() => { setTarget(p.id); setPassword(''); setError(''); }}>
+                  <AgentAvatar agent={{ id: p.id, name: p.name, avatar: p.avatar }} size={30} />
+                  <span className="flex">{p.name}</span>
+                  {p.hasPassword && <Lock size={13} className="muted" />}
+                </button>
+              ))}
+            </div>
+            {chosen?.hasPassword && (
+              <input className="text plain" type="password" autoFocus value={password} placeholder={`${chosen.name}'s password`} onChange={(e) => { setPassword(e.target.value); setError(''); }} />
+            )}
+          </>
+        )}
+        {error && <p className="lock-error small">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={!chosen || busy || (chosen.hasPassword && !password)}>{busy ? <Loader2 size={14} className="spin" /> : null} Move</button>
+        </div>
+      </form>
+    </div>
   );
 }
 

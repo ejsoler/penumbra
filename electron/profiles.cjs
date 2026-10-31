@@ -5,7 +5,7 @@
 //
 // A password is an app lock: Penumbra won't show a profile until it's entered. It is stored only as a
 // salted scrypt hash. It doesn't encrypt the files on disk (FileVault or BitLocker does that).
-const { app, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session } = require('electron');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -92,7 +92,67 @@ function openProfile(id) {
   return win;
 }
 
-const publicInfo = (p, currentId) => ({ id: p.id, name: p.name || (p.id === DEFAULT_ID ? 'Default' : 'Profile'), avatar: p.avatar, hasPassword: !!p.hash, current: p.id === currentId });
+/** The profile Penumbra opens at startup. */
+const startupId = (d = read()) => (d.profiles.some((p) => p.id === d.startup) ? d.startup : DEFAULT_ID);
+
+const publicInfo = (p, currentId, d = read()) => ({
+  id: p.id,
+  name: p.name || (p.id === DEFAULT_ID ? 'Default' : 'Profile'),
+  avatar: p.avatar,
+  hasPassword: !!p.hash,
+  current: p.id === currentId,
+  /** Opens at startup. */
+  isDefault: p.id === startupId(d),
+});
+
+/**
+ * Adds a chat (and agents it uses that the profile lacks) to another profile's storage. That storage is
+ * only reachable from a page in its session, so a hidden window opens an empty page on the app's own
+ * address there and writes it.
+ */
+async function writeToProfile(targetId, appUrl, conversation, agents) {
+  const ses = sessionOf(targetId);
+  const win = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, ...(partitionOf(targetId) ? { partition: partitionOf(targetId) } : {}) } });
+  try {
+    await win.loadURL(new URL('transfer.html', appUrl).toString());
+    const id = await win.webContents.executeJavaScript(`(() => {
+      const read = (k) => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch { return []; } };
+      const convs = read('ollama-gui.conversations');
+      const conv = ${JSON.stringify(conversation)};
+      if (convs.some((c) => c.id === conv.id)) conv.id = conv.id + '-' + Date.now().toString(36);
+      conv.updatedAt = Date.now();
+      localStorage.setItem('ollama-gui.conversations', JSON.stringify([conv, ...convs]));
+      const agents = read('ollama-gui.agents');
+      const add = ${JSON.stringify(agents)}.filter((a) => !agents.some((x) => x.id === a.id));
+      if (add.length) localStorage.setItem('ollama-gui.agents', JSON.stringify([...agents, ...add]));
+      return conv.id;
+    })()`);
+    await ses.flushStorageData?.();
+    return id;
+  } finally {
+    win.destroy();
+  }
+}
+
+/** Lets the target profile show the moved chat's generated images: they join its image list. */
+function shareImages(fromId, toId, conversation) {
+  const refs = (conversation.messages ?? []).flatMap((m) => m.generated ?? []);
+  if (!refs.length) return;
+  const histPath = (id) => path.join(imagesDir(id), 'history.json');
+  const readH = (id) => {
+    try {
+      return JSON.parse(fs.readFileSync(histPath(id), 'utf8'));
+    } catch {
+      return [];
+    }
+  };
+  const from = readH(fromId);
+  const to = readH(toId);
+  const add = refs.map((r) => from.find((h) => h.file === r.file) ?? { file: r.file, prompt: r.prompt, width: r.width, height: r.height, seed: r.seed, model: r.model, at: Date.now() }).filter((h) => !to.some((x) => x.file === h.file));
+  if (!add.length) return;
+  fs.mkdirSync(path.dirname(histPath(toId)), { recursive: true });
+  fs.writeFileSync(histPath(toId), JSON.stringify([...add, ...to]));
+}
 
 function registerProfiles(d) {
   deps = d;
@@ -115,7 +175,34 @@ function registerProfiles(d) {
   };
 
   handle('profiles:current', ({ e, id }) => ({ ...publicInfo(find(id), id), locked: !unlocked.has(e.sender.id) }));
-  handle('profiles:list', ({ id }) => read().profiles.map((p) => publicInfo(p, id)));
+  handle('profiles:list', ({ id }) => {
+    const d = read();
+    return d.profiles.map((p) => publicInfo(p, id, d));
+  });
+  handle('profiles:setDefault', ({ e }, target) => {
+    if (!unlocked.has(e.sender.id)) throw new Error('Unlock the profile first');
+    if (!find(String(target))) throw new Error('No such profile');
+    write({ ...read(), startup: String(target) });
+  });
+  handle('profiles:moveChat', async ({ e, id }, req) => {
+    if (!unlocked.has(e.sender.id)) throw new Error('Unlock the profile first');
+    const target = find(String(req?.target));
+    if (!target || target.id === id) throw new Error('Pick another profile');
+    if (target.hash) {
+      guard(target.id);
+      if (!checkPassword(target, req?.password)) {
+        failed(target.id);
+        throw new Error(`Wrong password for ${target.name}`);
+      }
+      failures.delete(target.id);
+    }
+    const conv = req?.conversation;
+    if (!conv || typeof conv !== 'object' || !Array.isArray(conv.messages) || JSON.stringify(conv).length > 50 * 1024 * 1024) throw new Error('Not a chat');
+    const agents = Array.isArray(req?.agents) ? req.agents.filter((a) => a && typeof a.id === 'string') : [];
+    const newId = await writeToProfile(target.id, e.sender.getURL(), conv, agents);
+    shareImages(id, target.id, conv);
+    return newId;
+  });
   handle('profiles:unlock', ({ e, id }, password) => {
     guard(id);
     if (!checkPassword(find(id), password)) {
@@ -170,7 +257,8 @@ function registerProfiles(d) {
     if (!unlocked.has(e.sender.id)) throw new Error('Unlock the profile first');
     const target = find(String(req?.id));
     if (!target) throw new Error('No such profile');
-    if (target.id === DEFAULT_ID) throw new Error("The default profile can't be deleted");
+    if (target.id === DEFAULT_ID) throw new Error("The original profile can't be deleted");
+    if (target.id === startupId()) throw new Error('Make another profile the default first');
     if (target.id === id) throw new Error('Switch to another profile before deleting this one');
     if (target.hash) {
       guard(target.id);
@@ -188,7 +276,7 @@ function registerProfiles(d) {
   });
 }
 
-/** The profile to open at launch: the last one used. */
-const activeProfile = () => read().active;
+/** The profile to open at launch: the default one. */
+const activeProfile = () => startupId();
 
 module.exports = { registerProfiles, openProfile, activeProfile };

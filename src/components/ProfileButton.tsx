@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { asAvatar, setProfile, useProfile } from '../profile';
 import { host, type ProfileInfo } from '../host';
 import { AgentAvatar, AvatarPicker } from './AgentAvatar';
-import { Lock, Plus, Trash2, X } from './icons';
+import { Lock, Plus, Star, Trash2, X } from './icons';
 
 const clean = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 
@@ -74,14 +74,22 @@ export function ProfileButton() {
                       {p.hasPassword && <Lock size={12} className="muted" />}
                       {p.current && <span className="badge">this one</span>}
                     </button>
-                    {!p.current && p.id !== 'default' && (
+                    <button
+                      className={`icon-btn sm profile-star ${p.isDefault ? 'on' : ''}`}
+                      title={p.isDefault ? `${p.name} opens when Penumbra starts` : `Open ${p.name} when Penumbra starts`}
+                      disabled={p.isDefault}
+                      onClick={async () => { await host()!.profiles.setDefault(p.id); load(); }}
+                    >
+                      <Star size={12} fill={p.isDefault ? 'currentColor' : 'none'} />
+                    </button>
+                    {!p.current && !p.isDefault && p.id !== 'default' && (
                       <button className="icon-btn sm" title={`Delete ${p.name}`} onClick={() => setForm({ kind: 'delete', target: p })}><Trash2 size={12} /></button>
                     )}
                   </div>
                 ))}
                 {form?.kind === 'new' && <NewProfile onDone={(id) => { setForm(null); load(); if (id) host()!.profiles.switchTo(id); }} onCancel={() => setForm(null)} />}
                 {form?.kind === 'delete' && <DeleteProfile target={form.target} onDone={() => { setForm(null); load(); }} onCancel={() => setForm(null)} />}
-                <p className="muted small">Each profile has its own chats, agents, skills, settings, scheduled tasks, and images. Downloaded models are shared.</p>
+                <p className="muted small">Each profile has its own chats, agents, skills, settings, scheduled tasks, and images. Downloaded models are shared. ★ marks the profile Penumbra opens at startup.</p>
               </div>
 
               <div className="profile-section">

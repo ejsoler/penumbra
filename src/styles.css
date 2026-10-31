@@ -773,3 +773,8 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .lightbox-caption-text { flex: 1; min-width: 0; max-height: 7.3em; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; padding-right: 4px; }
 .lightbox-caption .icon-btn { flex-shrink: 0; color: #e8e6f3; }
 .images-thumb .thumb-reuse { right: 32px; font-size: 13px; }
+/* Internet access in the Developer tab: roomier than the chat panel */
+#internet-access .field { max-width: 420px; }
+#internet-access .net-list { font-size: 12.5px; }
+#internet-access .net-add { max-width: 520px; }
+#internet-access .net-allowed { max-width: 520px; }

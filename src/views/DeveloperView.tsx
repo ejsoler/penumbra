@@ -1,11 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as api from '../api';
 import type { OllamaState } from '../store';
 import { Check, Copy, Loader2, Play, RefreshCw, Server } from '../components/icons';
 import { host as penumbraHost } from '../host';
 import { checkForUpdates, setUpdateSettings, useUpdates } from '../updates';
+import { InternetSettings } from '../components/InternetSettings';
+
+/** Set before switching to this tab to scroll to a section. */
+export const developerFocus = { section: '' };
 
 export function DeveloperView({ ollama }: { ollama: OllamaState }) {
+  useEffect(() => {
+    if (!developerFocus.section) return;
+    document.getElementById(developerFocus.section)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    developerFocus.section = '';
+  }, []);
   const [host, setHostInput] = useState(api.getHost());
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState('');
@@ -48,7 +57,7 @@ print(response.message.content)`,
       <header className="page-head">
         <div>
           <h1>Developer</h1>
-          <p className="muted">Server connection, API usage, the guided demo, and updates.</p>
+          <p className="muted">Server connection, internet access, API usage, the guided demo, and updates.</p>
         </div>
       </header>
 
@@ -73,6 +82,8 @@ print(response.message.content)`,
           </p>
         )}
       </section>
+
+      <InternetSettings />
 
       {penumbraHost() && <DemoPanel ollama={ollama} />}
 

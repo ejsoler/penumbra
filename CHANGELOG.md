@@ -12,8 +12,8 @@
 - A "best with 7B+" hint when a small model is selected with interactive answers on.
 - **Internet for widgets:** maps (Leaflet with OpenStreetMap or Esri tiles), live public data (weather, earthquakes, exchange rates, Wikipedia, countries), and libraries from CDNs.
   - A built-in list of approved sites works right away. Any other site shows an Allow / Always allow / Run offline card on that widget first.
-  - Optional **Whole internet** mode in the settings panel, with a warning before it turns on.
-  - **Your sites:** add your own sites to the approved list in **Settings → Internet access** (`api.example.com`, `*.example.com` for every subdomain, or paste a link), and remove them there. Widgets and agents' web tools use them without asking. Local addresses and IPs can't be added.
+  - Optional **Whole internet** mode in **Developer → Internet access**, with a warning before it turns on.
+  - **Your sites:** add your own sites to the approved list in **Developer → Internet access** (one list for all chats; each chat's settings panel shows a summary and a link to it) (`api.example.com`, `*.example.com` for every subdomain, or paste a link), and remove them there. Widgets and agents' web tools use them without asking. Local addresses and IPs can't be added.
   - Every widget has a network log listing each request it made, including blocked ones.
   - If a widget tries a site it wasn't granted, a bar offers to allow it.
   - Errors a widget catches and logs with `console.error` also show the **Ask model to fix** button.

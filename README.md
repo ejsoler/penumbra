@@ -33,7 +33,7 @@
 - It decides on its own when an app helps more than text, and answers in plain text otherwise
 - Turn it on or off for each chat with the **Interactive** switch at the top (on by default)
 - Chart.js, D3, and Three.js are built in, so widgets work offline
-- Widgets can use the internet for maps and live public data (weather, earthquakes, exchange rates, Wikipedia). Approved sites work right away; any other site asks you first. A **Whole internet** option is in the settings panel
+- Widgets can use the internet for maps and live public data (weather, earthquakes, exchange rates, Wikipedia). Approved sites work right away; any other site asks you first. A **Whole internet** option and your own approved sites are in the Developer tab
 - Open a widget full screen, save it as a standalone `.html` file, or view and copy its code
 - Widgets can suggest follow-up questions; they go into your message box, and you decide whether to send them
 - If a widget breaks, **Ask model to fix** sends the error back to the model for a corrected version

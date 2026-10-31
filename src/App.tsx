@@ -4,7 +4,7 @@ import { ChatView } from './views/ChatView';
 import { ModelsView } from './views/ModelsView';
 import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
-import { DeveloperView } from './views/DeveloperView';
+import { DeveloperView, developerFocus } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
 import { Bot, CalendarClock, FolderOpen, ImageIcon, MessageSquare, Telescope, Terminal, Workflow } from './components/icons';
 import { WorkspaceView } from './views/WorkspaceView';
@@ -103,6 +103,7 @@ export default function App() {
               pendingAgent={pendingAgent}
               onPendingHandled={() => { setPendingModel(null); setPendingAgent(null); }}
               onManageAgents={() => setView('agents')}
+              onInternetSettings={() => { developerFocus.section = 'internet-access'; setView('developer'); }}
             />
           </div>
           {view === 'orchestrator' && (

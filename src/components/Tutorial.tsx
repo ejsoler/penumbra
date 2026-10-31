@@ -51,23 +51,48 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { title: 'Welcome to Penumbra', body: 'A quick tour of what you can do: chat with local models, get live interactive answers, build agents, plan work with the orchestrator, schedule tasks, and make images. Everything runs on this computer with Ollama.' },
+  { title: 'Welcome to Penumbra', body: 'A tour of every tab: chat with local models, interactive answers, agents, the orchestrator, scheduled tasks, images, and your options. Everything runs on this computer with Ollama.' },
+
+  // Chat
+  { title: 'Your chats', body: 'Every chat is saved here. + starts a new one (⌘/Ctrl+N). Right-click a chat to rename, duplicate, export it as Markdown, move it to another profile, or delete it.', target: '.view-host aside.sidebar', view: 'chat' },
+  { title: 'Agent or orchestrator', body: 'Answer with the plain model, one of your agents, or the orchestrator, which splits a goal into tasks for several agents.', target: '.view-host .agent-picker', view: 'chat' },
   { title: 'Pick a model', body: 'Choose which Ollama model answers (⌘/Ctrl+L). It loads into memory when you pick it. Badges show what each model can do, like vision, tools, or reasoning.', target: '.picker-btn', view: 'chat' },
   { title: 'Interactive answers', body: 'With this on, the model can reply with small live apps: calculators, charts, maps, diagrams. Turn it off for plain text, per chat.', target: '.ia-switch', view: 'chat' },
   { title: 'Ask anything', body: 'Type here and press Enter. Attach images for vision models, or text files like notes and CSVs. Ask for a picture and the model can create one with your image model.', target: '.composer', view: 'chat' },
   { title: 'Chat settings', body: 'This button opens the panel with the system prompt, the tools a chat may use (web, files, terminal, images), a folder for file tools, and sampling settings.', target: '.view-host .topbar-right', view: 'chat' },
-  { title: 'Orchestrator', body: 'Give it a goal. It plans the tasks, creates the agents it needs, lets you review the plan, then runs it and writes the final answer.', target: '.rail-btn[title="Orchestrator"]' },
-  { title: 'Scheduler', body: 'Run prompts, agents, orchestrator goals, or commands at set times or on repeat. Each task keeps its results and a run log.', target: '.rail-btn[title="Scheduler"]' },
-  { title: 'Agents & Skills', body: 'Create agents with a purpose, a persona, an avatar, and their own tools. Skills are packaged instructions the model loads when a task needs them.', target: '.rail-btn[title="Agents & Skills"]' },
-  { title: 'Images', body: 'Make pictures on this computer, outside Ollama, with image models from Hugging Face. The next steps show how.', target: '.rail-btn[title="Images"]' },
-  { title: 'Find image models', body: 'Search Hugging Face for image models. Penumbra checks each file before you download it: Z-Image and FLUX.1 work today. Models marked 18+ stay hidden unless you choose to show them.', target: '.page-head .seg button:last-child', view: 'images' },
+
+  // Orchestrator
+  { title: 'Orchestrator runs', body: 'Every orchestrator run is listed here. + starts a new one.', target: '.content-inner > aside.sidebar', view: 'orchestrator' },
+  { title: 'Plan, review, run', body: 'Describe a goal and pick the planner model. The orchestrator proposes tasks and the agents for them (creating new ones if needed). You edit and approve the plan, then follow it on a board with a column per agent, and get the final answer.', target: '.content-inner > main', view: 'orchestrator' },
+
+  // Scheduler
+  { title: 'Scheduled tasks', body: 'New task runs a prompt, an agent, an orchestrator goal, or a terminal command once, daily or on chosen days, or every few minutes or hours. Each task keeps its own chat and a run log.', target: 'button[title="New task"]', view: 'scheduler' },
+  { title: 'While tasks are on', body: 'Penumbra can stay in the menu bar when you close the window, so tasks run on time, and notify you when one finishes or needs your OK.', target: '.content-inner > main .panel:last-child', view: 'scheduler' },
+
+  // Agents & Skills
+  { title: 'Your agents', body: 'Each agent is a card: avatar, purpose, persona, model, and the tools it may use. Edit opens its page; Chat starts a conversation with it.', target: '.tcards, .agents-empty', view: 'agents' },
+  { title: 'New agent', body: 'A short wizard: a purpose, a name, a persona (personality and style), an avatar, and a model. Templates like Researcher or Coder are a quick start.', target: '.list-new', view: 'agents' },
+  { title: 'Skills', body: 'Skills are packaged instructions (the SKILL.md format). Create them here or import folders and .zip files; the model loads one only when a task needs it.', target: '.content-inner > aside .sidebar-head .seg button:last-child', view: 'agents' },
+
+  // Images
+  { title: 'Find image models', body: 'Make pictures on this computer, outside Ollama. Search Hugging Face for image models: Penumbra checks each file before you download it (Z-Image and FLUX.1 work today). Models marked 18+ stay hidden unless you choose to show them.', target: '.page-head .seg button:last-child', view: 'images' },
   { title: 'Create', body: 'Write a prompt, pick a size, and Generate. Steps and seed are optional. Images are saved in Pictures/Penumbra (change it with Change…), and recent ones show below with their prompt.', target: '.images-create > .panel:first-child, .images-empty', view: 'images' },
   { title: 'Your image models', body: 'See what you downloaded and delete what you no longer need. The first model of a family also gets the image engine and a few shared files, so the next ones are smaller.', target: '.page-head .seg button:nth-child(2)', view: 'images' },
   { title: 'Images everywhere', body: 'Ask for a picture in any chat, or give an agent the Images tool, and it appears in the reply (saved in the chat’s folder if it has one). Click any image to zoom, pan, and copy its prompt. Generate… in an avatar menu makes an avatar.' },
-  { title: 'Models', body: 'My Models shows what you have installed and what is loaded. Discover finds new models in the Ollama library and on Hugging Face.', target: '.rail-btn[title="Discover"]' },
-  { title: 'Your profile', body: 'Your name and avatar, and your profiles: each one keeps its own chats, agents, and settings, and can have a password.', target: '.rail-profile' },
-  { title: 'Options', body: 'Server connection, internet access for widgets and agents, the guided demo, updates, and this tutorial, whenever you want it again.', target: '.rail-btn[title="Options"]' },
-  { title: "You're all set", body: 'Start a chat, or open Options → Guided demo for a step-by-step tour with real examples. Have fun!' },
+
+  // Models
+  { title: 'My Models', body: 'Everything you have installed, and what is loaded in memory right now with how much it uses. Load, eject, or delete models, and see their details.', target: '.content-inner > main', view: 'models' },
+  { title: 'Discover', body: 'Find new models in the Ollama library or on Hugging Face (pick a quantization). Downloads can be paused and resumed, and survive restarts.', target: '.discover-tabs', view: 'discover' },
+
+  // Profile
+  { title: 'Your profile', body: 'Your name and avatar, and your profiles: each one keeps its own chats, agents, and settings, can have a password, and ★ picks the one that opens at startup.', target: '.rail-profile' },
+
+  // Options
+  { title: 'Server', body: 'Where Penumbra finds Ollama. Change it to use Ollama on another computer.', target: '#server', view: 'developer' },
+  { title: 'Internet access', body: 'Which sites widgets and agents may reach without asking, for all chats. Add your own sites, or allow the whole internet (with a warning first).', target: '#internet-access', view: 'developer' },
+  { title: 'Guided demo', body: 'A longer, step-by-step tour with real examples, in its own window with sample data, so your chats aren’t touched.', target: '#demo', view: 'developer' },
+  { title: 'This tutorial', body: 'Open it again any time from here, and choose whether it shows when Penumbra starts.', target: '#tutorial', view: 'developer' },
+  { title: "You're all set", body: 'Start a chat, or open Options → Guided demo for a step-by-step tour with real examples. Have fun!', view: 'chat' },
 ];
 
 /** Mounted once in the app; `setView` switches tabs so each step's target is on screen. */
@@ -119,17 +144,24 @@ export function Tutorial({ setView }: { setView: (v: string) => void }) {
     closeTutorial();
   };
 
-  // Place the card next to what it describes: right of the sidebar, below the top bar, or above the composer.
+  // Place the card next to what it describes: beside the sidebar icons; otherwise below, above, beside, or (for
+  // big areas) inside the highlighted part, wherever it fits.
   const PAD = 8;
   const W = 340;
+  const H = 280;
   let style: React.CSSProperties = { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
   if (rect) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const clampX = (x: number) => Math.max(16, Math.min(vw - W - 16, x));
-    if (rect.left < 90) style = { left: rect.right + 18, top: Math.max(16, Math.min(vh - 260, rect.top - 10)) };
-    else if (rect.top < 160) style = { left: clampX(rect.left + rect.width / 2 - W / 2), top: rect.bottom + 16 };
-    else style = { left: clampX(rect.left + rect.width / 2 - W / 2), bottom: vh - rect.top + 16 };
+    const clampY = (y: number) => Math.max(16, Math.min(vh - H - 16, y));
+    const centerX = clampX(rect.left + rect.width / 2 - W / 2);
+    if (rect.left < 90 && rect.width < 120) style = { left: rect.right + 18, top: clampY(rect.top - 10) };
+    else if (vh - rect.bottom > H + 24) style = { left: centerX, top: rect.bottom + 16 };
+    else if (rect.top > H + 24) style = { left: centerX, bottom: vh - rect.top + 16 };
+    else if (vw - rect.right > W + 24) style = { left: rect.right + 16, top: clampY(rect.top) };
+    else if (rect.left > W + 24) style = { left: rect.left - W - 16, top: clampY(rect.top) };
+    else style = { left: clampX(rect.right - W - 24), top: clampY(rect.top + 24) };
   }
 
   return (

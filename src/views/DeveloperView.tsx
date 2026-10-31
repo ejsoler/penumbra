@@ -62,7 +62,7 @@ print(response.message.content)`,
         </div>
       </header>
 
-      <section className="panel">
+      <section className="panel" id="server">
         <div className="server-status">
           <Server size={18} />
           <span className={`dot ${ollama.connected ? 'on' : 'off'}`} />
@@ -123,7 +123,7 @@ function UpdatesPanel() {
             : `Penumbra ${info.version} is available. Open it from the arrow icon in the sidebar.`
           : "You're up to date.";
   return (
-    <section className="panel">
+    <section className="panel" id="updates">
       <h4>Updates</h4>
       <div className="row gap" style={{ alignItems: 'center' }}>
         <span className="muted">Penumbra <span className="mono">{info?.current ?? '…'}</span></span>
@@ -162,7 +162,7 @@ function DemoPanel({ ollama }: { ollama: OllamaState }) {
     }
   };
   return (
-    <section className="panel">
+    <section className="panel" id="demo">
       <h4>Guided demo</h4>
       <p className="muted small">
         A step-by-step tour of Penumbra: interactive answers, internet widgets, agents and skills, tools, the orchestrator, and the scheduler. It opens in its own
@@ -190,7 +190,7 @@ function TutorialPanel() {
     <section className="panel" id="tutorial">
       <h4>Tutorial</h4>
       <div className="row gap" style={{ alignItems: 'center' }}>
-        <span className="muted small flex">A short tour of Penumbra: each step points at part of the screen and explains it. About a minute.</span>
+        <span className="muted small flex">A tour of every tab: each step points at part of the screen and explains it. A few minutes; Esc closes it any time.</span>
         <button className="btn sm" onClick={openTutorial}>Show tutorial</button>
       </div>
       <label className="check-row">

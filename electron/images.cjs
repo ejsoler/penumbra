@@ -357,7 +357,8 @@ async function generate(sender, { id, prompt, width, height, steps, seed }) {
       const text = d.toString();
       tail = (tail + text).slice(-4000);
       if (/sampling|denois/i.test(text)) sampling = true;
-      if (/decod/i.test(text)) send({ phase: 'decoding', step: S, steps: S });
+      // "decoder" also shows up while loading; only count decoding after the steps.
+      if (sampling && /decod/i.test(text)) send({ phase: 'decoding', step: S, steps: S });
       const m2 = [...text.matchAll(/\|\s*(\d+)\/(\d+)\s*-/g)].pop();
       if (m2 && sampling) send({ phase: 'sampling', step: Number(m2[1]), steps: Number(m2[2]) });
     };

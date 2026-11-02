@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 (2026-11-02)
+
+### Changed
+- **Updates tab.** The arrow icon in the sidebar now opens an Updates tab instead of a small card. It shows the full release notes with their screenshots, the download with its progress, and Skip this version, without cutting off the buttons. **Options → Updates** links to it.
+
+### Fixed
+- **Profile avatar menu.** Edit on your avatar in the profile card opens its menu again (it was hidden by the card's scrolling).
+
 ## 0.3.0 (2026-10-31)
 
 ### Added

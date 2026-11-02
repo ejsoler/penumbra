@@ -10,7 +10,7 @@ import { openTutorial, setTutorialAtStart, tutorialAtStart } from '../components
 /** Set before switching to this tab to scroll to a section. */
 export const developerFocus = { section: '' };
 
-export function DeveloperView({ ollama }: { ollama: OllamaState }) {
+export function DeveloperView({ ollama, onOpenUpdates }: { ollama: OllamaState; onOpenUpdates: () => void }) {
   useEffect(() => {
     if (!developerFocus.section) return;
     document.getElementById(developerFocus.section)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -90,7 +90,7 @@ print(response.message.content)`,
 
       {penumbraHost() && <DemoPanel ollama={ollama} />}
 
-      {penumbraHost() && <UpdatesPanel />}
+      {penumbraHost() && <UpdatesPanel onOpen={onOpenUpdates} />}
 
       <section className="panel">
         <h4>Quick start</h4>
@@ -108,7 +108,7 @@ print(response.message.content)`,
   );
 }
 
-function UpdatesPanel() {
+function UpdatesPanel({ onOpen }: { onOpen: () => void }) {
   const u = useUpdates();
   const { info, settings } = u;
   const status = u.checking
@@ -120,7 +120,7 @@ function UpdatesPanel() {
         : info.available
           ? settings.skipped === info.version
             ? `Penumbra ${info.version} is available. You chose to skip it.`
-            : `Penumbra ${info.version} is available. Open it from the arrow icon in the sidebar.`
+            : `Penumbra ${info.version} is available.`
           : "You're up to date.";
   return (
     <section className="panel" id="updates">
@@ -133,8 +133,8 @@ function UpdatesPanel() {
         </button>
       </div>
       <p className="muted small">{status}</p>
-      {info?.available && settings.skipped === info.version && (
-        <button className="link small" style={{ marginLeft: 0 }} onClick={() => setUpdateSettings({ skipped: '' })}>Show it in the sidebar again</button>
+      {info?.available && (
+        <button className="link small" style={{ marginLeft: 0 }} onClick={onOpen}>Open Updates to see what's new and download it</button>
       )}
       <label className="check-row">
         <input type="checkbox" checked={settings.auto} onChange={(e) => setUpdateSettings({ auto: e.target.checked })} />

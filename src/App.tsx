@@ -10,6 +10,7 @@ import { Bot, CalendarClock, FolderOpen, ImageIcon, MessageSquare, Settings, Tel
 import { WorkspaceView } from './views/WorkspaceView';
 import { SchedulerView } from './views/SchedulerView';
 import { ImagesView } from './views/ImagesView';
+import { UpdatesView } from './views/UpdatesView';
 import { startScheduler, useScheduler } from './scheduler';
 import { start as startImages } from './images';
 import { chatController, openChatRequest, streaming } from './session';
@@ -25,7 +26,7 @@ import { host, type ProfileInfo } from './host';
 import { syncProfile } from './profile';
 import { startUpdateChecks } from './updates';
 
-type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer';
+type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer' | 'updates';
 
 const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
@@ -104,7 +105,7 @@ function Main() {
           </button>
         ))}
         <span className="flex" />
-        <UpdateButton />
+        <UpdateButton active={view === 'updates'} onOpen={() => setView('updates')} />
         <ProfileButton />
         <div className={`rail-status ${ollama.connected ? 'on' : ollama.connected === false ? 'off' : ''}`} title={ollama.connected ? `Ollama v${ollama.version}` : 'Ollama not reachable'} />
       </nav>
@@ -142,7 +143,8 @@ function Main() {
           {view === 'agents' && <AgentsView ollama={ollama} onChatWithAgent={chatWithAgent} />}
           {view === 'models' && <ModelsView ollama={ollama} onChatWith={chatWith} />}
           {view === 'discover' && <DiscoverView ollama={ollama} dl={dl} />}
-          {view === 'developer' && <DeveloperView ollama={ollama} />}
+          {view === 'developer' && <DeveloperView ollama={ollama} onOpenUpdates={() => setView('updates')} />}
+          {view === 'updates' && <UpdatesView />}
         </div>
       </div>
     <LightboxHost />

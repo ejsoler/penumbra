@@ -63,92 +63,80 @@ function ConfirmWholeInternet({ where, onYes, onNo }: { where: string; onYes: ()
   );
 }
 
-const MODE_TEXT = { ask: 'Approved sites, ask for others', all: 'Whole internet', off: 'No internet' } as const;
-
-/** One chat's internet access: the default for all chats, or its own mode, plus sites only this chat may use. */
-export function ChatInternet({ net, setNet, onManageDefault }: { net?: ChatNet; setNet: (net: ChatNet | undefined) => void; onManageDefault: () => void }) {
+/** One chat's internet access: its mode (copied from the default when the chat was made), and sites only it may use. */
+export function ChatInternet({ net, setNet, onManageDefault }: { net?: ChatNet; setNet: (net: ChatNet) => void; onManageDefault: () => void }) {
   const defaults = useNetSettings();
   const [confirmAll, setConfirmAll] = useState(false);
   const mode = net?.mode ?? defaults.mode;
   const own = net?.allow ?? [];
-  const save = (next: ChatNet) => setNet(next.mode || next.allow?.length ? next : undefined);
-  const pick = (v: string) => {
-    if (v === 'all') return setConfirmAll(true);
-    save({ ...net, mode: v === 'default' ? undefined : (v as ChatNet['mode']) });
-  };
+  const save = (patch: ChatNet) => setNet({ mode, ...net, ...patch });
   return (
     <section id="chat-internet">
       <h4>Internet access</h4>
-      <select className="wide-select net-select" value={net?.mode ?? 'default'} onChange={(e) => pick(e.target.value)} aria-label="Internet access for this chat">
-        <option value="default">Default for all chats</option>
-        <option value="ask">{MODE_TEXT.ask}</option>
-        <option value="all">{MODE_TEXT.all}</option>
-        <option value="off">{MODE_TEXT.off}</option>
+      <select className="wide-select net-select" value={mode} onChange={(e) => (e.target.value === 'all' ? setConfirmAll(true) : save({ mode: 'ask' }))} aria-label="Internet access for this chat">
+        <option value="ask">Approved sites, ask for others</option>
+        <option value="all">Whole internet</option>
       </select>
       {mode === 'all' ? (
-        <p className="net-note warn"><TriangleAlert size={12} /> {!net?.mode && 'Default: '}Widgets and agents in this chat reach any site without asking.</p>
-      ) : mode === 'off' ? (
-        <p className="net-note muted">Widgets run offline, and agents can't search or open pages in this chat.</p>
+        <p className="net-note warn"><TriangleAlert size={12} /> Widgets and agents in this chat reach any site without asking.</p>
       ) : (
         <>
           <p className="net-note muted">
-            {!net?.mode && 'Default: '}Approved sites{defaults.alwaysAllow.length ? `, your ${defaults.alwaysAllow.length} for all chats` : ''}{own.length ? `, and ${own.length} for this chat` : ''}; other sites ask first.
+            Approved sites{defaults.alwaysAllow.length ? `, your ${defaults.alwaysAllow.length} for all chats` : ''}{own.length ? `, and ${own.length} for this chat` : ''}; other sites ask first.
           </p>
           <div className="net-list">
             <b>Only in this chat</b>
             <SiteList
               sites={own}
               taken={defaults.alwaysAllow}
-              onAdd={(site) => save({ ...net, allow: [...own, site] })}
-              onRemove={(site) => save({ ...net, allow: own.filter((h) => h !== site) })}
+              onAdd={(site) => save({ allow: [...own, site] })}
+              onRemove={(site) => save({ allow: own.filter((h) => h !== site) })}
             />
           </div>
         </>
       )}
-      <button className="link-btn small" onClick={onManageDefault}>Change the default for all chats…</button>
-      {confirmAll && <ConfirmWholeInternet where="in this chat" onNo={() => setConfirmAll(false)} onYes={() => { save({ ...net, mode: 'all' }); setConfirmAll(false); }} />}
+      <button className="link-btn small" onClick={onManageDefault}>Sites for all chats and the default, in Options…</button>
+      {confirmAll && <ConfirmWholeInternet where="in this chat" onNo={() => setConfirmAll(false)} onYes={() => { save({ mode: 'all' }); setConfirmAll(false); }} />}
     </section>
   );
 }
 
-/** Internet access for every chat: the mode, the built-in approved sites, and the user's own sites. */
+/** The default for new chats, the built-in approved sites, and the user's own sites for all chats. */
 export function InternetSettings() {
   const net = useNetSettings();
   const [confirmAll, setConfirmAll] = useState(false);
   const [showList, setShowList] = useState(false);
   return (
     <section className="panel" id="internet-access">
-      <h4>Internet access <span className="muted small normal">default for all chats</span></h4>
+      <h4>Internet access <span className="muted small normal">default</span></h4>
       <label className="field">
-        <span>Access</span>
+        <span>New chats</span>
         <select value={net.mode} onChange={(e) => (e.target.value === 'all' ? setConfirmAll(true) : setNetMode('ask'))}>
           <option value="ask">Approved sites, ask for others</option>
           <option value="all">Whole internet</option>
         </select>
       </label>
       {net.mode === 'all' ? (
-        <p className="net-note warn"><TriangleAlert size={12} /> Widgets and agents can reach any site without asking.</p>
+        <p className="net-note warn"><TriangleAlert size={12} /> In new chats, widgets and agents can reach any site without asking. Each chat can change it in its settings panel.</p>
       ) : (
         <p className="net-note muted">
-          For widgets and agents' web tools. Maps, CDNs, and public data work right away; other sites ask first. Each chat can change this in its settings panel.{' '}
+          For widgets and agents' web tools in new chats; each chat can change it in its settings panel. Maps, CDNs, and public data work right away; other sites ask first.{' '}
           <button className="link-btn" onClick={() => setShowList(!showList)}>{showList ? 'Hide list' : 'See list'}</button>
         </p>
       )}
-      {showList && net.mode === 'ask' && (
+      {showList && (
         <div className="net-list">
           {APPROVED_SITES.map((g) => (
             <div key={g.group}><b>{g.group}</b><div className="mono">{g.hosts.join(', ')}</div></div>
           ))}
         </div>
       )}
-      {net.mode === 'ask' && (
-        <div className="net-list">
-          <b>Your sites</b>
-          <SiteList sites={net.alwaysAllow} onAdd={(site) => alwaysAllow([site])} onRemove={removeAlwaysAllowed} />
-          <span>Widgets and agents in every chat can use these without asking. Still download-only: no uploads, cookies, or local network.</span>
-        </div>
-      )}
-      {confirmAll && <ConfirmWholeInternet where="in every chat" onNo={() => setConfirmAll(false)} onYes={() => { setNetMode('all'); setConfirmAll(false); }} />}
+      <div className="net-list">
+        <b>Your sites <span className="muted normal">all chats</span></b>
+        <SiteList sites={net.alwaysAllow} onAdd={(site) => alwaysAllow([site])} onRemove={removeAlwaysAllowed} />
+        <span>Every chat checks these first, then its own sites. Widgets and agents can use them without asking. Still download-only: no uploads, cookies, or local network.</span>
+      </div>
+      {confirmAll && <ConfirmWholeInternet where="in new chats" onNo={() => setConfirmAll(false)} onYes={() => { setNetMode('all'); setConfirmAll(false); }} />}
     </section>
   );
 }

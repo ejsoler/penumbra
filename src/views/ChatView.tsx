@@ -20,7 +20,7 @@ import { TOOL_GROUPS, type ToolGroup } from '../agents/builtins';
 import type { Approval, ApprovalRequest } from '../agents/tools';
 import { host, type ProfileInfo } from '../host';
 import { approval as approvalStore, chatController, getConversations, streaming, useConversations, type RunOptions } from '../session';
-import { setOpenChatNet } from '../widgets/network';
+import { newChatNet, setOpenChatNet } from '../widgets/network';
 import { ChatInternet } from '../components/InternetSettings';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
@@ -35,6 +35,7 @@ import {
 } from '../components/icons';
 
 const newConversation = (model = ''): Conversation => ({
+  net: newChatNet(),
   id: uid(),
   title: 'New Chat',
   model,

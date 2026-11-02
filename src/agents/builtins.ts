@@ -26,7 +26,6 @@ export interface ToolEnv {
   net?: ChatNet;
 }
 
-const NO_INTERNET = 'Internet access is off for this chat. Tell the user they can turn it on in the chat\'s settings panel (Internet access).';
 
 const NO_FOLDER = "No folder is set for this chat. Tell the user to choose one with the folder button in the chat's settings panel, then try again.";
 const errText = (e: unknown) => String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
@@ -41,7 +40,6 @@ async function allowSite(url: string, ctx: ToolContext, env: ToolEnv): Promise<s
     return `"${url}" is not a valid web address.`;
   }
   const net = effectiveNet(env.net);
-  if (net.mode === 'off') return NO_INTERNET;
   if (net.mode === 'all' || [...APPROVED_HOSTS, ...net.sites].some((p) => hostMatches(hostname, p))) return null;
   const answer = await ctx.approve({
     tool: 'web_fetch',
@@ -66,7 +64,6 @@ function webTools(env: ToolEnv): Tool[] {
       parameters: { type: 'object', properties: { query: { type: 'string', description: 'What to search for' } }, required: ['query'] },
       summary: (a) => str(a.query),
       run: async (a) => {
-        if (effectiveNet(env.net).mode === 'off') return NO_INTERNET;
         const results = await host()!.tools.search(str(a.query));
         if (!results.length) return 'No results.';
         return results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}${r.snippet ? `\n   ${r.snippet}` : ''}`).join('\n');

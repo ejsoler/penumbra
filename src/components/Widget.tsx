@@ -99,7 +99,7 @@ function WidgetFrame({ code, title }: { code: string; title: string }) {
   const access = widgetAccess(code, net, chatNet);
   const mode = effectiveNet(chatNet, net).mode;
   if (access.pending.length) return <NetworkConsent id={id} title={title} hosts={access.pending} />;
-  return <WidgetRunner code={code} title={title} id={id} hosts={access.hosts} offline={access.offline} mode={mode === 'all' ? 'all' : 'ask'} />;
+  return <WidgetRunner code={code} title={title} id={id} hosts={access.hosts} offline={access.offline} mode={mode} />;
 }
 
 function WidgetRunner({ code, title, id, hosts, offline, mode }: {

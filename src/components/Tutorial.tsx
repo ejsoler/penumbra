@@ -89,7 +89,7 @@ const STEPS: Step[] = [
 
   // Options
   { title: 'Server', body: 'Where Penumbra finds Ollama. Change it to use Ollama on another computer.', target: '#server', view: 'developer' },
-  { title: 'Internet access', body: 'The default for all chats: which sites widgets and agents may reach without asking. Add your own sites, or allow the whole internet (with a warning first). Each chat can change this in its settings panel.', target: '#internet-access', view: 'developer' },
+  { title: 'Internet access', body: 'Whether new chats use approved sites or the whole internet (with a warning first), and your own sites, which every chat checks before its own list. Each chat can change its access in its settings panel.', target: '#internet-access', view: 'developer' },
   { title: 'Guided demo', body: 'A longer, step-by-step tour with real examples, in its own window with sample data, so your chats aren’t touched.', target: '#demo', view: 'developer' },
   { title: 'This tutorial', body: 'Open it again any time from here, and choose whether it shows when Penumbra starts.', target: '#tutorial', view: 'developer' },
   { title: "You're all set", body: 'Start a chat, or open Options → Guided demo for a step-by-step tour with real examples. Have fun!', view: 'chat' },

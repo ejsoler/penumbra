@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Internet access per chat.** The chat's settings panel can give a chat its own access: the default for all chats, approved sites only, the whole internet (with a warning first), or no internet (widgets run offline and agents can't search or open pages). A chat can also have sites only it may use; a widget asking for a site offers **Always in this chat** next to **Always in all chats**. The default list for all chats stays in **Options**.
+
 ## 0.3.1 (2026-11-02)
 
 ### Changed

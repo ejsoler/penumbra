@@ -20,7 +20,8 @@ import { TOOL_GROUPS, type ToolGroup } from '../agents/builtins';
 import type { Approval, ApprovalRequest } from '../agents/tools';
 import { host, type ProfileInfo } from '../host';
 import { approval as approvalStore, chatController, getConversations, streaming, useConversations, type RunOptions } from '../session';
-import { useNetSettings } from '../widgets/network';
+import { setOpenChatNet } from '../widgets/network';
+import { ChatInternet } from '../components/InternetSettings';
 import { ModelPicker } from '../components/ModelPicker';
 import { Logo } from '../components/Logo';
 import { shortcut } from '../platform';
@@ -30,7 +31,7 @@ import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
   ArrowUp, ArrowRightLeft, Bot, Brain, Loader2, Lock, Check, ChevronDown, FileText, FolderOpen, ShieldAlert, Workflow, ChevronRight, Copy, Download, Eraser, GitBranch, PanelRight, PanelRightClose, Paperclip, Pencil,
-  Plus, RefreshCw, Sparkles, Square, Trash2, TriangleAlert, X,
+  Plus, RefreshCw, Sparkles, Square, Trash2, X,
 } from '../components/icons';
 
 const newConversation = (model = ''): Conversation => ({
@@ -304,7 +305,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         task.status = 'running';
         patchTask(conv.id, msgId, task.id, (t) => ({ ...t, status: 'running', model }));
         const caps = ollama.capabilities[model] ?? [];
-        const { system, tools } = replySetup({ agent, systemPrompt: '', interactive: false, toolsSupported: caps.includes('tools'), folder: conv.folder });
+        const { system, tools } = replySetup({ agent, systemPrompt: '', interactive: false, toolsSupported: caps.includes('tools'), folder: conv.folder, net: conv.net });
         try {
           const result = await runAgent({
             model,
@@ -398,6 +399,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       toolsSupported: modelCaps.includes('tools'),
       chatTools: conv.tools,
       folder: conv.folder,
+      net: conv.net,
     });
     const messages: api.ChatMessage[] = [
       ...(system ? [{ role: 'system' as const, content: system }] : []),
@@ -479,7 +481,10 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         [],
       ),
     busy: !!streamingId,
-  }), [streamingId]);
+    net: current?.net,
+    allowInChat: current ? (hosts) => updateConv(current.id, (c) => ({ ...c, net: { ...c.net, allow: [...new Set([...(c.net?.allow ?? []), ...hosts])] } })) : undefined,
+  }), [streamingId, current?.id, JSON.stringify(current?.net)]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setOpenChatNet(current?.net), [current?.net]);
 
   // Other views (the Orchestrator page) drive runs through this; the chat view stays mounted.
   chatController.current = {
@@ -638,7 +643,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
 
       {showSettings && (
         <SettingsPanel
-          onInternetSettings={onInternetSettings}
+          internet={<ChatInternet net={current.net} setNet={(net) => updateConv(current.id, (c) => ({ ...c, net }))} onManageDefault={onInternetSettings} />}
           tools={
             <ChatTools
               agent={agent}
@@ -891,21 +896,6 @@ function GeneratedImages({ images, live }: { images: GeneratedRef[]; live: boole
         </div>
       )}
     </div>
-  );
-}
-
-/** The chat panel's line about internet access, which is set once for all chats in the Options tab. */
-function InternetSummary({ onManage }: { onManage: () => void }) {
-  const net = useNetSettings();
-  return (
-    <section>
-      <h4>Internet access</h4>
-      <p className={`net-note ${net.mode === 'all' ? 'warn' : 'muted'}`}>
-        {net.mode === 'all' ? <><TriangleAlert size={12} /> Whole internet: widgets and agents reach any site without asking.</>
-          : `Approved sites${net.alwaysAllow.length ? ` and ${net.alwaysAllow.length} of yours` : ''}; other sites ask first.`}{' '}
-        <button className="link-btn" onClick={onManage}>Manage for all chats</button>
-      </p>
-    </section>
   );
 }
 
@@ -1347,8 +1337,9 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
   );
 }
 
-function SettingsPanel({ tools, params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens, contextLimit, onInternetSettings }: {
+function SettingsPanel({ tools, internet, params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens, contextLimit }: {
   tools: ReactNode;
+  internet: ReactNode;
   params: GenParams;
   setParams: (p: Partial<GenParams>) => void;
   systemPrompt: string;
@@ -1356,7 +1347,6 @@ function SettingsPanel({ tools, params, setParams, systemPrompt, setSystemPrompt
   thinkingSupported: boolean;
   contextTokens: number;
   contextLimit: number;
-  onInternetSettings: () => void;
 }) {
   const ctxUsed = Math.min(100, (contextTokens / contextLimit) * 100);
   return (
@@ -1383,7 +1373,7 @@ function SettingsPanel({ tools, params, setParams, systemPrompt, setSystemPrompt
 
         {tools}
 
-        <InternetSummary onManage={onInternetSettings} />
+        {internet}
 
         <section>
           <h4>Sampling</h4>

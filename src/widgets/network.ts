@@ -1,7 +1,8 @@
 // Internet access for widgets. Widgets are offline-safe by default: they may reach a short list of
 // approved sites (CDNs, map tiles, keyless public data), and any other site needs the user's OK for
-// that widget. "Whole internet" mode lifts the site list. In every mode the Electron main process
-// also enforces GET-only requests, no cookies, no local network, and a URL length cap.
+// that widget. "Whole internet" mode lifts the site list. The settings here are the default for all
+// chats; a chat can override the mode and add its own sites (ChatNet). In every mode the Electron main
+// process also enforces GET-only requests, no cookies, no local network, and a URL length cap.
 import { useSyncExternalStore } from 'react';
 import { getHost } from '../api';
 
@@ -24,6 +25,19 @@ export const APPROVED_SITES: { group: string; hosts: string[] }[] = [
 export const APPROVED_HOSTS = APPROVED_SITES.flatMap((s) => s.hosts);
 
 export type NetMode = 'ask' | 'all';
+
+/** A chat's own internet access, on top of the default for all chats. Missing fields follow the default. */
+export interface ChatNet {
+  /** 'off': no internet in this chat. Missing: the default mode. */
+  mode?: NetMode | 'off';
+  /** Sites only this chat may use without asking, besides the default list. */
+  allow?: string[];
+}
+
+/** What applies in a chat: its own mode if it has one, and the default sites plus its own. */
+export function effectiveNet(chat?: ChatNet, s: NetSettings = settings): { mode: NetMode | 'off'; sites: string[] } {
+  return { mode: chat?.mode ?? s.mode, sites: [...s.alwaysAllow, ...(chat?.allow ?? [])] };
+}
 
 interface NetSettings {
   mode: NetMode;
@@ -124,12 +138,14 @@ export function requestedHosts(code: string): string[] {
 }
 
 /** What the widget may reach right now, and which of its sites still need the user's answer. */
-export function widgetAccess(code: string, s: NetSettings = settings): { hosts: string[] | 'all'; pending: string[]; offline: boolean } {
-  if (s.mode === 'all') return { hosts: 'all', pending: [], offline: false };
+export function widgetAccess(code: string, s: NetSettings = settings, chat?: ChatNet): { hosts: string[] | 'all'; pending: string[]; offline: boolean } {
+  const net = effectiveNet(chat, s);
+  if (net.mode === 'off') return { hosts: [], pending: [], offline: true };
+  if (net.mode === 'all') return { hosts: 'all', pending: [], offline: false };
   const decision = s.decisions[widgetId(code)];
   if (decision?.offline) return { hosts: [], pending: [], offline: true };
-  const allowed = [...APPROVED_HOSTS, ...s.alwaysAllow, ...(decision?.allow ?? [])];
-  const pending = decision ? [] : requestedHosts(code).filter((h) => !isApproved(h, [...s.alwaysAllow]));
+  const allowed = [...APPROVED_HOSTS, ...net.sites, ...(decision?.allow ?? [])];
+  const pending = decision ? [] : requestedHosts(code).filter((h) => !isApproved(h, net.sites));
   return { hosts: allowed, pending, offline: false };
 }
 
@@ -151,15 +167,24 @@ export interface WidgetRequest {
   cancelled?: boolean;
 }
 
+/** The open chat's own access, so the main process's backstop matches what its widgets may do. */
+let openChatNet: ChatNet | undefined;
+export function setOpenChatNet(chat?: ChatNet) {
+  if (JSON.stringify(chat) === JSON.stringify(openChatNet)) return;
+  openChatNet = chat;
+  syncHost();
+}
+
 function syncHost() {
-  const allow = new Set([...APPROVED_HOSTS, ...settings.alwaysAllow, ...Object.values(settings.decisions).flatMap((d) => d.allow)]);
+  const net = effectiveNet(openChatNet);
+  const allow = new Set(net.mode === 'off' ? [] : [...APPROVED_HOSTS, ...net.sites, ...Object.values(settings.decisions).flatMap((d) => d.allow)]);
   let ollama = '';
   try {
     ollama = new URL(getHost()).hostname;
   } catch {
     /* invalid server URL */
   }
-  window.penumbraHost?.setWidgetNetwork({ mode: settings.mode, hosts: [...allow], block: ollama ? [ollama] : [] });
+  window.penumbraHost?.setWidgetNetwork({ mode: net.mode === 'all' ? 'all' : 'ask', hosts: [...allow], block: ollama ? [ollama] : [] });
 }
 syncHost();
 

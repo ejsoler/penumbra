@@ -1,3 +1,4 @@
+import type { ChatNet } from './widgets/network';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { Step } from './agents/engine';
@@ -42,6 +43,8 @@ export interface Conversation {
   tools?: ToolGroup[];
   /** The folder file and terminal tools work in. */
   folder?: string;
+  /** This chat's internet access, if it differs from the default for all chats. */
+  net?: ChatNet;
 }
 
 export const isInteractive = (c: Conversation | undefined) => c?.interactive !== false;

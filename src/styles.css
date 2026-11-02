@@ -831,3 +831,6 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .tut-dots button { width: 7px; height: 7px; padding: 0; border-radius: 50%; border: none; background: var(--border-strong); cursor: pointer; }
 .tut-dots button.on { background: var(--accent); width: 18px; border-radius: 4px; }
 .tut-actions { display: flex; align-items: center; gap: 6px; }
+#chat-internet .net-select { margin-bottom: 0; font-size: 12.5px; }
+#chat-internet .net-add .text { flex: 1; }
+#chat-internet > .link-btn { margin-top: 8px; padding: 0; }

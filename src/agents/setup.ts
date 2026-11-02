@@ -1,4 +1,5 @@
 // What the model gets for a reply: the system prompt and tools, built from the chat and its agent.
+import type { ChatNet } from '../widgets/network';
 import { WIDGET_PROMPT } from '../widgets/prompt';
 import type { Agent } from './agents';
 import { builtinTools, toolsPrompt, type ToolGroup } from './builtins';
@@ -22,7 +23,7 @@ export function agentPrompt(agent: Agent): string {
   return lines.join('\n');
 }
 
-export function replySetup({ agent, systemPrompt, interactive, toolsSupported, chatTools, folder }: {
+export function replySetup({ agent, systemPrompt, interactive, toolsSupported, chatTools, folder, net }: {
   agent?: Agent;
   systemPrompt: string;
   interactive: boolean;
@@ -31,6 +32,7 @@ export function replySetup({ agent, systemPrompt, interactive, toolsSupported, c
   /** The chat's own tools, used when there is no agent. */
   chatTools?: ToolGroup[];
   folder?: string;
+  net?: ChatNet;
 }): { system: string; tools: Tool[] } {
   const parts: string[] = [];
   const tools: Tool[] = [];
@@ -38,7 +40,7 @@ export function replySetup({ agent, systemPrompt, interactive, toolsSupported, c
   if (systemPrompt.trim()) parts.push(systemPrompt.trim());
   if (toolsSupported) {
     const groups = agent ? agent.tools : chatTools ?? DEFAULT_CHAT_TOOLS;
-    const env = { folder };
+    const env = { folder, net };
     tools.push(...builtinTools(groups, env));
     const prompt = toolsPrompt(groups, env);
     if (prompt) parts.push(prompt);

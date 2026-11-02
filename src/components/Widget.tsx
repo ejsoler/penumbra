@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type MouseEvent
 import { createPortal } from 'react-dom';
 import { buildWidgetDocument, widgetCsp, widgetTitle } from '../widgets/document';
 import {
-  alwaysAllow, decide, forgetDecision, isLocalHost, useNetSettings, widgetAccess, widgetId, type WidgetRequest,
+  alwaysAllow, decide, effectiveNet, forgetDecision, isLocalHost, useNetSettings, widgetAccess, widgetId, type ChatNet, type WidgetRequest,
 } from '../widgets/network';
 import { copyText, downloadFile, useContextMenu } from './ContextMenu';
 import {
@@ -20,6 +20,10 @@ export interface WidgetActions {
   fix: (title: string, error: string) => void;
   /** A reply is being generated, so fixing has to wait. */
   busy: boolean;
+  /** The chat's own internet access, if it has one. */
+  net?: ChatNet;
+  /** Adds sites to this chat's own list. */
+  allowInChat?: (hosts: string[]) => void;
 }
 
 export const WidgetActionsContext = createContext<WidgetActions | null>(null);
@@ -58,6 +62,8 @@ const hostOf = (url: string) => {
 
 /** Shown instead of the widget until the user answers for sites outside the approved list. */
 function NetworkConsent({ id, title, hosts }: { id: string; title: string; hosts: string[] }) {
+  const actions = useContext(WidgetActionsContext);
+  const these = hosts.length > 1 ? 'these sites' : 'this site';
   return (
     <div className="widget">
       <div className="widget-head">
@@ -73,7 +79,10 @@ function NetworkConsent({ id, title, hosts }: { id: string; title: string; hosts
         </p>
         <div className="row gap">
           <button className="btn sm primary" onClick={() => decide(id, { allow: hosts })}>Allow</button>
-          <button className="btn sm" onClick={() => { alwaysAllow(hosts); decide(id, { allow: hosts }); }}>Always allow {hosts.length > 1 ? 'these sites' : 'this site'}</button>
+          {actions?.allowInChat && (
+            <button className="btn sm" title={`Add ${these} to this chat's own list`} onClick={() => { actions.allowInChat!(hosts); decide(id, { allow: hosts }); }}>Always in this chat</button>
+          )}
+          <button className="btn sm" title={`Add ${these} to the default list for all chats`} onClick={() => { alwaysAllow(hosts); decide(id, { allow: hosts }); }}>{actions?.allowInChat ? 'Always in all chats' : `Always allow ${these}`}</button>
           <button className="btn sm ghost" onClick={() => decide(id, { allow: [], offline: true })}><WifiOff size={13} /> Run offline</button>
         </div>
       </div>
@@ -85,10 +94,12 @@ let instances = 0;
 
 function WidgetFrame({ code, title }: { code: string; title: string }) {
   const net = useNetSettings();
+  const chatNet = useContext(WidgetActionsContext)?.net;
   const id = widgetId(code);
-  const access = widgetAccess(code, net);
+  const access = widgetAccess(code, net, chatNet);
+  const mode = effectiveNet(chatNet, net).mode;
   if (access.pending.length) return <NetworkConsent id={id} title={title} hosts={access.pending} />;
-  return <WidgetRunner code={code} title={title} id={id} hosts={access.hosts} offline={access.offline} mode={net.mode} />;
+  return <WidgetRunner code={code} title={title} id={id} hosts={access.hosts} offline={access.offline} mode={mode === 'all' ? 'all' : 'ask'} />;
 }
 
 function WidgetRunner({ code, title, id, hosts, offline, mode }: {

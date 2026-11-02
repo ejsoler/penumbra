@@ -59,7 +59,7 @@ const STEPS: Step[] = [
   { title: 'Pick a model', body: 'Choose which Ollama model answers (⌘/Ctrl+L). It loads into memory when you pick it. Badges show what each model can do, like vision, tools, or reasoning.', target: '.picker-btn', view: 'chat' },
   { title: 'Interactive answers', body: 'With this on, the model can reply with small live apps: calculators, charts, maps, diagrams. Turn it off for plain text, per chat.', target: '.ia-switch', view: 'chat' },
   { title: 'Ask anything', body: 'Type here and press Enter. Attach images for vision models, or text files like notes and CSVs. Ask for a picture and the model can create one with your image model.', target: '.composer', view: 'chat' },
-  { title: 'Chat settings', body: 'This button opens the panel with the system prompt, the tools a chat may use (web, files, terminal, images), a folder for file tools, and sampling settings.', target: '.view-host .topbar-right', view: 'chat' },
+  { title: 'Chat settings', body: 'This button opens the panel with the system prompt, the tools a chat may use (web, files, terminal, images), a folder for file tools, this chat’s internet access, and sampling settings.', target: '.view-host .topbar-right', view: 'chat' },
 
   // Orchestrator
   { title: 'Orchestrator runs', body: 'Every orchestrator run is listed here. + starts a new one.', target: '.content-inner > aside.sidebar', view: 'orchestrator' },
@@ -89,7 +89,7 @@ const STEPS: Step[] = [
 
   // Options
   { title: 'Server', body: 'Where Penumbra finds Ollama. Change it to use Ollama on another computer.', target: '#server', view: 'developer' },
-  { title: 'Internet access', body: 'Which sites widgets and agents may reach without asking, for all chats. Add your own sites, or allow the whole internet (with a warning first).', target: '#internet-access', view: 'developer' },
+  { title: 'Internet access', body: 'The default for all chats: which sites widgets and agents may reach without asking. Add your own sites, or allow the whole internet (with a warning first). Each chat can change this in its settings panel.', target: '#internet-access', view: 'developer' },
   { title: 'Guided demo', body: 'A longer, step-by-step tour with real examples, in its own window with sample data, so your chats aren’t touched.', target: '#demo', view: 'developer' },
   { title: 'This tutorial', body: 'Open it again any time from here, and choose whether it shows when Penumbra starts.', target: '#tutorial', view: 'developer' },
   { title: "You're all set", body: 'Start a chat, or open Options → Guided demo for a step-by-step tour with real examples. Have fun!', view: 'chat' },

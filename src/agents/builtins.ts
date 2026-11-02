@@ -2,7 +2,7 @@
 // The main process enforces hard limits (electron/tools.cjs); here we ask the user first where the
 // action is risky: any site outside the approved list (unless "Whole internet" is on) and every command.
 import { host } from '../host';
-import { alwaysAllow, APPROVED_HOSTS, getNetSettings, hostMatches } from '../widgets/network';
+import { alwaysAllow, APPROVED_HOSTS, effectiveNet, hostMatches, type ChatNet } from '../widgets/network';
 import { uid } from '../store';
 import { generateImage, hasImageModel, imageModelFor, modelLabel } from '../images';
 import { Declined, type Tool, type ToolArgs, type ToolContext } from './tools';
@@ -22,22 +22,27 @@ export const TOOL_GROUPS: { id: ToolGroup; label: string; description: string; n
 export interface ToolEnv {
   /** The chat's folder, if one was chosen. */
   folder?: string;
+  /** The chat's own internet access, if it has one. */
+  net?: ChatNet;
 }
+
+const NO_INTERNET = 'Internet access is off for this chat. Tell the user they can turn it on in the chat\'s settings panel (Internet access).';
 
 const NO_FOLDER = "No folder is set for this chat. Tell the user to choose one with the folder button in the chat's settings panel, then try again.";
 const errText = (e: unknown) => String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
 
 /** In "approved sites" mode, a site outside the list needs the user's OK (once, or always). */
-async function allowSite(url: string, ctx: ToolContext): Promise<string | null> {
+async function allowSite(url: string, ctx: ToolContext, env: ToolEnv): Promise<string | null> {
   let hostname: string;
   try {
     hostname = new URL(url).hostname.toLowerCase();
   } catch {
     return `"${url}" is not a valid web address.`;
   }
-  const s = getNetSettings();
-  if (s.mode === 'all' || [...APPROVED_HOSTS, ...s.alwaysAllow].some((p) => hostMatches(hostname, p))) return null;
+  const net = effectiveNet(env.net);
+  if (net.mode === 'off') return NO_INTERNET;
+  if (net.mode === 'all' || [...APPROVED_HOSTS, ...net.sites].some((p) => hostMatches(hostname, p))) return null;
   const answer = await ctx.approve({
     tool: 'web_fetch',
     title: 'Open a website?',
@@ -52,7 +57,7 @@ async function allowSite(url: string, ctx: ToolContext): Promise<string | null> 
   return null;
 }
 
-function webTools(): Tool[] {
+function webTools(env: ToolEnv): Tool[] {
   return [
     {
       name: 'web_search',
@@ -61,6 +66,7 @@ function webTools(): Tool[] {
       parameters: { type: 'object', properties: { query: { type: 'string', description: 'What to search for' } }, required: ['query'] },
       summary: (a) => str(a.query),
       run: async (a) => {
+        if (effectiveNet(env.net).mode === 'off') return NO_INTERNET;
         const results = await host()!.tools.search(str(a.query));
         if (!results.length) return 'No results.';
         return results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}${r.snippet ? `\n   ${r.snippet}` : ''}`).join('\n');
@@ -74,7 +80,7 @@ function webTools(): Tool[] {
       summary: (a) => str(a.url),
       run: async (a, ctx) => {
         const url = str(a.url).trim();
-        const denied = await allowSite(url, ctx);
+        const denied = await allowSite(url, ctx, env);
         if (denied) return denied;
         const page = await host()!.tools.fetch(url);
         return `${page.title ? `# ${page.title}\n` : ''}${page.url} (HTTP ${page.status}, ${page.type || 'unknown type'})\n\n${page.text}`;
@@ -231,7 +237,7 @@ export function builtinTools(groups: ToolGroup[], env: ToolEnv): Tool[] {
   const tools: Tool[] = [];
   // Only offered when an image model is installed, so models don't call a tool that can't work.
   if (groups.includes('images') && hasImageModel()) tools.push(...imageTools(env));
-  if (groups.includes('web')) tools.push(...webTools());
+  if (groups.includes('web')) tools.push(...webTools(env));
   if (groups.includes('files') || groups.includes('write')) tools.push(...fileTools(env, groups.includes('write')));
   if (groups.includes('terminal')) tools.push(...terminalTools(env));
   return tools;

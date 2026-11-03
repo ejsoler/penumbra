@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 (2026-11-03)
+
+### Fixed
+- **Replies after a chat was summarized.** Some models (Qwen's, for one) failed with "System message must be at the beginning" once a chat had a summary, and others ignored the summary. The summary now goes inside the single system message.
+- **Compact now** works again after an error: before, once it said it couldn't summarize, it did nothing on later tries.
+- **README.** The Download section, with the installers, is now first.
+
 ## 0.5.1 (2026-11-03)
 
 ### Changed

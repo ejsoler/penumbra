@@ -536,7 +536,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     if (streamingId || compacting) return;
     setCompacting({ id: c.id });
     try {
-      const s = await compactChat(c, { model: activeModel, numCtx, think: caps.includes('thinking') ? false : undefined });
+      const s = await compactChat(c, { model: activeModel, numCtx, think: caps.includes('thinking') ? false : undefined, minimal: true });
       if (!s) {
         setCompacting({ id: c.id, error: 'Nothing to summarize yet: the chat is still short.' });
         return;

@@ -54,6 +54,7 @@ function seed(model, folder) {
     { title: 'Demo · Attachment' },
     { title: 'Demo · Orchestrator', agentId: 'orchestrator' },
     { title: 'Demo · Story' },
+    { title: 'Demo · Long reply' },
   ].map((c, i) => ({ id: 'demo' + i, model, systemPrompt: '', messages: [], updatedAt: 100 - i, interactive: false, ...c }));
   const tomorrow8 = new Date();
   tomorrow8.setDate(tomorrow8.getDate() + 1);
@@ -155,9 +156,19 @@ async function runDemo(win, model) {
     if (!(await clickText('Run plan'))) throw new Error("Couldn't find the Run plan button.");
   };
   const page = '.content-inner > :not(.view-host)';
+  /** The Max Tokens field in the chat's settings panel. */
+  const setMaxTokens = (n) => js(`(() => {
+    const label = [...document.querySelectorAll('.settings label.field')].find((l) => l.innerText.startsWith('Max Tokens'));
+    const input = label?.querySelector('input');
+    if (!input) return false;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(String(n))});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
 
   const STEPS = [
     { t: 'Welcome', say: `A tour of Penumbra, one step at a time. This window is separate: its chats, agents, and skills are demo copies, and closing it deletes them. Every reply uses ${model}. Click Next to start.` },
+    { s: 'Home', t: 'Home', say: 'Penumbra opens here. The box starts a new chat, and each card shows a tab at a glance: recent chats, agents, upcoming tasks, orchestrator runs, models and downloads, images, backups, and updates.', run: () => view('Home') },
     { s: '1. Interactive answers', t: 'Temperature converter', say: 'Sends a prompt in a chat with Interactive on: the model answers with a small live app (about 30 seconds).', run: async () => { await openChat('Demo · Interactive'); await send('Make me a simple tool to convert temperatures between Celsius and Fahrenheit, with a slider.'); } },
     { t: 'Try it', say: 'Drag the slider. In the widget toolbar: View code, Save as HTML, and full screen (Esc closes it). Click Next when you’re ready.' },
     { t: 'A simple question', say: 'For a simple fact, the model just answers in text.', run: () => send('What is the capital of Japan?') },
@@ -216,7 +227,7 @@ async function runDemo(win, model) {
       await waitFor(`![...document.querySelectorAll('button')].some(b => b.offsetParent && b.innerText.trim() === 'Stop')`, 600);
     } },
     { t: 'The new agent is saved', run: () => view('Agents & Skills') },
-    { s: '7. Scheduler', t: 'Scheduled tasks', say: 'Tasks run prompts, agents, orchestrator goals, or commands at set times. "Morning haiku" runs every day at 8:00.', run: async () => {
+    { s: '7. Scheduler', t: 'Scheduled tasks', say: 'Tasks run prompts, agents, orchestrator goals, commands, or backups at set times. "Morning haiku" runs every day at 8:00.', run: async () => {
       await view('Scheduler');
       await js(`[...document.querySelectorAll('${page} .conv-item')].find(e => e.innerText.includes('Morning haiku'))?.click()`);
     } },
@@ -227,12 +238,36 @@ async function runDemo(win, model) {
       await js(`document.querySelector('.run-row')?.click(); document.querySelector('.run-log')?.scrollIntoView({ block: 'center', behavior: 'smooth' })`);
     } },
     { s: '8. Images and backups', t: 'Images', say: 'Make pictures on this computer, outside Ollama: search Hugging Face for an image model and download it here (nothing is downloaded in the demo). Then any chat or agent can create images.', run: () => view('Images') },
-    { t: 'Backup', say: 'Save chats, agents, skills, images, scheduled tasks, and settings in one .zip: everything, or what you pick from each list. Restore adds a backup to this profile without replacing anything. Try Back up… if you like: it asks where to save.', run: () => view('Backup') },
+    { t: 'Backup', say: 'Save chats, agents, skills, images, scheduled tasks, and settings in one .zip: a Full backup, or an Incremental one with only what changed since the last. A Backup task in the Scheduler does it on a schedule. Restore adds a backup to this profile. Try Back up… if you like: it asks where to save.', run: () => view('Backup') },
     { t: 'Back up one chat', say: 'The button at the top right of a chat (next to the settings panel button) backs up just that chat, with its agent, skills, and images.', run: async () => {
       await openChat('Demo · Writer');
       await js(`document.querySelector('.view-host .topbar-backup')?.animate([{ boxShadow: '0 0 0 0 #6c5ce7' }, { boxShadow: '0 0 0 8px rgba(108,92,231,0)' }], { duration: 900, iterations: 3 })`);
     } },
-    { s: '9. Keeps running in the background', t: 'A longer story', say: 'Sends a story and switches tabs: the dot on the Chat icon means it’s still writing.', run: async () => { await openChat('Demo · Story'); await send('Write a 200-word short story about a lighthouse keeper.', { wait: false }); await sleep(2500); await view('My Models'); } },
+    { s: '9. Long chats', t: 'Compact a chat', say: 'When a chat outgrows the model’s context, older messages are summarized automatically. Compact now does it on demand: the line in the chat marks where the summary ends; click it to read the summary (about 30 seconds).', run: async () => {
+      await openChat('Demo · Internet');
+      if (!(await js(`!!document.querySelector('.ctx-actions')`))) await js(`document.querySelector('.view-host .topbar-right').click()`);
+      await sleep(400);
+      if (!(await clickText('Compact now'))) throw new Error("Couldn't find Compact now.");
+      if (!(await waitFor(`!!document.querySelector('.summary-divider') || !!document.querySelector('.ctx-actions .red')`, 300))) throw new Error('Summarizing took too long.');
+      const err = await js(`document.querySelector('.ctx-actions .red')?.innerText || ''`);
+      if (err) throw new Error(err);
+      await js(`document.querySelector('.summary-divider')?.scrollIntoView({ block: 'center', behavior: 'smooth' })`);
+    } },
+    { t: 'A reply cut off', say: 'Sets Max Tokens (in the settings panel) to 60, so this reply stops early and says so.', run: async () => {
+      await openChat('Demo · Long reply');
+      if (!(await js(`!!document.querySelector('.settings')`))) await js(`document.querySelector('.view-host .topbar-right').click()`);
+      await sleep(300);
+      await setMaxTokens(60);
+      await send('Write a 200-word story about a lighthouse keeper.');
+    } },
+    { t: 'Continue', say: 'Puts Max Tokens back to unlimited and clicks Continue: the reply picks up exactly where it stopped.', run: async () => {
+      await setMaxTokens(-1);
+      await sleep(300);
+      if (!(await clickText('Continue'))) throw new Error("This reply wasn't cut off, so there's nothing to continue.");
+      await sleep(1500);
+      await waitDone();
+    } },
+    { s: '10. Keeps running in the background', t: 'A longer story', say: 'Sends a story and switches tabs: the dot on the Chat icon means it’s still writing.', run: async () => { await openChat('Demo · Story'); await send('Write a 200-word short story about a lighthouse keeper.', { wait: false }); await sleep(2500); await view('My Models'); } },
     { t: 'Back to the chat', say: 'The story is complete.', run: async () => { await sleep(1000); await openChat('Demo · Story'); await waitDone(); } },
     { t: 'That’s the tour', say: 'Everything ran on this computer. More in your own window: profiles (the button at the bottom of the sidebar), Updates, and Options → Tutorial. Close this window to end the demo; its chats and files are deleted.' },
   ];

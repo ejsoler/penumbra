@@ -118,18 +118,18 @@ async function summarize(o: { model: string; numCtx: number; think?: boolean; si
 
 /**
  * Summarizes the chat up to the most recent messages, which stay whole (about a third of the context, and
- * at least the last two). Long stretches are summarized in parts, each folded into the summary so far.
- * Returns null when there's nothing old enough to summarize.
+ * at least the last two; with `minimal`, as asked for by Compact now, just the last few). Long stretches are
+ * summarized in parts, each folded into the summary so far. Returns null when there's nothing old enough.
  */
 export async function compactChat(
   conv: Pick<Conversation, 'messages' | 'summary'>,
-  o: { model: string; numCtx: number; think?: boolean; signal?: AbortSignal; history?: UiMessage[] },
+  o: { model: string; numCtx: number; think?: boolean; signal?: AbortSignal; history?: UiMessage[]; minimal?: boolean },
 ): Promise<ChatSummary | null> {
   const history = (o.history ?? conv.messages).filter((m) => !m.error || m.content);
   const start = summaryEnd(history, conv.summary);
-  let split = history.length - 2;
+  let split = history.length - (o.minimal ? RECENT : 2);
   let kept = messagesTokens(history.slice(split).map((m) => toApi(m, false)));
-  while (split > start) {
+  while (split > start && !o.minimal) {
     const t = messagesTokens([toApi(history[split - 1], true)]);
     if (kept + t > o.numCtx / 3) break;
     kept += t;

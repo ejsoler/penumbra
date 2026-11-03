@@ -63,7 +63,7 @@ const STEPS: Step[] = [
   { title: 'Interactive answers', body: 'With this on, the model can reply with small live apps: calculators, charts, maps, diagrams. Turn it off for plain text, per chat.', target: '.ia-switch', view: 'chat' },
   { title: 'Ask anything', body: 'Type here and press Enter. Attach images for vision models, or text files like notes and CSVs. Ask for a picture and the model can create one with your image model.', target: '.composer', view: 'chat' },
   { title: 'Back up this chat', body: 'Saves this chat in a backup file, with its agent, that agent’s skills, and its images. The Backup tab restores it, here or on another computer.', target: '.view-host .topbar-backup', view: 'chat' },
-  { title: 'Chat settings', body: 'This button opens the panel with the system prompt, the tools a chat may use (web, files, terminal, images), a folder for file tools, this chat’s internet access, and sampling settings.', target: '.view-host .topbar-right', view: 'chat' },
+  { title: 'Chat settings', body: 'This button opens the panel with the system prompt, the tools a chat may use (web, files, terminal, images), a folder for file tools, this chat’s internet access, how full the context is (Compact now summarizes older messages to make room), and sampling settings.', target: '.view-host .topbar-right', view: 'chat' },
 
   // Orchestrator
   { title: 'Orchestrator runs', body: 'Every orchestrator run is listed here. + starts a new one.', target: '.content-inner > aside.sidebar', view: 'orchestrator' },

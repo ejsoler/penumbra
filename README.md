@@ -27,6 +27,8 @@
 - Edit & resend, regenerate, branch a chat from any message, delete messages
 - Image attachments for vision models (drag & drop or paste)
 - Per-chat system prompt; chats are saved locally
+- Long chats keep going: older messages are sent in short form and summarized when the context fills up, with **Compact now** and a warning before it's full
+- A reply cut off by **Max Tokens** can be continued from where it stopped
 
 **Interactive answers** *(new in 0.2.0)*
 - The model can reply with small live apps right in the chat: calculators, charts, step-through diagrams, 3D views, quizzes

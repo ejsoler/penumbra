@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import * as api from '../api';
 import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, type GenParams, type OllamaState, type UiMessage } from '../store';
 import { INTERACTIVE_MIN_CTX } from '../widgets/prompt';
@@ -31,9 +31,10 @@ import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
   ArrowUp, ArrowRightLeft, Bot, Brain, Loader2, Lock, Check, ChevronDown, FileText, FolderOpen, ShieldAlert, Workflow, ChevronRight, Copy, Download, Eraser, GitBranch, PanelRight, PanelRightClose, Paperclip, Pencil,
-  Plus, RefreshCw, Sparkles, Square, Trash2, X, DatabaseBackup,
+  Plus, RefreshCw, Sparkles, Square, Trash2, X, DatabaseBackup, Play, ChevronUp, TriangleAlert,
 } from '../components/icons';
 import { backupChat } from '../backup';
+import { chatMessages, compactChat, messagesTokens, overBudget, withFiles, type ChatSummary } from '../context';
 
 const newConversation = (model = ''): Conversation => ({
   net: newChatNet(),
@@ -99,6 +100,12 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   // Widgets and tool results are long; make sure the model has room for them (generate() does the same).
   const usesTools = caps.includes('tools') && (agent ? agent.tools : current?.tools ?? DEFAULT_CHAT_TOOLS).some((t) => (t === 'skills' ? enabledSkills().length > 0 : t === 'images' ? hasImageModel() : true));
   const numCtx = interactive || usesTools ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx;
+  // How full the context is: the last reply's measured size, or the estimate right after summarizing.
+  const lastStats = current ? [...current.messages].reverse().find((m) => m.stats) : undefined;
+  const contextTokens = current?.summary?.estimate && current.summary.statsMsg === lastStats?.id
+    ? current.summary.estimate
+    : lastStats?.stats ? lastStats.stats.promptTokens + lastStats.stats.tokens : 0;
+  const maxCtx = useModelMaxContext(activeModel);
 
   const sorted = useMemo(() => [...conversations].sort((a, b) => b.updatedAt - a.updatedAt), [conversations]);
 
@@ -255,7 +262,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     const system = planningPrompt({ agents: agentsRef.current, models, folder: conv.folder, toolsSupported: toolsOk });
     const messages: api.ChatMessage[] = [
       { role: 'system', content: system },
-      ...(run.fresh ? history.slice(-1) : history).filter((m) => !m.error).map((m) => ({ role: m.role, content: withFiles(m) })),
+      ...chatMessages(run.fresh ? history.slice(-1) : history, run.fresh ? undefined : conv.summary),
     ];
     try {
       let raw: Record<string, unknown> | null = null;
@@ -399,13 +406,20 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     cancel: (msgId) => current && patchOrch(current.id, msgId, (o) => ({ ...o, phase: 'cancelled' })),
   };
 
-  /** `run.fresh` sends only the last message (a scheduled task's runs don't build on each other). */
+  /**
+   * `run.fresh` sends only the last message (a scheduled task's runs don't build on each other).
+   * `run.continueId` adds to that reply, the last in `history`, after it stopped at the Max Tokens limit.
+   */
   const generate = async (conv: Conversation, history: UiMessage[], run: RunOptions = {}) => {
-    if (conv.agentId === ORCHESTRATOR_ID) return planOrchestration(conv, history, run);
-    const agent = getAgent(conv.agentId);
-    const model = agent?.model || conv.model;
-    const assistant: UiMessage = { id: uid(), role: 'assistant', content: '', model, ...(agent ? { agentId: agent.id } : {}) };
-    updateConv(conv.id, (c) => ({ ...c, messages: [...history, assistant], updatedAt: Date.now() }));
+    const continuing = run.continueId ? history.find((m) => m.id === run.continueId) : undefined;
+    if (conv.agentId === ORCHESTRATOR_ID && !continuing) return planOrchestration(conv, history, run);
+    const agent = getAgent(continuing ? continuing.agentId : conv.agentId);
+    const model = continuing?.model || agent?.model || conv.model;
+    const assistant: UiMessage = continuing ?? { id: uid(), role: 'assistant', content: '', model, ...(agent ? { agentId: agent.id } : {}) };
+    // Steps record where in the text they ran; a continuation's text comes after what's there.
+    const offset = continuing?.content.length ?? 0;
+    if (continuing) patchMessage(conv.id, assistant.id, (m) => ({ ...m, truncated: undefined, error: undefined }));
+    else updateConv(conv.id, (c) => ({ ...c, messages: [...history, assistant], updatedAt: Date.now() }));
 
     const ac = new AbortController();
     abortRef.current = ac;
@@ -421,34 +435,62 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       folder: conv.folder,
       net: conv.net,
     });
-    const messages: api.ChatMessage[] = [
-      ...(system ? [{ role: 'system' as const, content: system }] : []),
-      ...(run.fresh ? history.slice(-1) : history).filter((m) => !m.error).map((m) => ({ role: m.role, content: withFiles(m), ...(m.images?.length ? { images: m.images } : {}) })),
-    ];
     const options = genOptions(agent?.temperature, isInteractive(conv) || tools.length > 0);
+    const sendable = run.fresh ? history.slice(-1) : history;
+    let summary = run.fresh ? undefined : conv.summary;
+    // Continuing: the cut-off reply is the last message, and Ollama picks it up from where it stopped.
+    const build = (): api.ChatMessage[] => [
+      ...(system ? [{ role: 'system' as const, content: system }] : []),
+      ...chatMessages(sendable, summary),
+    ];
 
     const patch = (fn: (m: UiMessage) => UiMessage) => patchMessage(conv.id, assistant.id, fn);
     try {
+      let messages = build();
+      // Too long for the context window: summarize the older part first, so nothing is dropped silently.
+      if (!run.fresh && overBudget(messages, options.num_ctx, options.num_predict, tools.length)) {
+        patch((m) => ({ ...m, notice: 'Summarizing earlier messages to make room…' }));
+        try {
+          const s = await compactChat({ messages: sendable, summary }, { model, numCtx: options.num_ctx, think: modelCaps.includes('thinking') ? false : undefined, signal: ac.signal });
+          if (s) {
+            summary = s;
+            updateConv(conv.id, (c) => ({ ...c, summary: s }));
+            messages = build();
+          }
+        } catch (e) {
+          if (ac.signal.aborted) throw e;
+          console.warn('Could not summarize the chat', e); // Ollama then drops the oldest part itself
+        } finally {
+          patch((m) => ({ ...m, notice: undefined }));
+        }
+      }
       const result = await runAgent({
         model,
         messages,
         tools,
         options,
         keepAlive: params.keep_alive,
-        ...(modelCaps.includes('thinking') ? { think: params.think } : {}),
+        // A continuation goes straight on with the answer, without thinking first.
+        ...(modelCaps.includes('thinking') ? { think: continuing ? false : params.think } : {}),
         signal: ac.signal,
         approve: approver(ac, conv.id, run.preApproved),
         onImage: (img) => patch((m) => ({ ...m, generated: [...(m.generated ?? []), img] })),
         onText: (piece) => patch((m) => ({ ...m, content: m.content + piece })),
         onThinking: (piece) => patch((m) => ({ ...m, thinking: (m.thinking ?? '') + piece })),
-        onStep: (step) =>
+        onStep: (raw) =>
           patch((m) => {
+            const step = offset ? { ...raw, at: (raw.at ?? 0) + offset } : raw;
             const steps = m.steps ?? [];
             const i = steps.findIndex((x) => x.id === step.id);
             return { ...m, steps: i < 0 ? [...steps, step] : steps.map((x) => (x.id === step.id ? step : x)) };
           }),
       });
-      patch((m) => ({ ...m, stats: result.stats, ...(result.cutOff ? { error: 'Stopped after too many tool calls in a row.' } : {}) }));
+      patch((m) => ({
+        ...m,
+        stats: result.stats,
+        ...(result.truncated ? { truncated: true } : {}),
+        ...(result.cutOff ? { error: 'Stopped after too many tool calls in a row.' } : {}),
+      }));
     } catch (e) {
       if (ac.signal.aborted) patch((m) => ({ ...m, stopped: true }));
       else patch((m) => ({ ...m, error: (e as Error).message }));
@@ -478,6 +520,39 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     if (!current || streamingId) return;
     const idx = current.messages.findIndex((m) => m.id === msgId);
     generate(current, current.messages.slice(0, idx));
+  };
+
+  /** Picks up the last reply where the Max Tokens limit stopped it. */
+  const continueReply = (msgId: string) => {
+    if (!current || streamingId) return;
+    const last = current.messages[current.messages.length - 1];
+    if (last?.id !== msgId) return;
+    generate(current, current.messages, { continueId: msgId });
+  };
+
+  /** Summarizes the older part of the chat now (the Compact button). */
+  const [compacting, setCompacting] = useState<{ id: string; error?: string } | null>(null);
+  const compactNow = async (c: Conversation) => {
+    if (streamingId || compacting) return;
+    setCompacting({ id: c.id });
+    try {
+      const s = await compactChat(c, { model: activeModel, numCtx, think: caps.includes('thinking') ? false : undefined });
+      if (!s) {
+        setCompacting({ id: c.id, error: 'Nothing to summarize yet: the chat is still short.' });
+        return;
+      }
+      const statsMsg = [...c.messages].reverse().find((m) => m.stats)?.id;
+      const estimate = messagesTokens(chatMessages(c.messages, s)) + estimateSystem(c);
+      updateConv(c.id, (x) => ({ ...x, summary: { ...s, estimate, statsMsg } }));
+      setCompacting(null);
+    } catch (e) {
+      setCompacting({ id: c.id, error: `Couldn't summarize: ${(e as Error).message}` });
+    }
+  };
+  /** The system prompt's rough size, for the meter right after summarizing. */
+  const estimateSystem = (c: Conversation) => {
+    const { system } = replySetup({ agent: getAgent(c.agentId), systemPrompt: c.systemPrompt, interactive: isInteractive(c), toolsSupported: caps.includes('tools'), chatTools: c.tools, folder: c.folder, net: c.net });
+    return messagesTokens(system ? [{ role: 'system', content: system }] : []);
   };
 
   const editAndResend = (msgId: string, text: string) => {
@@ -656,11 +731,21 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
           onDelete={deleteMessage}
           onEdit={editAndResend}
           onBranch={(id) => duplicateChat(current, id)}
+          onContinue={continueReply}
+          summary={current.summary}
+          onForgetSummary={() => updateConv(current.id, (c) => ({ ...c, summary: undefined }))}
         />
         </PlanActionsContext.Provider>
         </WidgetActionsContext.Provider>
 
         {pendingApproval && <ApprovalBar req={pendingApproval.req} onAnswer={pendingApproval.resolve} />}
+        {!isStreaming && contextTokens / numCtx >= CONTEXT_WARN && (
+          <div className="ctx-chip">
+            <span>Context {Math.min(100, Math.round((contextTokens / numCtx) * 100))}% full. Older messages are summarized automatically when needed.</span>
+            <button className="link-btn small" disabled={!!compacting} onClick={() => compactNow(current)}>{compacting?.id === current.id && !compacting.error ? 'Summarizing…' : 'Compact now'}</button>
+            {!showSettings && <button className="link-btn small" onClick={() => setShowSettings(true)}>Settings</button>}
+          </div>
+        )}
         <Composer
           disabled={!activeModel}
           streaming={isStreaming}
@@ -690,11 +775,20 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
           systemPrompt={current.systemPrompt}
           setSystemPrompt={(systemPrompt) => updateConv(current.id, (c) => ({ ...c, systemPrompt }))}
           thinkingSupported={caps.includes('thinking')}
-          contextTokens={(() => {
-            const s = [...current.messages].reverse().find((m) => m.stats)?.stats;
-            return s ? s.promptTokens + s.tokens : 0;
-          })()}
+          contextTokens={contextTokens}
           contextLimit={numCtx}
+          context={
+            <ContextActions
+              used={contextTokens / numCtx}
+              numCtx={numCtx}
+              maxCtx={maxCtx}
+              summary={current.summary}
+              busy={isStreaming || !!compacting}
+              compacting={compacting?.id === current.id ? compacting : null}
+              onCompact={() => compactNow(current)}
+              onRaise={(n) => setParams({ ...params, num_ctx: n })}
+            />
+          }
         />
       )}
 
@@ -714,19 +808,6 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
 
 type Attachment = { name: string; text: string };
 const MAX_ATTACHMENT = 200 * 1024;
-/** Attached files go to the model inside the message, capped so they can't flood the context. */
-const MAX_ATTACHED_TOTAL = 60000;
-
-function withFiles(m: UiMessage): string {
-  if (!m.files?.length) return m.content;
-  let room = MAX_ATTACHED_TOTAL;
-  const blocks = m.files.map((f) => {
-    const text = f.text.length > room ? `${f.text.slice(0, Math.max(0, room))}\n[…cut: the file has ${f.text.length.toLocaleString()} characters]` : f.text;
-    room -= Math.min(room, f.text.length);
-    return `<attached_file name="${f.name.replace(/"/g, "'")}">\n${text}\n</attached_file>`;
-  });
-  return `${blocks.join('\n\n')}\n\n${m.content}`;
-}
 
 function ApprovalBar({ req, onAnswer }: { req: ApprovalRequest; onAnswer: (a: Approval) => void }) {
   return (
@@ -994,8 +1075,12 @@ function Messages(props: {
   onDelete: (id: string) => void;
   onEdit: (id: string, text: string) => void;
   onBranch: (id: string) => void;
+  onContinue: (id: string) => void;
+  summary?: ChatSummary;
+  onForgetSummary: () => void;
 }) {
-  const { messages, streaming } = props;
+  const { messages, streaming, summary } = props;
+  const summaryAt = summary ? messages.findIndex((m) => m.id === summary.upTo) : -1;
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
 
@@ -1029,8 +1114,8 @@ function Messages(props: {
     >
       <div className="messages-inner">
         {messages.map((m, i) => (
+          <Fragment key={m.id}>
           <MessageView
-            key={m.id}
             msg={m}
             agentName={m.agentId === ORCHESTRATOR_ID ? 'Orchestrator' : m.agentId ? props.agents.find((a) => a.id === m.agentId)?.name : undefined}
             agent={m.agentId && m.agentId !== ORCHESTRATOR_ID ? props.agents.find((a) => a.id === m.agentId) : undefined}
@@ -1040,14 +1125,17 @@ function Messages(props: {
             onDelete={() => props.onDelete(m.id)}
             onEdit={(t) => props.onEdit(m.id, t)}
             onBranch={() => props.onBranch(m.id)}
+            onContinue={i === messages.length - 1 ? () => props.onContinue(m.id) : undefined}
           />
+          {i === summaryAt && i < messages.length - 1 && summary && <SummaryDivider summary={summary} onForget={props.onForgetSummary} />}
+          </Fragment>
         ))}
       </div>
     </div>
   );
 }
 
-function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete, onEdit, onBranch }: {
+function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete, onEdit, onBranch, onContinue }: {
   msg: UiMessage;
   agentName?: string;
   agent?: Agent;
@@ -1057,6 +1145,8 @@ function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete
   onDelete: () => void;
   onEdit: (text: string) => void;
   onBranch: () => void;
+  /** Only for the last message: picks up a reply that hit the Max Tokens limit. */
+  onContinue?: () => void;
 }) {
   const me = asAvatar(useProfile());
   const menu = useContextMenu();
@@ -1137,6 +1227,8 @@ function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete
             )
           ) : answer ? (
             <Markdown text={answer} live={live} />
+          ) : live && msg.notice ? (
+            <span className="msg-notice"><Loader2 size={13} className="spin" /> {msg.notice}</span>
           ) : live && !thinking ? (
             <span className="typing"><i /><i /><i /></span>
           ) : null}
@@ -1145,6 +1237,12 @@ function MessageView({ msg, agentName, agent, live, busy, onRegenerate, onDelete
       )}
       {msg.role === 'assistant' && (msg.generated?.length || live) ? <GeneratedImages images={msg.generated ?? []} live={live} /> : null}
       {msg.error && <div className="msg-error">⚠ {msg.error}</div>}
+      {msg.truncated && !live && (
+        <div className="msg-truncated">
+          <span>This reply stopped at the Max Tokens limit.</span>
+          {onContinue && <button className="btn sm" disabled={busy} onClick={onContinue}><Play size={12} /> Continue</button>}
+        </div>
+      )}
       {!live && !editing && (
         <div className="msg-footer">
           {msg.stats && (
@@ -1368,9 +1466,10 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
   );
 }
 
-function SettingsPanel({ tools, internet, params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens, contextLimit }: {
+function SettingsPanel({ tools, internet, context, params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens, contextLimit }: {
   tools: ReactNode;
   internet: ReactNode;
+  context: ReactNode;
   params: GenParams;
   setParams: (p: Partial<GenParams>) => void;
   systemPrompt: string;
@@ -1400,6 +1499,7 @@ function SettingsPanel({ tools, internet, params, setParams, systemPrompt, setSy
             <div className="ctx-bar"><div style={{ width: `${ctxUsed}%` }} /></div>
             <span className="muted mono">{contextTokens.toLocaleString()} / {contextLimit.toLocaleString()} tokens</span>
           </div>
+          {context}
         </section>
 
         {tools}
@@ -1471,5 +1571,82 @@ function NumberField({ label, hint, value, min, step, onChange }: {
       <span>{label}{hint && <small className="muted"> {hint}</small>}</span>
       <input className="num wide" type="number" value={value} min={min} step={step} onChange={(e) => e.target.value !== '' && onChange(Number(e.target.value))} />
     </label>
+  );
+}
+
+/** Above this share of the context, the chat suggests compacting or a bigger context. */
+const CONTEXT_WARN = 0.8;
+
+const maxContextCache = new Map<string, number>();
+/** The model's own context limit (from Ollama's model info), once it's known. */
+function useModelMaxContext(model: string) {
+  const [max, setMax] = useState<number | undefined>(() => maxContextCache.get(model));
+  useEffect(() => {
+    if (!model) return;
+    if (maxContextCache.has(model)) return setMax(maxContextCache.get(model));
+    let cancelled = false;
+    api.showModel(model).then((info) => {
+      const mi = info.model_info ?? {};
+      const arch = String(mi['general.architecture'] ?? '');
+      const n = Number(mi[`${arch}.context_length`]);
+      if (n > 0) maxContextCache.set(model, n);
+      if (!cancelled) setMax(n > 0 ? n : undefined);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [model]);
+  return max;
+}
+
+/** Under the context meter: a warning when it's nearly full, Compact now, and a bigger context. */
+function ContextActions({ used, numCtx, maxCtx, summary, busy, compacting, onCompact, onRaise }: {
+  used: number;
+  numCtx: number;
+  maxCtx?: number;
+  summary?: ChatSummary;
+  busy: boolean;
+  compacting: { error?: string } | null;
+  onCompact: () => void;
+  onRaise: (n: number) => void;
+}) {
+  // Doubling is a big enough step without asking for far more memory than needed.
+  const next = maxCtx && maxCtx > numCtx ? Math.min(maxCtx, Math.max(numCtx * 2, 8192)) : null;
+  return (
+    <div className="ctx-actions">
+      {used >= CONTEXT_WARN && (
+        <p className="net-note warn"><TriangleAlert size={12} /> Almost full. Before the next reply, older messages are summarized to make room.</p>
+      )}
+      {summary && <p className="muted small">{summary.count} earlier messages are summarized for the model.</p>}
+      {compacting?.error && <p className="small red">{compacting.error}</p>}
+      <div className="row gap">
+        <button className="btn sm" disabled={busy} onClick={onCompact} title="Summarize the older part of the chat now">
+          {compacting && !compacting.error ? <Loader2 size={12} className="spin" /> : null} Compact now
+        </button>
+        {next && (
+          <button className="btn sm" onClick={() => onRaise(next)} title={`This model can use up to ${maxCtx!.toLocaleString()} tokens. More context uses more memory.`}>
+            Raise to {next.toLocaleString()}
+          </button>
+        )}
+      </div>
+      {maxCtx && <p className="muted small">This model handles up to {maxCtx.toLocaleString()} tokens. A bigger context uses more memory.</p>}
+    </div>
+  );
+}
+
+/** Where the summary ends in the chat: everything above it reaches the model as the summary. */
+function SummaryDivider({ summary, onForget }: { summary: ChatSummary; onForget: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="summary-divider">
+      <button className="summary-line" onClick={() => setOpen(!open)} title="The model gets a summary of the messages above instead of the messages themselves">
+        <span>Messages above are summarized for the model</span>
+        {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+      </button>
+      {open && (
+        <div className="summary-text">
+          <Markdown text={summary.text} />
+          <button className="link-btn small" onClick={onForget} title="Send the full messages again (older ones still go in short form)">Stop using this summary</button>
+        </div>
+      )}
+    </div>
   );
 }

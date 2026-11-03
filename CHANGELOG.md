@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Long chats keep going.** Chats no longer lose their beginning when they outgrow the model's context:
+  - Older messages are sent in a shorter form: widget code, attached files, and images in earlier messages are replaced by short notes (the chat on screen doesn't change; the last few messages always go whole).
+  - When a chat still wouldn't fit, the model first summarizes the older part ("Summarizing earlier messages to make room…"), and from then on gets the summary instead of those messages. A line in the chat marks where the summary ends; click it to read the summary, or stop using it.
+  - **Compact now** (in the settings panel, and in a notice above the message box when the context is over 80% full) summarizes on demand.
+  - The context meter warns when it's nearly full and offers **Raise to…**, a bigger context up to the model's own maximum.
+- **Continue a cut-off reply.** When a reply stops at the **Max Tokens** limit, it says so and offers **Continue**, which picks it up exactly where it stopped.
+
 ## 0.4.0 (2026-11-02)
 
 ### Added

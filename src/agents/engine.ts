@@ -47,6 +47,8 @@ export interface RunResult {
   stats: RunStats;
   /** True if the run hit maxSteps before the model gave a final answer. */
   cutOff: boolean;
+  /** True if the reply stopped at the length limit (Max Tokens) rather than finishing. */
+  truncated: boolean;
 }
 
 /** Tool results go back into the model's context, so keep them bounded. */
@@ -66,6 +68,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
   const maxSteps = o.maxSteps ?? 12;
 
   for (let round = 0; ; round++) {
+    let doneReason = '';
     let text = '';
     let thinking = '';
     const calls: api.ToolCall[] = [];
@@ -101,6 +104,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
       }
       if (chunk.message?.tool_calls?.length) calls.push(...chunk.message.tool_calls);
       if (chunk.done) {
+        doneReason = chunk.done_reason ?? '';
         stats.tokens += chunk.eval_count ?? 0;
         evalSeconds += (chunk.eval_duration ?? 0) / 1e9;
         stats.promptTokens = (chunk.prompt_eval_count ?? 0) + (chunk.eval_count ?? 0);
@@ -111,7 +115,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
     if (!calls.length || round >= maxSteps) {
       stats.tps = evalSeconds ? stats.tokens / evalSeconds : 0;
       stats.seconds = (performance.now() - start) / 1000;
-      return { content, stats, cutOff: calls.length > 0 };
+      return { content, stats, cutOff: calls.length > 0, truncated: !calls.length && doneReason === 'length' };
     }
 
     for (const call of calls) {

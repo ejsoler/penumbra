@@ -104,6 +104,8 @@ export interface RunOptions {
   preApproved?: string[];
   /** Send only the newest message to the model, not the whole chat. */
   fresh?: boolean;
+  /** Add to this reply instead of writing a new one (it stopped at the Max Tokens limit). */
+  continueId?: string;
 }
 
 /** Actions the chat view offers to other views (it stays mounted, so these keep working). */

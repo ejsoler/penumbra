@@ -1,4 +1,5 @@
 import type { ChatNet } from './widgets/network';
+import type { ChatSummary } from './context';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { Step } from './agents/engine';
@@ -26,6 +27,10 @@ export interface UiMessage {
   orchestration?: Orchestration;
   /** Images a tool created for this reply. */
   generated?: GeneratedRef[];
+  /** The reply stopped at the Max Tokens limit; Continue picks it up. */
+  truncated?: boolean;
+  /** Shown while the reply waits for something, like summarizing older messages. */
+  notice?: string;
 }
 
 export interface Conversation {
@@ -45,6 +50,8 @@ export interface Conversation {
   folder?: string;
   /** This chat's internet access, if it differs from the default for all chats. */
   net?: ChatNet;
+  /** The older part of the chat, summarized so the chat fits the model's context (see context.ts). */
+  summary?: ChatSummary;
 }
 
 export const isInteractive = (c: Conversation | undefined) => c?.interactive !== false;

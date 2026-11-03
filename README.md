@@ -33,7 +33,7 @@
 - It decides on its own when an app helps more than text, and answers in plain text otherwise
 - Turn it on or off for each chat with the **Interactive** switch at the top (on by default)
 - Chart.js, D3, and Three.js are built in, so widgets work offline
-- Widgets can use the internet for maps and live public data (weather, earthquakes, exchange rates, Wikipedia). Approved sites work right away; any other site asks you first. A **Whole internet** option and your own approved sites are in the Options tab
+- Widgets can use the internet for maps and live public data (weather, earthquakes, exchange rates, Wikipedia). Approved sites work right away; any other site asks you first. Each chat has its own access (approved sites or **Whole internet**) and its own sites; new chats start with the default from the Options tab, and every chat also uses your sites from there
 - Open a widget full screen, save it as a standalone `.html` file, or view and copy its code
 - Widgets can suggest follow-up questions; they go into your message box, and you decide whether to send them
 - If a widget breaks, **Ask model to fix** sends the error back to the model for a corrected version
@@ -41,7 +41,7 @@
 
 **Agents, skills & orchestration** *(new in 0.2.0)*
 - Create agents with a short wizard: a purpose, a name, and a persona (personality and communication style). Every agent keeps the model's full knowledge; the persona shapes how it talks and works
-- Give each agent an avatar (an image or an emoji). The Agents tab shows them as trading cards
+- Give each agent an avatar (an image or an emoji). The Agents tab shows them as trading cards; drag and zoom a picture to choose what shows on the card
 - Each agent has its own model, skills, and tools, and can be picked in any chat
 - Skills use Claude's `SKILL.md` format: create them in the app or import folders and `.zip` files. The model loads a skill only when a task needs it
 - Tools: web search and pages, read and write files in a folder you choose, and terminal commands (each one asks you first). Every reply shows the tools it used
@@ -58,6 +58,11 @@
 **Profiles** *(new in 0.3.0)*
 - Separate profiles, each with its own chats, agents, skills, settings, scheduled tasks, and images; downloaded models are shared
 - Lock a profile with a password, move chats between profiles, and pick the one that opens at startup
+
+**Backup** *(new in 0.4.0)*
+- A **Backup** tab saves chats, agents, skills, images, scheduled tasks, and settings in one `.zip`: everything, or the items you pick
+- Back up a single chat (with its agent, skills, and images) from the button at the top of the chat
+- Restore adds what you choose from a backup to the current profile without replacing anything: items already there are skipped, changed ones come back as copies, and restored scheduled tasks start paused
 
 **Screenshots**
 
@@ -85,7 +90,7 @@
 **Everywhere**
 - A guided tutorial of every tab the first time you open Penumbra (and in each new profile), until you choose not to see it again; Options → Tutorial shows it any time
 - Your own name and avatar on your messages (set from the button at the bottom of the sidebar)
-- A quiet update check: a small icon in the sidebar when a new version is out, which downloads the installer for your computer
+- A quiet update check: a small icon in the sidebar when a new version is out. It opens the Updates tab with what's new, and downloads the installer for your computer
 - A guided demo of every feature (Options → Guided demo), in its own window with sample data
 - Right-click menus for chats, messages, code blocks, models, and downloads
 - Keyboard shortcuts: <kbd>⌘N</kbd> new chat, <kbd>⌘L</kbd> model picker, <kbd>Enter</kbd> send, <kbd>Shift</kbd>+<kbd>Enter</kbd> newline
@@ -153,9 +158,10 @@ OLLAMA_HOST=0.0.0.0 OLLAMA_ORIGINS=* ollama serve
 ## Project structure
 
 ```
-electron/         Electron main process, preload bridge, skills, tools (files, terminal, web), update check, menu bar, image generation, profiles
+electron/         Electron main process, preload bridge, skills, tools (files, terminal, web), update check, menu bar, image generation, profiles, backups
 src/
-  updates.ts      Update check state (the sidebar icon and Options panel)
+  updates.ts      Update check state (the sidebar icon, Updates tab, and Options panel)
+  backup.ts       What goes into a backup, and merging one back in
   scheduler.ts    Scheduled tasks: timing, running them, menu bar status
   images.ts       Image models, downloads, and generation state
   profile.ts      Your name and avatar, synced with the profile list
@@ -167,7 +173,7 @@ src/
   agents/         Agent loop, tools, skills, agents store, orchestrator planning
   components/     Model picker, Markdown renderer, widget frame, plan card, context menu, icons
   widgets/        Widget sandbox document, system prompt, bundled chart/3D libraries
-  views/          Chat, Orchestrator, Scheduler, Images, Agents & Skills, My Models, Discover, Hugging Face, Options
+  views/          Chat, Orchestrator, Scheduler, Images, Agents & Skills, Backup, Updates, My Models, Discover, Hugging Face, Options
 build/            App icon source, icon generator, install script
 ```
 
@@ -179,13 +185,15 @@ If you use a cloud model from Ollama (names ending in `-cloud`), Ollama sends th
 
 Interactive widgets are code written by the model, so Penumbra treats them as untrusted. Each one runs in a sandboxed frame with no network access and no access to your chats, files, or Ollama. It can only resize itself, report errors, and suggest a follow-up question that you choose whether to send.
 
-Widgets can download from a list of approved sites (map tiles, script CDNs, and keyless public data). Any other site needs your OK for that widget, unless you turn on **Whole internet** in the settings panel. In every mode, widgets can only make https GET requests: they can't upload or post data, send cookies, or reach your computer, local network, or Ollama. Each widget's network log shows every request it made.
+Widgets can download from a list of approved sites (map tiles, script CDNs, and keyless public data). Any other site needs your OK for that widget, unless you add it to your sites (for all chats, in Options, or for one chat, in its settings panel) or set that chat to **Whole internet**. In every mode, widgets can only make https GET requests: they can't upload or post data, send cookies, or reach your computer, local network, or Ollama. Each widget's network log shows every request it made.
 
 Scheduled tasks run unattended, so they only skip the usual questions for what you allow in each task (opening websites, running commands); everything else waits for you. A command task runs its command without asking each time, since you wrote it.
 
 Image models and the image engine are downloaded only when you choose a model in the Images tab, from Hugging Face and stable-diffusion.cpp's GitHub releases, and checked against the hashes they publish.
 
 Profiles keep their data apart, and a profile's password is an app lock: Penumbra won't open the profile without it, but the files on disk aren't encrypted, so use FileVault or BitLocker if others can access your computer. Passwords are stored only as a salted hash.
+
+Backups are plain `.zip` files and aren't encrypted, so keep them somewhere safe. They don't include models or profile passwords.
 
 Agents follow the same internet rules. Their file tools only work inside the folder you choose for a chat, replaced files go to the Trash, and every terminal command waits for your approval. Approved commands run with your user account's permissions, so read them before you allow them. Skills are stored in Penumbra's data folder (open it from the Skills tab).
 

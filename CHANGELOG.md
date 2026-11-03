@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-11-02)
 
 ### Added
 - **Adjust an agent's image.** **Adjust image** under an agent's card (or **Adjust…** in its avatar menu) opens a preview of the card: drag the picture to choose what shows, and zoom with the slider or the scroll wheel. The round avatar uses the same framing. New image avatars are saved at 512px, so they stay sharp when zoomed.

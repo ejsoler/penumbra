@@ -210,4 +210,7 @@ function registerSkills() {
   handle('skills:reveal', (_e, id) => shell.openPath(id ? inside(root(), String(id)) : root()));
 }
 
-module.exports = { setSkillsFolder, registerSkills, frontmatter, readZip };
+/** Runs `fn` with a window's skills folder, for other modules (the backup) that work with skills. */
+const withSkillsOf = (webContents, fn) => request.run(rootFor.get(webContents.id), fn);
+
+module.exports = { setSkillsFolder, registerSkills, frontmatter, readZip, withSkillsOf, skillsRoot: root, listSkills: list, listFiles, installFrom };

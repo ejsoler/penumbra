@@ -38,6 +38,14 @@ contextBridge.exposeInMainWorld('penumbraHost', {
     },
   },
   /** Tells the main process whether to stay in the menu bar, and what to show there. */
+  backup: {
+    summary: () => ipcRenderer.invoke('backup:summary'),
+    save: (req) => ipcRenderer.invoke('backup:save', req),
+    open: () => ipcRenderer.invoke('backup:open'),
+    restoreFiles: (req) => ipcRenderer.invoke('backup:restoreFiles', req),
+    close: () => ipcRenderer.invoke('backup:close'),
+    reveal: (file) => ipcRenderer.invoke('backup:reveal', file),
+  },
   images: {
     status: () => ipcRenderer.invoke('images:status'),
     inspect: (repo, file) => ipcRenderer.invoke('images:inspect', repo, file),

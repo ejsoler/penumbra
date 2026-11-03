@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **Backup tab.** Save chats (with their attachments and widgets), agents, skills, images, scheduled tasks (with their run logs), and settings in one .zip file: everything, or the items you pick from each list. **Only those in the chosen chats** picks just the images your chosen chats show. **Restore** opens a backup, shows what's in it, and adds what you choose to the current profile: items already here are skipped, changed ones are added as copies, chats keep their agents and images, and restored scheduled tasks start paused. Settings are only replaced if you choose them. Models and profile passwords aren't included.
 - **Internet access per chat.** Each chat's settings panel has its own Internet access: **Approved sites, ask for others** or **Whole internet** (with a warning first), and sites only that chat may use. New chats start with the default from **Options**, and every chat checks the sites in Options first, then its own. A widget asking for a site offers **Always in this chat** next to **Always in all chats**.
 
 ## 0.3.1 (2026-11-02)

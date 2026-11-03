@@ -6,11 +6,12 @@ import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView, developerFocus } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
-import { Bot, CalendarClock, FolderOpen, ImageIcon, MessageSquare, Settings, Telescope, Workflow } from './components/icons';
+import { Bot, CalendarClock, DatabaseBackup, FolderOpen, ImageIcon, MessageSquare, Settings, Telescope, Workflow } from './components/icons';
 import { WorkspaceView } from './views/WorkspaceView';
 import { SchedulerView } from './views/SchedulerView';
 import { ImagesView } from './views/ImagesView';
 import { UpdatesView } from './views/UpdatesView';
+import { BackupView } from './views/BackupView';
 import { startScheduler, useScheduler } from './scheduler';
 import { start as startImages } from './images';
 import { chatController, openChatRequest, streaming } from './session';
@@ -26,7 +27,7 @@ import { host, type ProfileInfo } from './host';
 import { syncProfile } from './profile';
 import { startUpdateChecks } from './updates';
 
-type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer' | 'updates';
+type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer' | 'updates' | 'backup';
 
 const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare },
@@ -34,6 +35,7 @@ const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'scheduler', label: 'Scheduler', icon: CalendarClock },
   { id: 'agents', label: 'Agents & Skills', icon: Bot },
   { id: 'images', label: 'Images', icon: ImageIcon },
+  { id: 'backup', label: 'Backup', icon: DatabaseBackup },
   { id: 'developer', label: 'Options', icon: Settings },
   { id: 'models', label: 'My Models', icon: FolderOpen },
   { id: 'discover', label: 'Discover', icon: Telescope },
@@ -145,6 +147,7 @@ function Main() {
           {view === 'discover' && <DiscoverView ollama={ollama} dl={dl} />}
           {view === 'developer' && <DeveloperView ollama={ollama} onOpenUpdates={() => setView('updates')} />}
           {view === 'updates' && <UpdatesView />}
+          {view === 'backup' && <BackupView />}
         </div>
       </div>
     <LightboxHost />

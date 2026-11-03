@@ -834,3 +834,29 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 #chat-internet .net-select { margin-bottom: 0; font-size: 12.5px; }
 #chat-internet .net-add .text { flex: 1; }
 #chat-internet > .link-btn { margin-top: 8px; padding: 0; text-align: left; }
+.backup-page .page-head, .backup-page .panel { max-width: 860px; }
+.backup-panel h4 { display: flex; align-items: center; gap: 6px; }
+.backup-panel > p { margin: 0 0 10px; }
+.backup-cat { border-top: 1px solid var(--border); padding: 8px 0; }
+.backup-cat.empty { opacity: 0.55; }
+.backup-cat-head { display: flex; align-items: center; gap: 8px; }
+.backup-cat-head input, .backup-item input { accent-color: var(--accent); }
+.backup-cat-title { display: flex; align-items: center; gap: 6px; background: none; border: none; color: inherit; padding: 2px 0; cursor: pointer; font: inherit; }
+.backup-cat-title:disabled { cursor: default; }
+.backup-note { margin-left: auto; }
+.backup-items { padding: 8px 0 2px 24px; }
+.backup-items-tools { align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+.backup-search { padding: 4px 10px; flex: 1; max-width: 320px; }
+.backup-search input { flex: 1; min-width: 0; font-size: 12.5px; }
+.backup-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--border); border-radius: 8px; padding: 4px; background: var(--bg-input); }
+.backup-item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; cursor: pointer; }
+.backup-item:hover { background: var(--bg-hover, rgba(255, 255, 255, 0.04)); }
+.backup-item-text { display: flex; flex-direction: column; min-width: 0; }
+.backup-item-text > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.backup-item-label { font-size: 13px; }
+.backup-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 5px; flex-shrink: 0; background: var(--bg-side); }
+.backup-actions { align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.backup-done { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); }
+.backup-source { margin: 12px 0 4px; }
+.backup-confirm { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-input); }
+.backup-report { margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }

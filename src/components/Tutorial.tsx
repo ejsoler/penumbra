@@ -87,6 +87,9 @@ const STEPS: Step[] = [
   // Profile
   { title: 'Your profile', body: 'Your name and avatar, and your profiles: each one keeps its own chats, agents, and settings, can have a password, and ★ picks the one that opens at startup.', target: '.rail-profile' },
 
+  // Backup
+  { title: 'Backup', body: 'Save chats, agents, skills, images, scheduled tasks, and settings in one .zip file, all of them or the ones you pick. Restore adds what you choose from a backup to this profile, without replacing anything.', target: '.backup-page .panel:first-of-type', view: 'backup' },
+
   // Options
   { title: 'Server', body: 'Where Penumbra finds Ollama. Change it to use Ollama on another computer.', target: '#server', view: 'developer' },
   { title: 'Internet access', body: 'Whether new chats use approved sites or the whole internet (with a warning first), and your own sites, which every chat checks before its own list. Each chat can change its access in its settings panel.', target: '#internet-access', view: 'developer' },

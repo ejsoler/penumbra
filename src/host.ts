@@ -82,7 +82,46 @@ export interface ProfileInfo {
   isDefault: boolean;
 }
 
+export interface BackupImage {
+  file: string;
+  prompt: string;
+  at: number;
+  width?: number;
+  height?: number;
+  size: number;
+  /** In an opened backup: its name inside the backup. */
+  name?: string;
+}
+
+export interface BackupSkill {
+  id: string;
+  name: string;
+  description: string;
+}
+
+/** What an opened backup holds. `data` has the app's JSON (chats, agents, tasks, settings). */
+export interface OpenedBackup {
+  file: string;
+  createdAt: number;
+  app: string;
+  data: Record<string, unknown>;
+  skills: BackupSkill[];
+  images: BackupImage[];
+}
+
 export interface PenumbraHost {
+  backup: {
+    /** This profile's skills and images, to choose from. */
+    summary: () => Promise<{ skills: BackupSkill[]; images: BackupImage[] }>;
+    /** Asks where to save, then writes the .zip. Null if the user cancels. */
+    save: (req: { data: Record<string, unknown>; skills: string[]; images: string[] }) => Promise<{ file: string; size: number } | null>;
+    /** Asks for a backup and reads it. Null if the user cancels. */
+    open: () => Promise<OpenedBackup | null>;
+    /** Copies the chosen skills and images (by name in the backup) into this profile, skipping ones already here; returns old → new ids and paths. */
+    restoreFiles: (req: { skills: string[]; images: string[] }) => Promise<{ skills: Record<string, string>; images: Record<string, string>; skipped: number }>;
+    close: () => Promise<void>;
+    reveal: (file: string) => Promise<void>;
+  };
   skills: {
     list: () => Promise<SkillInfo[]>;
     read: (id: string) => Promise<string>;

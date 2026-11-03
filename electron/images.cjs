@@ -543,4 +543,4 @@ function registerImages() {
   });
 }
 
-module.exports = { registerImages, setImagesFolder, serveImages };
+module.exports = { registerImages, setImagesFolder, serveImages, imagesStore: { dirFor, readHistory, writeHistory, saveDir } };

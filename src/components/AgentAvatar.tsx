@@ -1,16 +1,28 @@
 // An agent's avatar: an uploaded or generated image, an emoji, or (with neither) its initials on a color
-// picked from its id. Images are cropped to a square and shrunk to 256px, so agents stay small in storage
-// and still look sharp as trading-card art.
+// picked from its id. Images are cropped to a square and shrunk to 512px, so agents stay small in storage
+// and still look sharp as trading-card art, even zoomed in with Adjust image (AvatarFrame).
 import { useEffect, useRef, useState } from 'react';
 import type { Agent } from '../agents/agents';
-import { Loader2, Sparkles, Upload, X } from './icons';
+import { Loader2, Move, Sparkles, Upload, X } from './icons';
 import { cleanError, generateImage, modelLabel, readyModels, useImages } from '../images';
 import { host } from '../host';
 
 const COLORS = ['#7c6cf0', '#e0688f', '#3fa7d6', '#3ecf8e', '#f0a04b', '#c06bd6', '#5f9e8f', '#d6604d'];
-const SIZE = 256;
+const SIZE = 512;
 
 export const isImageAvatar = (a?: string) => !!a && a.startsWith('data:image/');
+
+/** The part of an image avatar that shows: a point (percent across and down) kept in place, and a zoom of 1 or more. */
+export interface AvatarFrame {
+  x: number;
+  y: number;
+  zoom: number;
+}
+export const DEFAULT_FRAME: AvatarFrame = { x: 50, y: 50, zoom: 1 };
+
+/** Styles for an <img> filling its box (object-fit: cover) so it shows `frame`. */
+export const frameStyle = (f?: AvatarFrame): React.CSSProperties =>
+  f ? { objectPosition: `${f.x}% ${f.y}%`, transformOrigin: `${f.x}% ${f.y}%`, transform: f.zoom > 1 ? `scale(${f.zoom})` : undefined } : {};
 
 export const initials = (name: string) =>
   name
@@ -29,8 +41,11 @@ export function colorFor(id: string) {
   return COLORS[h % COLORS.length];
 }
 
-export function AgentAvatar({ agent, size = 20, className = '' }: { agent: Pick<Agent, 'id' | 'name' | 'avatar'>; size?: number; className?: string }) {
+export function AgentAvatar({ agent, size = 20, className = '' }: { agent: Pick<Agent, 'id' | 'name' | 'avatar'> & { avatarFrame?: AvatarFrame }; size?: number; className?: string }) {
   const style = { width: size, height: size, fontSize: Math.round(size * (agent.avatar && !isImageAvatar(agent.avatar) ? 0.62 : 0.42)) };
+  if (isImageAvatar(agent.avatar) && agent.avatarFrame) {
+    return <span className={`agent-avatar framed ${className}`} style={style}><img src={agent.avatar} alt="" draggable={false} style={frameStyle(agent.avatarFrame)} /></span>;
+  }
   if (isImageAvatar(agent.avatar)) return <img className={`agent-avatar ${className}`} style={style} src={agent.avatar} alt="" draggable={false} />;
   if (agent.avatar) return <span className={`agent-avatar emoji ${className}`} style={style} aria-hidden="true">{agent.avatar}</span>;
   return <span className={`agent-avatar ${className}`} style={{ ...style, background: colorFor(agent.id) }} aria-hidden="true">{initials(agent.name)}</span>;
@@ -79,9 +94,11 @@ export const avatarPrompt = (a: { name: string; description?: string; persona?: 
 const EMOJIS = ['🤖', '🧠', '🦉', '🧪', '📚', '✍️', '💻', '📊', '🎨', '🧭', '🦜', '👩‍🏫', '🧑‍🍳', '🩺', '🚀', '🌱', '🐙', '🦊', '⚡', '🎧'];
 
 /** The big avatar on the agent page and in the New agent wizard; click it to change. */
-export function AvatarPicker({ agent, onChange, size = 56 }: {
-  agent: Pick<Agent, 'id' | 'name' | 'avatar'> & { description?: string; persona?: string };
+export function AvatarPicker({ agent, onChange, onAdjust, size = 56 }: {
+  agent: Pick<Agent, 'id' | 'name' | 'avatar'> & { description?: string; persona?: string; avatarFrame?: AvatarFrame };
   onChange: (avatar: string | undefined) => void;
+  /** Opens Adjust image (for image avatars). */
+  onAdjust?: () => void;
   size?: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -198,6 +215,7 @@ export function AvatarPicker({ agent, onChange, size = 56 }: {
                     <Sparkles size={13} /> Generate…
                   </button>
                 )}
+                {onAdjust && isImageAvatar(agent.avatar) && <button type="button" className="btn sm" onClick={() => { setOpen(false); onAdjust(); }}><Move size={13} /> Adjust…</button>}
                 {agent.avatar && <button type="button" className="btn ghost sm" title="Use initials" onClick={() => { onChange(undefined); setOpen(false); }}><X size={13} /></button>}
               </div>
               <div className="avatar-emojis">

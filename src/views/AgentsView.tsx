@@ -7,9 +7,9 @@ import {
 import { NEW_SKILL, refreshSkills, setSkillEnabled, useSkills } from '../agents/skills';
 import { host, type SkillInfo } from '../host';
 import { useContextMenu } from '../components/ContextMenu';
-import { AgentAvatar, AvatarPicker, colorFor, initials, isImageAvatar } from '../components/AgentAvatar';
+import { AgentAvatar, AvatarPicker, colorFor, DEFAULT_FRAME, frameStyle, initials, isImageAvatar, type AvatarFrame } from '../components/AgentAvatar';
 import {
-  BookOpen, Bot, Copy, FileText, FolderOpen, Globe, ImageIcon, MessageSquarePlus, Pencil, Plus, Sparkles, Terminal, Trash2, Upload, X,
+  BookOpen, Bot, Copy, FileText, FolderOpen, Globe, ImageIcon, MessageSquarePlus, Move, Pencil, Plus, Sparkles, Terminal, Trash2, Upload, X, ZoomIn, ZoomOut,
 } from '../components/icons';
 
 type Tab = 'agents' | 'skills';
@@ -120,6 +120,9 @@ const TOOL_ICONS: Record<ToolGroup, typeof Globe> = { skills: BookOpen, web: Glo
 
 /** The Agents page's overview: one trading card per agent. */
 function AgentCards({ agents, ollama, onOpen, onChat, onNew }: { agents: Agent[]; ollama: OllamaState; onOpen: (id: string) => void; onChat: (id: string) => void; onNew: () => void }) {
+  const [adjusting, setAdjusting] = useState<string | null>(null);
+  const adjusted = agents.find((a) => a.id === adjusting);
+  const sizeOf = (a: Agent) => ollama.models.find((m) => m.name === a.model)?.details.parameter_size;
   return (
     <div className="editor wide">
       <header className="page-head">
@@ -132,9 +135,10 @@ function AgentCards({ agents, ollama, onOpen, onChat, onNew }: { agents: Agent[]
       <div className="tcards">
         {agents.map((a, i) => (
           <div key={a.id} className="tcard-wrap">
-            <TradingCard agent={a} size={ollama.models.find((m) => m.name === a.model)?.details.parameter_size} number={`${i + 1}/${agents.length}`} onClick={() => onOpen(a.id)} />
+            <TradingCard agent={a} size={sizeOf(a)} number={`${i + 1}/${agents.length}`} onClick={() => onOpen(a.id)} />
             <div className="tcard-actions">
               <button className="btn sm" onClick={() => onOpen(a.id)}>Edit</button>
+              {isImageAvatar(a.avatar) && <button className="btn sm" title="Choose which part of the image shows" onClick={() => setAdjusting(a.id)}><Move size={13} /> Adjust image</button>}
               <button className="btn primary sm" disabled={!a.model} title={a.model ? '' : 'Choose a model first'} onClick={() => onChat(a.id)}><MessageSquarePlus size={13} /> Chat</button>
             </div>
           </div>
@@ -146,16 +150,76 @@ function AgentCards({ agents, ollama, onOpen, onChat, onNew }: { agents: Agent[]
           </button>
         </div>
       </div>
+      {adjusted && <AdjustImage agent={adjusted} size={sizeOf(adjusted)} number={`${agents.indexOf(adjusted) + 1}/${agents.length}`} onClose={() => setAdjusting(null)} />}
     </div>
   );
 }
 
-function TradingCard({ agent: a, size, number, onClick }: { agent: Agent; size?: string; number: string; onClick: () => void }) {
+const clampFrame = (f: AvatarFrame): AvatarFrame => ({
+  x: Math.round(Math.min(100, Math.max(0, f.x)) * 10) / 10,
+  y: Math.round(Math.min(100, Math.max(0, f.y)) * 10) / 10,
+  zoom: Math.round(Math.min(4, Math.max(1, f.zoom)) * 100) / 100,
+});
+
+/**
+ * Adjust image: drag the art on a preview of the agent's card to choose what shows, and zoom with the slider
+ * or the wheel. The round avatar uses the same framing.
+ */
+function AdjustImage({ agent, size, number, onClose }: { agent: Agent; size?: string; number: string; onClose: () => void }) {
+  const [frame, setFrame] = useState<AvatarFrame>(agent.avatarFrame ?? DEFAULT_FRAME);
+  const save = () => {
+    const same = frame.x === 50 && frame.y === 50 && frame.zoom === 1;
+    updateAgent(agent.id, { avatarFrame: same ? undefined : frame });
+    onClose();
+  };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [onClose]);
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal adjust-modal" role="dialog" aria-modal="true" aria-label={`Adjust ${agent.name}'s image`}>
+        <h3>Adjust image</h3>
+        <p className="muted small">Drag the picture to move it, and zoom with the slider or the scroll wheel.</p>
+        <div className="adjust-body">
+          <TradingCard agent={{ ...agent, avatarFrame: frame }} size={size} number={number} onClick={() => {}} adjust={{ frame, onFrame: (f) => setFrame(clampFrame(f)) }} />
+          <div className="adjust-side">
+            <span className="muted small">Avatar</span>
+            <AgentAvatar agent={{ ...agent, avatarFrame: frame }} size={72} />
+            <AgentAvatar agent={{ ...agent, avatarFrame: frame }} size={28} />
+          </div>
+        </div>
+        <div className="adjust-zoom">
+          <button className="icon-btn sm" title="Zoom out" onClick={() => setFrame((f) => clampFrame({ ...f, zoom: f.zoom - 0.25 }))}><ZoomOut size={15} /></button>
+          <input type="range" min={1} max={4} step={0.01} value={frame.zoom} aria-label="Zoom" onChange={(e) => setFrame((f) => clampFrame({ ...f, zoom: Number(e.target.value) }))} />
+          <button className="icon-btn sm" title="Zoom in" onClick={() => setFrame((f) => clampFrame({ ...f, zoom: f.zoom + 0.25 }))}><ZoomIn size={15} /></button>
+        </div>
+        <div className="modal-actions">
+          <button className="btn ghost" onClick={() => setFrame(DEFAULT_FRAME)}>Reset</button>
+          <span className="flex" />
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={save}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TradingCard({ agent: a, size, number, onClick, adjust }: {
+  agent: Agent;
+  size?: string;
+  number: string;
+  onClick: () => void;
+  /** In Adjust image: the art can be dragged and zoomed, and the card doesn't tilt. */
+  adjust?: { frame: AvatarFrame; onFrame: (f: AvatarFrame) => void };
+}) {
   const card = useRef<HTMLButtonElement>(null);
+  const drag = useRef<{ x: number; y: number; frame: AvatarFrame } | null>(null);
   // Tilts toward the pointer, with a light that follows it.
   const tilt = (e: React.MouseEvent) => {
     const el = card.current;
-    if (!el) return;
+    if (!el || adjust) return;
     const r = el.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width;
     const y = (e.clientY - r.top) / r.height;
@@ -175,8 +239,30 @@ function TradingCard({ agent: a, size, number, onClick }: { agent: Agent; size?:
           <b>{a.name}</b>
           {size && <span className="tcard-cost" title="Model size">{size}</span>}
         </div>
-        <div className="tcard-art">
-          {isImageAvatar(a.avatar) ? <img src={a.avatar} alt="" draggable={false} /> : <span className={a.avatar ? 'tcard-emoji' : 'tcard-initials'}>{a.avatar || initials(a.name)}</span>}
+        <div
+          className={`tcard-art ${adjust ? 'adjusting' : ''}`}
+          onPointerDown={adjust && ((e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            drag.current = { x: e.clientX, y: e.clientY, frame: adjust.frame };
+          })}
+          onPointerMove={adjust && ((e) => {
+            const d = drag.current;
+            if (!d) return;
+            // The image covers the art box; moving it by a pixel shifts the kept point by 1/overflow of the way.
+            const r = e.currentTarget.getBoundingClientRect();
+            const shown = Math.max(r.width, r.height) * d.frame.zoom;
+            const ox = shown - r.width;
+            const oy = shown - r.height;
+            adjust.onFrame({
+              ...d.frame,
+              x: ox > 0 ? d.frame.x - ((e.clientX - d.x) / ox) * 100 : d.frame.x,
+              y: oy > 0 ? d.frame.y - ((e.clientY - d.y) / oy) * 100 : d.frame.y,
+            });
+          })}
+          onPointerUp={adjust && (() => { drag.current = null; })}
+          onWheel={adjust && ((e) => adjust.onFrame({ ...adjust.frame, zoom: adjust.frame.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08) }))}
+        >
+          {isImageAvatar(a.avatar) ? <img src={a.avatar} alt="" draggable={false} style={frameStyle(a.avatarFrame)} /> : <span className={a.avatar ? 'tcard-emoji' : 'tcard-initials'}>{a.avatar || initials(a.name)}</span>}
         </div>
         <div className="tcard-type">
           <span>Agent{a.createdBy === 'orchestrator' ? ' · made by the orchestrator' : ''}</span>
@@ -230,12 +316,14 @@ function AgentEditor({ agent, ollama, skills, onChat, onBack }: { agent: Agent; 
   const noTools = !!agent.model && caps.length > 0 && !caps.includes('tools');
   const toggleTool = (t: ToolGroup, on: boolean) => set({ tools: on ? [...new Set([...agent.tools, t])] : agent.tools.filter((x) => x !== t) });
   const allSkills = agent.skills.length === 0;
+  const [adjusting, setAdjusting] = useState(false);
 
   return (
     <div className="editor">
+      {adjusting && <AdjustImage agent={agent} size={ollama.models.find((m) => m.name === agent.model)?.details.parameter_size} number="" onClose={() => setAdjusting(false)} />}
       <button className="link-btn back-link" onClick={onBack}>← All agents</button>
       <header className="page-head">
-        <AvatarPicker agent={agent} onChange={(avatar) => set({ avatar })} size={84} />
+        <AvatarPicker agent={agent} onChange={(avatar) => set({ avatar, avatarFrame: undefined })} onAdjust={() => setAdjusting(true)} size={84} />
         <div className="editor-title">
           <input className="title-input" value={agent.name} onChange={(e) => set({ name: e.target.value })} aria-label="Agent name" />
           <input className="subtitle-input" value={agent.description} placeholder="Purpose: what is this agent for? (the orchestrator reads this)" onChange={(e) => set({ description: e.target.value })} aria-label="Purpose" />

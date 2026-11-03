@@ -1,5 +1,6 @@
 // Agents: a name, a purpose, a short persona, a model, and the skills and tools it may use. Every agent
 // shares the model's full knowledge; the persona only shapes how it talks and works. Stored locally.
+import type { AvatarFrame } from '../components/AgentAvatar';
 import { useSyncExternalStore } from 'react';
 import { uid } from '../store';
 import type { ToolGroup } from './builtins';
@@ -15,6 +16,8 @@ export interface Agent {
   persona?: string;
   /** An emoji, or a small image as a data URL. Missing means initials. */
   avatar?: string;
+  /** Which part of an image avatar shows, and how close (set with Adjust image). */
+  avatarFrame?: AvatarFrame;
   model: string;
   /** Optional extra rules, on top of the purpose and persona. */
   instructions: string;

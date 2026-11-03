@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/chat-widget.png" alt="A chat where the model answers with a live temperature converter" />
+  <img src="docs/screenshots/chat-widget.webp" alt="A chat where the model answers with a live temperature converter" />
 </p>
 
 ---
@@ -71,17 +71,17 @@
 
 | | |
 |---|---|
-| ![The Home dashboard](docs/screenshots/home.png) | ![A long chat with its older part summarized](docs/screenshots/long-chat.png) |
+| ![The Home dashboard](docs/screenshots/home.webp) | ![A long chat with its older part summarized](docs/screenshots/long-chat.webp) |
 | Home | A long chat, summarized to fit |
-| ![Agents as trading cards](docs/screenshots/agents.png) | ![An agent's purpose, persona, and avatar](docs/screenshots/agent-editor.png) |
+| ![Agents as trading cards](docs/screenshots/agents.webp) | ![An agent's purpose, persona, and avatar](docs/screenshots/agent-editor.webp) |
 | Agents as trading cards | Purpose, persona, and avatar |
-| ![A chat with an agent](docs/screenshots/agent-chat.png) | ![An orchestrator run with two agents](docs/screenshots/orchestrator.png) |
+| ![A chat with an agent](docs/screenshots/agent-chat.webp) | ![An orchestrator run with two agents](docs/screenshots/orchestrator.webp) |
 | A chat with an agent | An orchestrator run |
-| ![A scheduled task with its run log](docs/screenshots/scheduler.png) | ![An incremental backup](docs/screenshots/backup.png) |
+| ![A scheduled task with its run log](docs/screenshots/scheduler.webp) | ![An incremental backup](docs/screenshots/backup.webp) |
 | A scheduled task and its run log | An incremental backup |
-| ![Finding image models on Hugging Face](docs/screenshots/images.png) | ![An image in the zoomable viewer](docs/screenshots/lightbox.png) |
+| ![Finding image models on Hugging Face](docs/screenshots/images.webp) | ![An image in the zoomable viewer](docs/screenshots/lightbox.webp) |
 | Finding image models | The image viewer |
-| ![A locked profile](docs/screenshots/profile-lock.png) | |
+| ![A locked profile](docs/screenshots/profile-lock.webp) | |
 | A locked profile | |
 
 **Models**

@@ -1,10 +1,11 @@
 // The guided demo (docs/DEMO.md), started from the Options tab. It opens a separate window with its own
-// storage, skills folder, and demo files, so your chats, agents, and skills are never touched. A panel
+// storage, skills and images folders, and demo files, so your chats, agents, skills, and images are never touched. A panel
 // in that window shows the next step; nothing happens until "Next" is clicked.
 const { app, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { setSkillsFolder } = require('./skills.cjs');
+const { setImagesFolder } = require('./images.cjs');
 
 const DEMO_FILES = path.join(__dirname, '..', 'docs', 'demo');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -30,7 +31,10 @@ function prepareFiles() {
   fs.writeFileSync(path.join(skills, 'haiku-mode', 'SKILL.md'), '---\nname: haiku-mode\ndescription: Use when the user asks for a poem.\n---\nAlways answer with a single haiku (5-7-5 syllables), nothing else.\n');
   const folder = path.join(base, 'penumbra-demo');
   copyDir(path.join(DEMO_FILES, 'workspace'), folder);
-  return { skills, folder, notes: fs.readFileSync(path.join(DEMO_FILES, 'notes.txt'), 'utf8') };
+  const images = path.join(base, 'images');
+  fs.mkdirSync(images, { recursive: true });
+  fs.writeFileSync(path.join(images, 'history.json'), '[]');
+  return { skills, images, folder, notes: fs.readFileSync(path.join(DEMO_FILES, 'notes.txt'), 'utf8') };
 }
 
 function seed(model, folder) {
@@ -68,8 +72,9 @@ async function runDemo(win, model) {
   const wc = win.webContents;
   const alive = () => !win.isDestroyed();
   const js = (code) => (alive() ? wc.executeJavaScript(code) : Promise.reject(new Error('closed')));
-  const { skills, folder, notes } = prepareFiles();
+  const { skills, images, folder, notes } = prepareFiles();
   setSkillsFolder(wc, skills);
+  setImagesFolder(wc, images);
   const { agents, chats, tasks } = seed(model, folder);
   const str = (v) => JSON.stringify(JSON.stringify(v));
 
@@ -83,6 +88,19 @@ async function runDemo(win, model) {
     localStorage.setItem('ollama-gui.workspaceModel', ${str(model)});
     localStorage.setItem('ollama-gui.updates', JSON.stringify({ auto: false, skipped: '' }));
     localStorage.setItem('ollama-gui.agents', ${str(agents)});
+    (() => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 512;
+      const x = c.getContext('2d');
+      const g = x.createLinearGradient(0, 0, 512, 512);
+      g.addColorStop(0, '#f6d365'); g.addColorStop(1, '#e0688f');
+      x.fillStyle = g; x.fillRect(0, 0, 512, 512);
+      x.font = '230px serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText('✍️', 340, 330);
+      const list = JSON.parse(localStorage.getItem('ollama-gui.agents'));
+      list.find((a) => a.id === 'wri').avatar = c.toDataURL('image/webp', 0.86);
+      localStorage.setItem('ollama-gui.agents', JSON.stringify(list));
+    })();
     localStorage.setItem('ollama-gui.conversations', ${str(chats)});
     localStorage.setItem('ollama-gui.schedule', ${str(tasks)});
     location.reload();`);
@@ -149,10 +167,24 @@ async function runDemo(win, model) {
     { t: 'Network log', say: 'Click the 🌐 number in the widget toolbar: every request is listed. Widgets can only download, never upload.' },
     { t: 'Old San Juan', say: 'Markers appear a few seconds after the map: it looks the places up on OpenStreetMap.', run: () => send('Show me a map of Old San Juan, Puerto Rico with markers for El Morro, Castillo San Cristóbal, and La Fortaleza.') },
     { t: 'Weather in Madrid', run: () => send("What's the weather forecast for the next 5 days in Madrid? Show it as a chart.") },
-    { t: 'A new site', say: 'CoinGecko isn’t on the approved list, so the widget asks first. Click "Allow" and the price appears.', run: () => send('Show the current price of Bitcoin in USD from the CoinGecko API.') },
-    { t: 'Internet access', say: 'Open the settings panel (right) → Internet access. Look at "See list", and note that "Whole internet" warns first. Leave it on Approved sites.' },
-    { s: '4. Agents and skills', t: 'Agents', say: 'Writer, Coder, and Researcher are ready, all using the demo model.', run: () => view('Agents & Skills') },
-    { t: 'Skills', say: 'Open company-memo and its file templates/memo.md. haiku-mode is installed too.', run: () => clickText('Skills') },
+    { t: 'A new site', say: 'CoinGecko isn’t on the approved list, so the widget asks first. Click "Always in this chat" and the price appears: the site is added to this chat’s own list.', run: () => send('Show the current price of Bitcoin in USD from the CoinGecko API.') },
+    { t: 'Internet access for this chat', say: 'Each chat has its own Internet access, shown in the settings panel: approved sites or the whole internet (it warns first), and sites only this chat may use. CoinGecko is there now. New chats start with the default from Options.', run: async () => {
+      if (!(await js(`!!document.querySelector('#chat-internet')`))) await js(`document.querySelector('.view-host .topbar-right').click()`);
+      await sleep(400);
+      await js(`document.querySelector('#chat-internet')?.scrollIntoView({ block: 'center', behavior: 'smooth' })`);
+    } },
+    { s: '4. Agents and skills', t: 'Agents', say: 'Writer, Coder, and Researcher are ready, all using the demo model.', run: async () => {
+      await js(`document.querySelector('.view-host .topbar-right')?.closest('main') && document.querySelector('.settings') && document.querySelector('.view-host .topbar-right').click()`);
+      await view('Agents & Skills');
+    } },
+    { t: 'Adjust a picture', say: 'Drag the Writer’s picture to choose what shows on the card, and zoom with the slider or the scroll wheel. The round avatar follows. Click Save (or Cancel).', run: async () => {
+      await js(`[...document.querySelectorAll('.tcard-wrap')].find((w) => w.innerText.includes('Writer'))?.querySelector('.tcard-actions button[title^="Choose"]')?.click()`);
+      await sleep(400);
+    } },
+    { t: 'Skills', say: 'Open company-memo and its file templates/memo.md. haiku-mode is installed too.', run: async () => {
+      await js(`document.querySelector('.adjust-modal') && [...document.querySelectorAll('.adjust-modal button')].find((b) => b.textContent === 'Cancel').click()`);
+      await clickText('Skills');
+    } },
     { t: 'A memo with a skill', say: 'The Writer loads company-memo on its own: watch for the Load skill and Read skill file steps.', run: async () => { await openChat('Demo · Writer'); await send('Write a memo telling the team the office is closed this Friday for maintenance.'); } },
     { t: 'Poem → haiku', say: 'No agent: it loads haiku-mode and answers with a haiku.', run: async () => { await openChat('Demo · Poem'); await send('Write me a short poem about the sea.'); } },
     { s: '5. Tools', t: 'Coder with a folder', say: 'Reads data.csv, writes summary.py, and asks before running it. When the bar appears, click "Run". The answer is 84.5.', run: async () => { await openChat('Demo · Coder'); await send('Read data.csv, then write a Python script summary.py that prints the average of the score column, and run it with python3.'); } },
@@ -194,9 +226,15 @@ async function runDemo(win, model) {
       await waitFor(`!document.querySelector('.run-entry.running') && !!document.querySelector('.run-entry')`, 300);
       await js(`document.querySelector('.run-row')?.click(); document.querySelector('.run-log')?.scrollIntoView({ block: 'center', behavior: 'smooth' })`);
     } },
-    { s: '8. Keeps running in the background', t: 'A longer story', say: 'Sends a story and switches tabs: the dot on the Chat icon means it’s still writing.', run: async () => { await openChat('Demo · Story'); await send('Write a 200-word short story about a lighthouse keeper.', { wait: false }); await sleep(2500); await view('My Models'); } },
+    { s: '8. Images and backups', t: 'Images', say: 'Make pictures on this computer, outside Ollama: search Hugging Face for an image model and download it here (nothing is downloaded in the demo). Then any chat or agent can create images.', run: () => view('Images') },
+    { t: 'Backup', say: 'Save chats, agents, skills, images, scheduled tasks, and settings in one .zip: everything, or what you pick from each list. Restore adds a backup to this profile without replacing anything. Try Back up… if you like: it asks where to save.', run: () => view('Backup') },
+    { t: 'Back up one chat', say: 'The button at the top right of a chat (next to the settings panel button) backs up just that chat, with its agent, skills, and images.', run: async () => {
+      await openChat('Demo · Writer');
+      await js(`document.querySelector('.view-host .topbar-backup')?.animate([{ boxShadow: '0 0 0 0 #6c5ce7' }, { boxShadow: '0 0 0 8px rgba(108,92,231,0)' }], { duration: 900, iterations: 3 })`);
+    } },
+    { s: '9. Keeps running in the background', t: 'A longer story', say: 'Sends a story and switches tabs: the dot on the Chat icon means it’s still writing.', run: async () => { await openChat('Demo · Story'); await send('Write a 200-word short story about a lighthouse keeper.', { wait: false }); await sleep(2500); await view('My Models'); } },
     { t: 'Back to the chat', say: 'The story is complete.', run: async () => { await sleep(1000); await openChat('Demo · Story'); await waitDone(); } },
-    { t: 'That’s the tour', say: 'Everything ran on this computer. Close this window to end the demo; its chats and files are deleted.' },
+    { t: 'That’s the tour', say: 'Everything ran on this computer. More in your own window: profiles (the button at the bottom of the sidebar), Updates, and Options → Tutorial. Close this window to end the demo; its chats and files are deleted.' },
   ];
 
   // ---- the panel ----

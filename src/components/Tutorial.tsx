@@ -59,6 +59,7 @@ const STEPS: Step[] = [
   { title: 'Pick a model', body: 'Choose which Ollama model answers (⌘/Ctrl+L). It loads into memory when you pick it. Badges show what each model can do, like vision, tools, or reasoning.', target: '.picker-btn', view: 'chat' },
   { title: 'Interactive answers', body: 'With this on, the model can reply with small live apps: calculators, charts, maps, diagrams. Turn it off for plain text, per chat.', target: '.ia-switch', view: 'chat' },
   { title: 'Ask anything', body: 'Type here and press Enter. Attach images for vision models, or text files like notes and CSVs. Ask for a picture and the model can create one with your image model.', target: '.composer', view: 'chat' },
+  { title: 'Back up this chat', body: 'Saves this chat in a backup file, with its agent, that agent’s skills, and its images. The Backup tab restores it, here or on another computer.', target: '.view-host .topbar-backup', view: 'chat' },
   { title: 'Chat settings', body: 'This button opens the panel with the system prompt, the tools a chat may use (web, files, terminal, images), a folder for file tools, this chat’s internet access, and sampling settings.', target: '.view-host .topbar-right', view: 'chat' },
 
   // Orchestrator
@@ -70,7 +71,7 @@ const STEPS: Step[] = [
   { title: 'While tasks are on', body: 'Penumbra can stay in the menu bar when you close the window, so tasks run on time, and notify you when one finishes or needs your OK.', target: '.content-inner > main .panel:last-child', view: 'scheduler' },
 
   // Agents & Skills
-  { title: 'Your agents', body: 'Each agent is a card: avatar, purpose, persona, model, and the tools it may use. Edit opens its page; Chat starts a conversation with it.', target: '.tcards, .agents-empty', view: 'agents' },
+  { title: 'Your agents', body: 'Each agent is a card: avatar, purpose, persona, model, and the tools it may use. Edit opens its page; Chat starts a conversation with it. For a picture, Adjust image lets you drag and zoom to choose what shows on the card.', target: '.tcards, .agents-empty', view: 'agents' },
   { title: 'New agent', body: 'A short wizard: a purpose, a name, a persona (personality and style), an avatar, and a model. Templates like Researcher or Coder are a quick start.', target: '.list-new', view: 'agents' },
   { title: 'Skills', body: 'Skills are packaged instructions (the SKILL.md format). Create them here or import folders and .zip files; the model loads one only when a task needs it.', target: '.content-inner > aside .sidebar-head .seg button:last-child', view: 'agents' },
 
@@ -93,6 +94,7 @@ const STEPS: Step[] = [
   // Options
   { title: 'Server', body: 'Where Penumbra finds Ollama. Change it to use Ollama on another computer.', target: '#server', view: 'developer' },
   { title: 'Internet access', body: 'Whether new chats use approved sites or the whole internet (with a warning first), and your own sites, which every chat checks before its own list. Each chat can change its access in its settings panel.', target: '#internet-access', view: 'developer' },
+  { title: 'Updates', body: 'Penumbra checks GitHub for new versions. When one is out, an arrow appears at the bottom of the sidebar and opens the Updates tab, with what’s new and the download.', target: '#updates', view: 'developer' },
   { title: 'Guided demo', body: 'A longer, step-by-step tour with real examples, in its own window with sample data, so your chats aren’t touched.', target: '#demo', view: 'developer' },
   { title: 'This tutorial', body: 'Open it again any time from here, and choose whether it shows when Penumbra starts.', target: '#tutorial', view: 'developer' },
   { title: "You're all set", body: 'Start a chat, or open Options → Guided demo for a step-by-step tour with real examples. Have fun!', view: 'chat' },

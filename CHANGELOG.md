@@ -8,6 +8,9 @@
 - **Back up one chat.** A button at the top of each chat (and **Back up this chat…** in a chat's right-click menu) saves that chat in a backup file with what it needs: its agent, the agent's skills, and the images it shows. Restore it from the Backup tab.
 - **Internet access per chat.** Each chat's settings panel has its own Internet access: **Approved sites, ask for others** or **Whole internet** (with a warning first), and sites only that chat may use. New chats start with the default from **Options**, and every chat checks the sites in Options first, then its own. A widget asking for a site offers **Always in this chat** next to **Always in all chats**.
 
+### Changed
+- **Tutorial and guided demo.** The tutorial shows backing up a chat, adjusting an agent's picture, and Updates. The guided demo shows a chat's own internet access, adjusting the Writer's picture, the Images and Backup tabs, and backing up one chat; it now also keeps its own images folder, so it never sees yours.
+
 ## 0.3.1 (2026-11-02)
 
 ### Changed

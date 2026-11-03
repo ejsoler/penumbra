@@ -260,10 +260,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     const caps = ollama.capabilities[model] ?? [];
     const toolsOk = caps.includes('tools');
     const system = planningPrompt({ agents: agentsRef.current, models, folder: conv.folder, toolsSupported: toolsOk });
-    const messages: api.ChatMessage[] = [
-      { role: 'system', content: system },
-      ...chatMessages(run.fresh ? history.slice(-1) : history, run.fresh ? undefined : conv.summary),
-    ];
+    const messages: api.ChatMessage[] = chatMessages(run.fresh ? history.slice(-1) : history, run.fresh ? undefined : conv.summary, system);
     try {
       let raw: Record<string, unknown> | null = null;
       let said = '';
@@ -439,10 +436,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     const sendable = run.fresh ? history.slice(-1) : history;
     let summary = run.fresh ? undefined : conv.summary;
     // Continuing: the cut-off reply is the last message, and Ollama picks it up from where it stopped.
-    const build = (): api.ChatMessage[] => [
-      ...(system ? [{ role: 'system' as const, content: system }] : []),
-      ...chatMessages(sendable, summary),
-    ];
+    const build = (): api.ChatMessage[] => chatMessages(sendable, summary, system);
 
     const patch = (fn: (m: UiMessage) => UiMessage) => patchMessage(conv.id, assistant.id, fn);
     try {
@@ -533,7 +527,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   /** Summarizes the older part of the chat now (the Compact button). */
   const [compacting, setCompacting] = useState<{ id: string; error?: string } | null>(null);
   const compactNow = async (c: Conversation) => {
-    if (streamingId || compacting) return;
+    if (streamingId || (compacting && !compacting.error)) return;
     setCompacting({ id: c.id });
     try {
       const s = await compactChat(c, { model: activeModel, numCtx, think: caps.includes('thinking') ? false : undefined, minimal: true });
@@ -752,7 +746,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         {!isStreaming && contextTokens / numCtx >= CONTEXT_WARN && (
           <div className="ctx-chip">
             <span>Context {Math.min(100, Math.round((contextTokens / numCtx) * 100))}% full. Older messages are summarized automatically when needed.</span>
-            <button className="link-btn small" disabled={!!compacting} onClick={() => compactNow(current)}>{compacting?.id === current.id && !compacting.error ? 'Summarizing…' : 'Compact now'}</button>
+            <button className="link-btn small" disabled={!!compacting && !compacting.error} onClick={() => compactNow(current)}>{compacting?.id === current.id && !compacting.error ? 'Summarizing…' : 'Compact now'}</button>
             {!showSettings && <button className="link-btn small" onClick={() => setShowSettings(true)}>Settings</button>}
           </div>
         )}
@@ -793,7 +787,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
               numCtx={numCtx}
               maxCtx={maxCtx}
               summary={current.summary}
-              busy={isStreaming || !!compacting}
+              busy={isStreaming || (!!compacting && !compacting.error)}
               compacting={compacting?.id === current.id ? compacting : null}
               onCompact={() => compactNow(current)}
               onRaise={(n) => setParams({ ...params, num_ctx: n })}

@@ -63,13 +63,14 @@ function summaryEnd(history: UiMessage[], summary?: ChatSummary) {
 }
 
 /** The chat as the model receives it: the summary (if any), then the rest, older messages shortened. */
-export function chatMessages(history: UiMessage[], summary?: ChatSummary): api.ChatMessage[] {
+export function chatMessages(history: UiMessage[], summary?: ChatSummary, system?: string): api.ChatMessage[] {
   const start = summaryEnd(history, summary);
   const rest = history.slice(start).filter((m) => !m.error || m.content);
   const out = rest.map((m, i) => toApi(m, i < rest.length - RECENT));
-  if (start && summary) {
-    out.unshift({ role: 'system', content: `Summary of the earlier part of this conversation (those messages are no longer shown to you):\n\n${summary.text}` });
-  }
+  // One system message only: chat templates such as Qwen's reject a second one.
+  const note = start && summary ? `Summary of the earlier part of this conversation (those messages are no longer shown to you):\n\n${summary.text}` : '';
+  const content = [system, note].filter(Boolean).join('\n\n');
+  if (content) out.unshift({ role: 'system', content });
   return out;
 }
 

@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.5.1 (2026-11-03)
 
 ### Changed
+- **Screenshots.** All the README screenshots are new, with today's interface, and there are new ones of Home, a summarized long chat, and an incremental backup.
 - **Compact now** summarizes everything but the last few messages, so it makes room even in a chat that isn't long yet (before, it could say there was nothing to summarize).
 - **Guided demo.** It starts on Home, and a new "Long chats" section compacts a chat and shows a reply cut off at Max Tokens and then continued. The Backup and Scheduler steps mention incremental and scheduled backups. The tutorial mentions the context meter and Compact now.
 

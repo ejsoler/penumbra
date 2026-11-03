@@ -71,10 +71,14 @@
 
 | | |
 |---|---|
+| ![The Home dashboard](docs/screenshots/home.png) | ![A long chat with its older part summarized](docs/screenshots/long-chat.png) |
+| Home | A long chat, summarized to fit |
 | ![Agents as trading cards](docs/screenshots/agents.png) | ![An agent's purpose, persona, and avatar](docs/screenshots/agent-editor.png) |
 | Agents as trading cards | Purpose, persona, and avatar |
-| ![An orchestrator run with two agents](docs/screenshots/orchestrator.png) | ![A scheduled task with its run log](docs/screenshots/scheduler.png) |
-| An orchestrator run | A scheduled task and its run log |
+| ![A chat with an agent](docs/screenshots/agent-chat.png) | ![An orchestrator run with two agents](docs/screenshots/orchestrator.png) |
+| A chat with an agent | An orchestrator run |
+| ![A scheduled task with its run log](docs/screenshots/scheduler.png) | ![An incremental backup](docs/screenshots/backup.png) |
+| A scheduled task and its run log | An incremental backup |
 | ![Finding image models on Hugging Face](docs/screenshots/images.png) | ![An image in the zoomable viewer](docs/screenshots/lightbox.png) |
 | Finding image models | The image viewer |
 | ![A locked profile](docs/screenshots/profile-lock.png) | |

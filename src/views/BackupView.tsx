@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAgents } from '../agents/agents';
 import { AgentAvatar } from '../components/AgentAvatar';
 import { Archive, ArchiveRestore, Check, ChevronDown, ChevronRight, DatabaseBackup, FolderOpen, Loader2, Search } from '../components/icons';
-import { backupContents, chatImages, makeBackup, restoreBackup, savedTasks, SETTING_GROUPS, type BackupChoice, type RestoreReport } from '../backup';
+import { backupChoiceFor, backupContents, chatImages, lastBackup, makeBackup, restoreBackup, savedTasks, SETTING_GROUPS, type BackupChoice, type BackupKind, type RestoreReport } from '../backup';
 import { host, type BackupImage, type BackupSkill, type OpenedBackup } from '../host';
 import { imageUrl } from '../images';
 import { getConversations } from '../session';
@@ -106,20 +106,23 @@ function BackUp() {
   const [files, setFiles] = useState<{ skills: BackupSkill[]; images: BackupImage[] } | null>(null);
   const [choice, setChoice] = useState<BackupChoice>(EMPTY);
   const [state, setState] = useState<'idle' | 'saving' | { file: string; size: number } | { error: string }>('idle');
+  const [kind, setKind] = useState<BackupKind>('full');
+  // For an incremental backup: what changed since it was last backed up (the lists show only those).
+  const [changed, setChanged] = useState<BackupChoice | null>(null);
 
   useEffect(() => {
-    host()!.backup.summary().then((f) => {
-      setFiles(f);
-      setChoice({
-        chats: chats.map((c) => c.id),
-        agents: agents.map((a) => a.id),
-        tasks: tasks.map((t) => t.id),
-        skills: f.skills.map((s) => s.id),
-        images: f.images.map((i) => i.file),
-        settings: SETTING_GROUPS.map((g) => g.id),
-      });
+    host()!.backup.summary().then(setFiles).catch((e) => setState({ error: clean(e) }));
+  }, []);
+  // Pick everything (full) or only what changed (incremental), whenever the kind changes or a backup is saved.
+  const saved = typeof state === 'object' && 'file' in state ? state.file : '';
+  useEffect(() => {
+    if (!files) return;
+    backupChoiceFor(kind).then(({ choice: c }) => {
+      setChoice(c);
+      setChanged(kind === 'incremental' ? c : null);
     }).catch((e) => setState({ error: clean(e) }));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [files, kind, saved]);
+  const only = <T extends { id: string }>(list: T[], k: keyof BackupChoice) => (changed ? list.filter((x) => changed[k].includes(x.id)) : list);
 
   const set = (k: keyof BackupChoice) => (ids: string[]) => setChoice((c) => ({ ...c, [k]: ids }));
   const imageBytes = (files?.images ?? []).filter((i) => choice.images.includes(i.file)).reduce((n, i) => n + i.size, 0);
@@ -129,7 +132,7 @@ function BackUp() {
   const save = async () => {
     setState('saving');
     try {
-      const r = await makeBackup(choice);
+      const r = await makeBackup(choice, { kind });
       setState(r ?? 'idle');
     } catch (e) {
       setState({ error: clean(e) });
@@ -140,24 +143,34 @@ function BackUp() {
   return (
     <section className="panel backup-panel">
       <h4><Archive size={14} /> Back up</h4>
-      <p className="muted small">Everything is chosen. Uncheck what you don't need, or open a list to pick items.</p>
+      <div className="seg seg-wide backup-kind">
+        <button className={kind === 'full' ? 'on' : ''} onClick={() => setKind('full')}>Full</button>
+        <button className={kind === 'incremental' ? 'on' : ''} onClick={() => setKind('incremental')}>Incremental</button>
+      </div>
+      <p className="muted small">
+        {kind === 'full'
+          ? 'Everything is chosen. Uncheck what you don’t need, or open a list to pick items.'
+          : lastBackup()
+            ? `Only what’s new or changed since it was last backed up (your last backup was ${new Date(lastBackup()).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}). Restore a full backup first, then the incremental ones in order.`
+            : 'Nothing has been backed up from this profile yet, so this includes everything.'}
+      </p>
       <Category
         title="Chats"
-        items={chats.map((c) => ({ id: c.id, label: c.title || 'Untitled chat', sub: `${c.messages.length} messages · ${date(c.updatedAt)}` }))}
+        items={only(chats, 'chats').map((c) => ({ id: c.id, label: c.title || 'Untitled chat', sub: `${c.messages.length} messages · ${date(c.updatedAt)}` }))}
         selected={choice.chats}
         setSelected={set('chats')}
         note="with their attachments and widgets"
       />
       <Category
         title="Agents"
-        items={agents.map((a) => ({ id: a.id, label: a.name, sub: a.description, icon: <AgentAvatar agent={a} size={22} /> }))}
+        items={only(agents, 'agents').map((a) => ({ id: a.id, label: a.name, sub: a.description, icon: <AgentAvatar agent={a} size={22} /> }))}
         selected={choice.agents}
         setSelected={set('agents')}
       />
-      <Category title="Skills" items={skillItems(files.skills)} selected={choice.skills} setSelected={set('skills')} />
+      <Category title="Skills" items={skillItems(only(files.skills, 'skills'))} selected={choice.skills} setSelected={set('skills')} />
       <Category
         title="Images"
-        items={imageItems(files.images, 'file', true)}
+        items={imageItems(changed ? files.images.filter((i) => changed.images.includes(i.file)) : files.images, 'file', true)}
         selected={choice.images}
         setSelected={set('images')}
         note={choice.images.length ? mb(imageBytes) : undefined}
@@ -167,19 +180,20 @@ function BackUp() {
       />
       <Category
         title="Scheduled tasks"
-        items={tasks.map((t) => ({ id: t.id, label: t.name, sub: t.kind === 'command' ? t.command : t.prompt }))}
+        items={only(tasks, 'tasks').map((t) => ({ id: t.id, label: t.name, sub: t.kind === 'command' ? t.command : t.kind === 'backup' ? `${t.backup ?? 'full'} backup` : t.prompt }))}
         selected={choice.tasks}
         setSelected={set('tasks')}
         note="with their run logs"
       />
-      <Category title="Settings" items={settingItems(SETTING_GROUPS)} selected={choice.settings} setSelected={set('settings')} />
+      <Category title="Settings" items={settingItems(SETTING_GROUPS.filter((g) => (changed ? changed.settings.includes(g.id) : g.keys.some((k) => localStorage.getItem(k) !== null))))} selected={choice.settings} setSelected={set('settings')} />
+      {kind === 'incremental' && nothing && <p className="small backup-uptodate"><Check size={13} /> Nothing changed since the last backup.</p>}
 
       <p className="muted small">
-        Not included: downloaded models (get them again in Discover and Images) and profile passwords. The backup isn't encrypted, so keep it somewhere safe.
+        Not included: downloaded models (get them again in Discover and Images) and profile passwords. The backup isn't encrypted, so keep it somewhere safe. To back up on a schedule, add a Backup task in the Scheduler.
       </p>
       <div className="row gap backup-actions">
         <button className="btn primary" disabled={nothing || state === 'saving'} onClick={save}>
-          {state === 'saving' ? <Loader2 size={14} className="spin" /> : <Archive size={14} />} Back up…
+          {state === 'saving' ? <Loader2 size={14} className="spin" /> : <Archive size={14} />} {kind === 'incremental' ? 'Back up changes…' : 'Back up…'}
         </button>
         {typeof state === 'object' && 'file' in state && (
           <span className="backup-done small">
@@ -197,6 +211,7 @@ function Restore() {
   const [backup, setBackup] = useState<OpenedBackup | null>(null);
   const [choice, setChoice] = useState<BackupChoice>(EMPTY);
   const [state, setState] = useState<'idle' | 'opening' | 'confirm' | 'restoring' | { error: string }>('idle');
+  const [replace, setReplace] = useState(false);
   const [report] = useState<RestoreReport | null>(() => {
     try {
       const r = sessionStorage.getItem(REPORT_KEY);
@@ -215,6 +230,8 @@ function Restore() {
       if (b) {
         const c = backupContents(b);
         setBackup(b);
+        // Incremental backups are restored in order on top of a full one, so their newer versions replace.
+        setReplace(b.kind === 'incremental');
         // Settings replace the current ones, so they start unchecked.
         setChoice({ chats: c.chats.map((x) => x.id), agents: c.agents.map((x) => x.id), tasks: c.tasks.map((x) => x.id), skills: b.skills.map((s) => s.id), images: b.images.map((i) => String(i.name)), settings: [] });
       }
@@ -227,7 +244,7 @@ function Restore() {
     if (!backup) return;
     setState('restoring');
     try {
-      const r = await restoreBackup(backup, choice);
+      const r = await restoreBackup(backup, choice, replace);
       try {
         sessionStorage.setItem(REPORT_KEY, JSON.stringify(r));
       } catch {
@@ -240,7 +257,7 @@ function Restore() {
   };
   const set = (k: keyof BackupChoice) => (ids: string[]) => setChoice((c) => ({ ...c, [k]: ids }));
   const nothing = Object.values(choice).every((v) => !v.length);
-  const added = report ? Object.entries(report.added).filter(([, n]) => n).map(([k, n]) => `${n} ${n === 1 ? k.replace(/s$/, '') : k}`) : [];
+  const added = report ? [...Object.entries(report.added).filter(([, n]) => n).map(([k, n]) => `${n} ${n === 1 ? k.replace(/s$/, '') : k}`), ...(report.replaced ? [`${report.replaced} replaced`] : [])] : [];
 
   return (
     <section className="panel backup-panel">
@@ -253,7 +270,7 @@ function Restore() {
         </div>
       )}
       <p className="muted small">
-        Adds what you choose from a backup to this profile. Nothing here is replaced: items already here are skipped, and changed ones are added as copies. Restored scheduled tasks start paused.
+        Adds what you choose from a backup to this profile. Items already here are skipped; ones that differ are added as copies, or replaced if you choose. Restored scheduled tasks start paused. For incremental backups, restore the full backup first, then each incremental one in order.
       </p>
       <div className="row gap">
         <button className="btn" disabled={state === 'opening' || state === 'restoring'} onClick={open}>
@@ -265,7 +282,7 @@ function Restore() {
       {backup && contents && (
         <>
           <p className="small backup-source">
-            <b>{backup.file.split(/[\\/]/).pop()}</b> <span className="muted">· made {date(backup.createdAt)} with Penumbra {backup.app}</span>
+            <b>{backup.file.split(/[\\/]/).pop()}</b> <span className="muted">· {backup.kind === 'incremental' ? 'incremental backup' : 'full backup'} made {date(backup.createdAt)} with Penumbra {backup.app}</span>
           </p>
           <Category title="Chats" items={contents.chats.map((c) => ({ id: c.id, label: c.title || 'Untitled chat', sub: `${c.messages.length} messages · ${date(c.updatedAt)}` }))} selected={choice.chats} setSelected={set('chats')} />
           <Category title="Agents" items={contents.agents.map((a) => ({ id: a.id, label: a.name, sub: a.description, icon: <AgentAvatar agent={a} size={22} /> }))} selected={choice.agents} setSelected={set('agents')} />
@@ -274,6 +291,13 @@ function Restore() {
           <Category title="Scheduled tasks" items={contents.tasks.map((t) => ({ id: t.id, label: t.name, sub: t.kind === 'command' ? t.command : t.prompt }))} selected={choice.tasks} setSelected={set('tasks')} />
           <Category title="Settings" items={settingItems(contents.settingGroups)} selected={choice.settings} setSelected={set('settings')} note="replace your current ones" />
 
+          <div className="field slim backup-replace">
+            <span>Items already here that differ</span>
+            <select className="wide-select" value={replace ? 'replace' : 'copy'} onChange={(e) => setReplace(e.target.value === 'replace')}>
+              <option value="copy">Keep both (add the backup’s as a copy)</option>
+              <option value="replace">Use the backup’s version</option>
+            </select>
+          </div>
           {state === 'confirm' || state === 'restoring' ? (
             <div className="backup-confirm">
               <span className="small flex">Restore the chosen items into this profile? Penumbra reloads when it's done.</span>

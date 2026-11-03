@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **Incremental and scheduled backups.** The Backup tab can make a **Full** backup or an **Incremental** one, with only what's new or changed since it was last backed up (Penumbra remembers a fingerprint of everything it saves). The Scheduler has a new **Backup** task that saves a full or incremental backup in a folder you choose, named with the date and time, without asking; an incremental run with nothing new saves no file, and the run log says what was saved. When restoring, **Use the backup's version** replaces items that are already here, so a full backup and then its incremental ones can be restored in order (it's chosen automatically for incremental backups).
 - **Home.** Penumbra now opens on a Home dashboard: ask something to start a chat right away, and see every tab at a glance (recent chats, agents to chat with, upcoming scheduled tasks, orchestrator runs, loaded models and downloads, recent images, your last backup, and whether an update is out), each with a link to jump in. The tutorial starts with it.
 - **Long chats keep going.** Chats no longer lose their beginning when they outgrow the model's context:
   - Older messages are sent in a shorter form: widget code, attached files, and images in earlier messages are replaced by short notes (the chat on screen doesn't change; the last few messages always go whole).

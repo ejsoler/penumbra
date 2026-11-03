@@ -60,8 +60,14 @@ export default function App() {
 }
 
 function Main() {
-  // Penumbra always opens on Home.
-  const [view, setView] = useState<View>('home');
+  // Penumbra always opens on Home, except right after a restore, which reloads to show what came back.
+  const [view, setView] = useState<View>(() => {
+    try {
+      return sessionStorage.getItem('ollama-gui.restoreReport') ? 'backup' : 'home';
+    } catch {
+      return 'home';
+    }
+  });
   const ollama = useOllama();
   const dl = useDownloads(ollama.refresh);
   const [showBanner, setShowBanner] = useState(true);

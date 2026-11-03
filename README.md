@@ -64,6 +64,7 @@
 **Backup** *(new in 0.4.0)*
 - A **Backup** tab saves chats, agents, skills, images, scheduled tasks, and settings in one `.zip`: everything, or the items you pick
 - Back up a single chat (with its agent, skills, and images) from the button at the top of the chat
+- Full or incremental backups (only what changed since the last one), and scheduled backups with a **Backup** task in the Scheduler
 - Restore adds what you choose from a backup to the current profile without replacing anything: items already there are skipped, changed ones come back as copies, and restored scheduled tasks start paused
 
 **Screenshots**

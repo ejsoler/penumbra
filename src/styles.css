@@ -950,3 +950,9 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .home-links { display: flex; gap: 6px; margin-top: auto; padding-top: 6px; }
 .home-links .btn { display: inline-flex; align-items: center; gap: 5px; }
 @media (max-width: 760px) { .home-grid { grid-template-columns: 1fr; } }
+.backup-kind { margin: 2px 0 10px; max-width: 280px; }
+.backup-uptodate { display: flex; align-items: center; gap: 6px; color: var(--green); margin: 8px 0 0; }
+.backup-replace { margin: 12px 0 0; align-items: center; gap: 10px; }
+.backup-replace .wide-select { margin: 0; max-width: 340px; }
+.field.column > .seg { align-self: flex-start; }
+.panel .field.column + .field.column, .panel .hint + .field.column { margin-top: 10px; }

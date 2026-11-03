@@ -13,6 +13,7 @@ const KINDS: { id: TaskKind; label: string; hint: string }[] = [
   { id: 'prompt', label: 'Prompt', hint: 'A model or agent answers a prompt. With an agent, it can use the agent’s tools and skills.' },
   { id: 'orchestrator', label: 'Orchestrator', hint: 'The orchestrator plans the goal and runs the plan right away, since nobody is there to review it.' },
   { id: 'command', label: 'Command', hint: 'Runs a terminal command in a folder, with no model. It runs without asking, so check it carefully.' },
+  { id: 'backup', label: 'Backup', hint: 'Saves a backup of this profile (chats, agents, skills, images, scheduled tasks, and settings) in a folder, without asking where.' },
 ];
 
 const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -177,7 +178,7 @@ function TaskEditor({ draft: d, saved, running, log, models, onChange, onSave, o
   const setSchedule = (s: Schedule) => set({ schedule: s });
   const s = d.schedule;
   const agent = agents.find((a) => a.id === d.agentId);
-  const FIELDS = ['name', 'enabled', 'kind', 'prompt', 'agentId', 'model', 'folder', 'command', 'preApproved', 'schedule'] as const;
+  const FIELDS = ['name', 'enabled', 'kind', 'prompt', 'agentId', 'model', 'folder', 'command', 'backup', 'preApproved', 'schedule'] as const;
   const dirty = !saved || FIELDS.some((k) => JSON.stringify(saved[k]) !== JSON.stringify(d[k]));
   const togglePre = (p: PreApproval, on: boolean) => set({ preApproved: on ? [...new Set([...d.preApproved, p])] : d.preApproved.filter((x) => x !== p) });
   const pickFolder = async () => {
@@ -190,6 +191,7 @@ function TaskEditor({ draft: d, saved, running, log, models, onChange, onSave, o
 
   const problem =
     !d.name.trim() ? 'Give the task a name.'
+    : d.kind === 'backup' ? (!d.folder ? 'Choose the folder to save backups in.' : '')
     : d.kind === 'command' ? (!d.command?.trim() ? 'Enter a command.' : !d.folder ? 'Choose the folder the command runs in.' : '')
     : !d.prompt.trim() ? (d.kind === 'orchestrator' ? 'Describe the goal.' : 'Write the prompt.')
     : !(agent?.model || d.model) ? 'Choose a model.'
@@ -221,7 +223,20 @@ function TaskEditor({ draft: d, saved, running, log, models, onChange, onSave, o
         </div>
         <p className="hint muted">{KINDS.find((k) => k.id === d.kind)!.hint}</p>
 
-        {d.kind === 'command' ? (
+        {d.kind === 'backup' ? (
+          <div className="field slim column">
+            <span>What to back up</span>
+            <div className="seg">
+              <button className={(d.backup ?? 'full') === 'full' ? 'on' : ''} onClick={() => set({ backup: 'full' })}>Full</button>
+              <button className={d.backup === 'incremental' ? 'on' : ''} onClick={() => set({ backup: 'incremental' })}>Incremental</button>
+            </div>
+            <p className="hint muted">
+              {d.backup === 'incremental'
+                ? 'Only what’s new or changed since it was last backed up. If nothing changed, no file is saved. To restore, restore a full backup first, then the incremental ones in order.'
+                : 'Everything in this profile, every time. Images can make full backups large.'}
+            </p>
+          </div>
+        ) : d.kind === 'command' ? (
           <label className="field column">
             <span>Command</span>
             <input className="text mono" value={d.command ?? ''} placeholder="npm test" onChange={(e) => set({ command: e.target.value })} />
@@ -263,7 +278,7 @@ function TaskEditor({ draft: d, saved, running, log, models, onChange, onSave, o
         )}
 
         <div className="field slim column">
-          <span>Folder <small className="muted">{d.kind === 'command' ? 'where the command runs' : 'optional, for file and terminal tools'}</small></span>
+          <span>{d.kind === 'backup' ? 'Save in' : 'Folder'} <small className="muted">{d.kind === 'backup' ? 'backups are named with the date and time' : d.kind === 'command' ? 'where the command runs' : 'optional, for file and terminal tools'}</small></span>
           <div className="row gap">
             {d.folder ? (
               <>
@@ -336,7 +351,7 @@ function TaskEditor({ draft: d, saved, running, log, models, onChange, onSave, o
         </label>
       </section>
 
-      {d.kind !== 'command' && (usesWeb || usesTerminal) && (
+      {d.kind !== 'command' && d.kind !== 'backup' && (usesWeb || usesTerminal) && (
         <section className="panel">
           <h4>Without asking</h4>
           <p className="muted small">Nobody may be at the computer when it runs. Choose what this task may do on its own; anything else waits for your OK and notifies you.</p>

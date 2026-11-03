@@ -1,6 +1,6 @@
-// Scheduled tasks: a prompt for a model or agent, an orchestrator goal, or a terminal command, run at a
-// set time or on repeat. Each task has its own chat where every run is added, so results are easy to
-// find. Tasks run one at a time, and wait while you're using the chat. While any task is on, closing
+// Scheduled tasks: a prompt for a model or agent, an orchestrator goal, a terminal command, or a backup,
+// run at a set time or on repeat. Each task (but a backup) has its own chat where every run is added, so
+// results are easy to find. Tasks run one at a time, and wait while you're using the chat. While any task is on, closing
 // the window keeps Penumbra in the menu bar (see electron/tray.cjs) so tasks still run on time.
 import { useSyncExternalStore } from 'react';
 import { host } from './host';
@@ -8,8 +8,9 @@ import { uid, type Conversation, type UiMessage } from './store';
 import { ORCHESTRATOR_ID } from './agents/orchestrator';
 import { getAgent } from './agents/agents';
 import { approval, chatController, getConversations, openChatRequest, streaming, updateConversations } from './session';
+import { scheduledBackup, type BackupKind } from './backup';
 
-export type TaskKind = 'prompt' | 'orchestrator' | 'command';
+export type TaskKind = 'prompt' | 'orchestrator' | 'command' | 'backup';
 
 export type Schedule =
   | { type: 'once'; at: number }
@@ -32,8 +33,11 @@ export interface ScheduledTask {
   agentId?: string;
   /** The model (prompt tasks without an agent, and the orchestrator's planner). */
   model: string;
+  /** Where a command runs, the folder for file tools, or where a backup is saved. */
   folder?: string;
   command?: string;
+  /** Backup tasks: everything, or what changed since the last backup. */
+  backup?: BackupKind;
   preApproved: PreApproval[];
   schedule: Schedule;
   /** The chat this task's runs go into. */
@@ -324,12 +328,24 @@ async function runModel(t: ScheduledTask, convId: string) {
   return reply?.content ?? '';
 }
 
+const mb = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
+
+/** A backup task: saves a full or incremental backup in its folder, without asking where. */
+async function runBackup(t: ScheduledTask) {
+  if (!t.folder) throw new Error('Choose the folder to save backups in');
+  const kind = t.backup ?? 'full';
+  const r = await scheduledBackup(kind, t.folder);
+  if (!r) return 'Nothing changed since the last backup, so no file was saved.';
+  const parts = Object.entries(r.choice).filter(([, ids]) => ids.length).map(([k, ids]) => `${ids.length} ${ids.length === 1 ? k.replace(/s$/, '') : k}`);
+  return `Saved ${r.file.split(/[\\/]/).pop()} (${mb(r.size)}): ${parts.join(', ')}.`;
+}
+
 async function runTask(t: ScheduledTask) {
   running = t.id;
   const now = Date.now();
   const trigger: RunLogEntry['trigger'] = manualRuns.delete(t.id) ? 'manual' : t.nextRun !== null && now - t.nextRun > 2 * 60000 ? 'missed' : 'schedule';
   const agent = t.kind === 'prompt' ? getAgent(t.agentId) : undefined;
-  const by = t.kind === 'command' ? 'Command' : t.kind === 'orchestrator' ? `Orchestrator · ${t.model}` : agent ? `${agent.name} · ${agent.model}` : t.model;
+  const by = t.kind === 'backup' ? `Backup · ${t.backup ?? 'full'}` : t.kind === 'command' ? 'Command' : t.kind === 'orchestrator' ? `Orchestrator · ${t.model}` : agent ? `${agent.name} · ${agent.model}` : t.model;
   current = { logId: uid(), approvals: [] };
   saveLog([{ id: current.logId, taskId: t.id, startedAt: now, trigger, status: 'running', by }, ...log]);
   const finish = (patch: Partial<RunLogEntry>) =>
@@ -344,9 +360,10 @@ async function runTask(t: ScheduledTask) {
     }));
   // The next time is set before running, so a long run doesn't fire twice.
   patchTask(t.id, { lastStatus: 'running', lastError: undefined, lastRun: Date.now(), nextRun: nextAfter(t.schedule, Date.now()), ...(t.schedule.type === 'once' ? { enabled: false } : {}) });
-  const convId = taskChat(t);
+  // A backup's result goes in the run log only; the other kinds add each run to the task's chat.
+  const convId = t.kind === 'backup' ? undefined : taskChat(t);
   try {
-    const out = t.kind === 'command' ? await runCommand(t, convId) : await runModel(t, convId);
+    const out = t.kind === 'backup' ? await runBackup(t) : t.kind === 'command' ? await runCommand(t, convId!) : await runModel(t, convId!);
     patchTask(t.id, { lastStatus: 'ok' });
     // Plain text for the log: no Markdown symbols or code fences.
     const plain = out.replace(/```[a-z]*/gi, ' ').replace(/\*\*|__|`/g, '').replace(/^\s*(#{1,6}|>)\s+/gm, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\s+/g, ' ').trim();

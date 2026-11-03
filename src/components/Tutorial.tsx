@@ -70,7 +70,7 @@ const STEPS: Step[] = [
   { title: 'Plan, review, run', body: 'Describe a goal and pick the planner model. The orchestrator proposes tasks and the agents for them (creating new ones if needed). You edit and approve the plan, then follow it on a board with a column per agent, and get the final answer.', target: '.content-inner > main', view: 'orchestrator' },
 
   // Scheduler
-  { title: 'Scheduled tasks', body: 'New task runs a prompt, an agent, an orchestrator goal, or a terminal command once, daily or on chosen days, or every few minutes or hours. Each task keeps its own chat and a run log.', target: 'button[title="New task"]', view: 'scheduler' },
+  { title: 'Scheduled tasks', body: 'New task runs a prompt, an agent, an orchestrator goal, a terminal command, or a backup once, daily or on chosen days, or every few minutes or hours. Each task keeps its own chat and a run log.', target: 'button[title="New task"]', view: 'scheduler' },
   { title: 'While tasks are on', body: 'Penumbra can stay in the menu bar when you close the window, so tasks run on time, and notify you when one finishes or needs your OK.', target: '.content-inner > main .panel:last-child', view: 'scheduler' },
 
   // Agents & Skills
@@ -92,7 +92,7 @@ const STEPS: Step[] = [
   { title: 'Your profile', body: 'Your name and avatar, and your profiles: each one keeps its own chats, agents, and settings, can have a password, and ★ picks the one that opens at startup.', target: '.rail-profile' },
 
   // Backup
-  { title: 'Backup', body: 'Save chats, agents, skills, images, scheduled tasks, and settings in one .zip file, all of them or the ones you pick. Restore adds what you choose from a backup to this profile, without replacing anything.', target: '.backup-page .panel:first-of-type', view: 'backup' },
+  { title: 'Backup', body: 'Save chats, agents, skills, images, scheduled tasks, and settings in one .zip file: a full backup, or an incremental one with only what changed. Schedule backups with a Backup task in the Scheduler. Restore adds what you choose from a backup to this profile, without replacing anything.', target: '.backup-page .panel:first-of-type', view: 'backup' },
 
   // Options
   { title: 'Server', body: 'Where Penumbra finds Ollama. Change it to use Ollama on another computer.', target: '#server', view: 'developer' },

@@ -4,9 +4,11 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const zlib = require('zlib');
 const { readZip, withSkillsOf, skillsRoot, listSkills, listFiles, installFrom } = require('./skills.cjs');
 const { imagesStore } = require('./images.cjs');
+const { checkRoot } = require('./tools.cjs');
 
 const FORMAT = 'penumbra-backup';
 const MAX_BACKUP = 4 * 1024 * 1024 * 1024 - 1; // zip without ZIP64
@@ -107,11 +109,25 @@ function zipWriter(file) {
 /** This profile's images that still exist. */
 const imagesOf = (sender) => imagesStore.readHistory(imagesStore.dirFor(sender)).filter((h) => h.file && fs.existsSync(h.file));
 
-const stamp = () => {
+const stamp = (withTime = false) => {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}${withTime ? ` ${pad(d.getHours())}.${pad(d.getMinutes())}` : ''}`;
 };
+
+/** The same hash for a skill's files from a backup ({ 'rel/path': Buffer }). */
+function hashFiles(files) {
+  const h = crypto.createHash('sha1');
+  for (const rel of Object.keys(files).filter((f) => !/(^|\/)\./.test(f)).sort()) h.update(rel).update('\0').update(files[rel]).update('\0');
+  return h.digest('hex').slice(0, 16);
+}
+
+/** A skill's files, hashed: tells an incremental backup whether it changed. */
+function skillHash(dir) {
+  const h = crypto.createHash('sha1');
+  for (const rel of listFiles(dir).sort()) h.update(rel).update('\0').update(fs.readFileSync(path.join(dir, rel))).update('\0');
+  return h.digest('hex').slice(0, 16);
+}
 
 /** A name that isn't taken in `dir`. */
 function freeName(dir, name) {
@@ -129,20 +145,35 @@ const opened = new Map(); // webContents id → { files }
 
 /** What this profile has on disk, for the app's backup choices. */
 function summary(sender) {
-  const skills = withSkillsOf(sender, () => listSkills()).map((s) => ({ id: s.id, name: s.name, description: s.description }));
+  const skills = withSkillsOf(sender, () => {
+    const root = skillsRoot();
+    return listSkills().map((s) => ({ id: s.id, name: s.name, description: s.description, hash: skillHash(path.join(root, s.id)) }));
+  });
   const images = imagesOf(sender).map((h) => ({ file: h.file, prompt: h.prompt ?? '', at: h.at ?? 0, width: h.width, height: h.height, size: fs.statSync(h.file).size }));
   return { skills, images };
 }
 
-async function save(sender, { data, skills = [], images = [], name }) {
-  const win = BrowserWindow.fromWebContents(sender);
-  const { canceled, filePath } = await dialog.showSaveDialog(win, {
-    title: 'Save backup',
-    defaultPath: path.join(app.getPath('documents'), `${String(name ?? '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Penumbra backup'} ${stamp()}.zip`),
-    buttonLabel: 'Save backup',
-    filters: [{ name: 'Penumbra backup', extensions: ['zip'] }],
-  });
-  if (canceled || !filePath) return null;
+/**
+ * Writes a backup. With `dir` (a scheduled backup) it's saved there under a dated name, without asking;
+ * otherwise the user picks where. `kind` (full or incremental) goes in the name and the manifest.
+ */
+async function save(sender, { data, skills = [], images = [], name, kind, dir }) {
+  const incremental = kind === 'incremental';
+  const base = `${String(name ?? '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Penumbra backup'} ${stamp(!!dir)}${incremental ? ' (incremental)' : ''}.zip`;
+  let filePath;
+  if (dir) {
+    const folder = checkRoot(dir);
+    filePath = path.join(folder, freeName(folder, base));
+  } else {
+    const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(sender), {
+      title: incremental ? 'Save incremental backup' : 'Save backup',
+      defaultPath: path.join(app.getPath('documents'), base),
+      buttonLabel: 'Save backup',
+      filters: [{ name: 'Penumbra backup', extensions: ['zip'] }],
+    });
+    if (r.canceled || !r.filePath) return null;
+    filePath = r.filePath;
+  }
 
   const zip = zipWriter(filePath);
   try {
@@ -174,7 +205,7 @@ async function save(sender, { data, skills = [], images = [], name }) {
     zip.add('images.json', Buffer.from(JSON.stringify(imageList)));
     counts.images = imageList.length;
 
-    zip.add('backup.json', Buffer.from(JSON.stringify({ format: FORMAT, version: 1, app: app.getVersion(), createdAt: Date.now(), counts }, null, 2)));
+    zip.add('backup.json', Buffer.from(JSON.stringify({ format: FORMAT, version: 1, app: app.getVersion(), createdAt: Date.now(), kind: incremental ? 'incremental' : 'full', counts }, null, 2)));
     zip.finish();
   } catch (e) {
     zip.abort();
@@ -223,34 +254,49 @@ async function open(sender) {
   const images = JSON.parse(files['images.json']?.toString('utf8') || '[]')
     .filter((h) => files[`images/${h.name}`])
     .map((h) => ({ ...h, size: files[`images/${h.name}`].length, thumb: undefined }));
-  return { file: filePaths[0], createdAt: manifest.createdAt, app: manifest.app, data, skills, images };
+  return { file: filePaths[0], createdAt: manifest.createdAt, app: manifest.app, kind: manifest.kind === 'incremental' ? 'incremental' : 'full', data, skills, images };
 }
 
 /**
  * Copies the chosen skills and images from the opened backup. Ones already here (the same SKILL.md, or the
- * same image file) are skipped. Returns old → new skill ids and image paths, and how many were skipped.
+ * same image file) are skipped. A skill that differs is added as another skill, or with `replace` takes the
+ * place of the one here (its old files go to the Trash). Returns old → new skill ids and image paths, and
+ * how many were skipped and replaced.
  */
-function restoreFiles(sender, { skills = [], images = [] }) {
+async function restoreFiles(sender, { skills = [], images = [], replace = false }) {
   const backup = opened.get(sender.id);
   if (!backup) throw new Error('Open the backup again');
   const { files } = backup;
   const skillIds = {};
   let skipped = 0;
-  withSkillsOf(sender, () => {
-    for (const id of skills.map(String)) {
-      const here = path.join(skillsRoot(), id, 'SKILL.md');
-      if (/^[\w.-]+$/.test(id) && fs.existsSync(here) && files[`skills/${id}/SKILL.md`]?.equals(fs.readFileSync(here))) {
-        skipped++;
-        continue;
-      }
-      const prefix = `skills/${id}/`;
-      const subset = {};
-      for (const [name, buf] of Object.entries(files)) if (name.startsWith(prefix)) subset[`${id}/${name.slice(prefix.length)}`] = buf;
-      if (!subset[`${id}/SKILL.md`]) continue;
-      const [installed] = installFrom(subset);
-      skillIds[id] = installed;
+  let replaced = 0;
+  const root = withSkillsOf(sender, () => skillsRoot());
+  for (const id of skills.map(String)) {
+    const prefix = `skills/${id}/`;
+    const subset = {};
+    for (const [name, buf] of Object.entries(files)) if (name.startsWith(prefix)) subset[name.slice(prefix.length)] = buf;
+    if (!subset['SKILL.md']) continue;
+    const dir = path.join(root, id);
+    const exists = /^[\w.-]+$/.test(id) && fs.existsSync(path.join(dir, 'SKILL.md'));
+    if (exists && skillHash(dir) === hashFiles(subset)) {
+      skipped++;
+      continue;
     }
-  });
+    if (exists && replace) {
+      await shell.trashItem(dir);
+      for (const [rel, buf] of Object.entries(subset)) {
+        const target = path.resolve(dir, rel);
+        if (!target.startsWith(dir + path.sep)) continue;
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, buf);
+      }
+      skillIds[id] = id;
+      replaced++;
+      continue;
+    }
+    const [installed] = withSkillsOf(sender, () => installFrom(Object.fromEntries(Object.entries(subset).map(([rel, buf]) => [`${id}/${rel}`, buf]))));
+    skillIds[id] = installed;
+  }
 
   const imageFiles = {};
   const wanted = new Set(images.map(String));
@@ -275,7 +321,7 @@ function restoreFiles(sender, { skills = [], images = [] }) {
     }
     if (added.length) imagesStore.writeHistory(d, [...added, ...history].sort((a, b) => (b.at ?? 0) - (a.at ?? 0)));
   }
-  return { skills: skillIds, images: imageFiles, skipped };
+  return { skills: skillIds, images: imageFiles, skipped, replaced };
 }
 
 function registerBackup() {

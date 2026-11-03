@@ -18,6 +18,27 @@
 
 ---
 
+## Download
+
+Get the installer for your computer from the [latest release](https://github.com/ejsoler/penumbra/releases/latest):
+
+| Platform | File |
+| --- | --- |
+| macOS, Apple Silicon | `Penumbra-<version>-mac-arm64.dmg` |
+| macOS, Intel | `Penumbra-<version>-mac-x64.dmg` |
+| Windows | `Penumbra-Setup-<version>.exe` (picks x64 or ARM64 automatically) |
+| Linux | `Penumbra-<version>-linux-x86_64.AppImage`, or the `.deb` for Debian/Ubuntu (ARM64 builds included) |
+
+You need [Ollama](https://ollama.com/download) installed and running (`ollama serve`).
+
+The builds aren't code-signed yet, so your OS will warn you the first time:
+
+- **macOS:** right-click the app → **Open** → **Open**. On recent macOS versions: System Settings → Privacy & Security → **Open Anyway**.
+- **Windows:** on the SmartScreen prompt, click **More info** → **Run anyway**.
+- **Linux (AppImage):** `chmod +x Penumbra-*.AppImage` and run it.
+
+---
+
 ## Features
 
 **Chat**
@@ -108,22 +129,6 @@
 - [Ollama](https://ollama.com/download) installed and running (`ollama serve`)
 - [Node.js](https://nodejs.org) 22 or newer
 - macOS, Windows, or Linux
-
-## Download
-
-Get the latest installer from [Releases](https://github.com/ejsoler/penumbra/releases):
-
-| Platform | File |
-| --- | --- |
-| macOS (Apple Silicon / Intel) | `Penumbra-<version>-mac-arm64.dmg` / `-mac-x64.dmg` |
-| Windows | `Penumbra-Setup-<version>-x64.exe` (or `-arm64.exe`) |
-| Linux | `Penumbra-<version>-linux-x86_64.AppImage`, or `.deb` for Debian/Ubuntu |
-
-The builds aren't code-signed yet, so your OS will warn you the first time:
-
-- **macOS:** right-click the app → **Open** → **Open**. On recent macOS versions: System Settings → Privacy & Security → **Open Anyway**.
-- **Windows:** on the SmartScreen prompt, click **More info** → **Run anyway**.
-- **Linux (AppImage):** `chmod +x Penumbra-*.AppImage` and run it.
 
 ## Build from source
 

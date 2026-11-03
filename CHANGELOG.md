@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **Home.** Penumbra now opens on a Home dashboard: ask something to start a chat right away, and see every tab at a glance (recent chats, agents to chat with, upcoming scheduled tasks, orchestrator runs, loaded models and downloads, recent images, your last backup, and whether an update is out), each with a link to jump in. The tutorial starts with it.
 - **Long chats keep going.** Chats no longer lose their beginning when they outgrow the model's context:
   - Older messages are sent in a shorter form: widget code, attached files, and images in earlier messages are replaced by short notes (the chat on screen doesn't change; the last few messages always go whole).
   - When a chat still wouldn't fit, the model first summarizes the older part ("Summarizing earlier messages to make room…"), and from then on gets the summary instead of those messages. A line in the chat marks where the summary ends; click it to read the summary, or stop using it.

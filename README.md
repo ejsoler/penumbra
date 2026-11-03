@@ -90,6 +90,7 @@
 - Pause, resume, and retry downloads, with speed and time remaining; unfinished downloads survive restarts
 
 **Everywhere**
+- A **Home** dashboard, where Penumbra opens: start a chat from one box, and see recent chats, agents, upcoming tasks, orchestrator runs, loaded models and downloads, recent images, your last backup, and updates at a glance
 - A guided tutorial of every tab the first time you open Penumbra (and in each new profile), until you choose not to see it again; Options → Tutorial shows it any time
 - Your own name and avatar on your messages (set from the button at the bottom of the sidebar)
 - A quiet update check: a small icon in the sidebar when a new version is out. It opens the Updates tab with what's new, and downloads the installer for your computer
@@ -175,7 +176,7 @@ src/
   agents/         Agent loop, tools, skills, agents store, orchestrator planning
   components/     Model picker, Markdown renderer, widget frame, plan card, context menu, icons
   widgets/        Widget sandbox document, system prompt, bundled chart/3D libraries
-  views/          Chat, Orchestrator, Scheduler, Images, Agents & Skills, Backup, Updates, My Models, Discover, Hugging Face, Options
+  views/          Home, Chat, Orchestrator, Scheduler, Images, Agents & Skills, Backup, Updates, My Models, Discover, Hugging Face, Options
 build/            App icon source, icon generator, install script
 ```
 

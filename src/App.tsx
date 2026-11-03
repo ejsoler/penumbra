@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useOllama, usePersistent } from './store';
+import { useOllama } from './store';
 import { ChatView } from './views/ChatView';
 import { ModelsView } from './views/ModelsView';
 import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView, developerFocus } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
-import { Bot, CalendarClock, DatabaseBackup, FolderOpen, ImageIcon, MessageSquare, Settings, Telescope, Workflow } from './components/icons';
+import { Bot, CalendarClock, DatabaseBackup, FolderOpen, House, ImageIcon, MessageSquare, Settings, Telescope, Workflow } from './components/icons';
 import { WorkspaceView } from './views/WorkspaceView';
 import { SchedulerView } from './views/SchedulerView';
 import { ImagesView } from './views/ImagesView';
 import { UpdatesView } from './views/UpdatesView';
 import { BackupView } from './views/BackupView';
+import { HomeView } from './views/HomeView';
 import { startScheduler, useScheduler } from './scheduler';
 import { start as startImages } from './images';
 import { chatController, openChatRequest, streaming } from './session';
@@ -27,9 +28,10 @@ import { host, type ProfileInfo } from './host';
 import { syncProfile } from './profile';
 import { startUpdateChecks } from './updates';
 
-type View = 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer' | 'updates' | 'backup';
+type View = 'home' | 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer' | 'updates' | 'backup';
 
 const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
+  { id: 'home', label: 'Home', icon: House },
   { id: 'chat', label: 'Chat', icon: MessageSquare },
   { id: 'orchestrator', label: 'Orchestrator', icon: Workflow },
   { id: 'scheduler', label: 'Scheduler', icon: CalendarClock },
@@ -58,7 +60,8 @@ export default function App() {
 }
 
 function Main() {
-  const [view, setView] = usePersistent<View>('ollama-gui.view', 'chat');
+  // Penumbra always opens on Home.
+  const [view, setView] = useState<View>('home');
   const ollama = useOllama();
   const dl = useDownloads(ollama.refresh);
   const [showBanner, setShowBanner] = useState(true);
@@ -148,6 +151,7 @@ function Main() {
           {view === 'developer' && <DeveloperView ollama={ollama} onOpenUpdates={() => setView('updates')} />}
           {view === 'updates' && <UpdatesView />}
           {view === 'backup' && <BackupView />}
+          {view === 'home' && <HomeView ollama={ollama} dl={dl} setView={(v) => setView(v as View)} onChatWithAgent={chatWithAgent} />}
         </div>
       </div>
     <LightboxHost />

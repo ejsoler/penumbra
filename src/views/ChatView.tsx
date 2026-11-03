@@ -583,6 +583,16 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
 
   // Other views (the Orchestrator page) drive runs through this; the chat view stays mounted.
   chatController.current = {
+    startChat: (text, agentId) => {
+      const model = (agentId && getAgent(agentId)?.model) || current?.model || '';
+      if (streamingId || !text.trim() || !model) return null;
+      const user: UiMessage = { id: uid(), role: 'user', content: text.trim() };
+      const conv: Conversation = { ...newConversation(model), title: text.trim().slice(0, 48), ...(agentId ? { agentId } : {}), messages: [user] };
+      setConversations((cs) => [conv, ...cs]);
+      setCurrentId(conv.id);
+      generate(conv, [user]);
+      return conv.id;
+    },
     startOrchestration: (goal, model, folder) => {
       if (streamingId || !goal.trim() || !model) return null;
       const user: UiMessage = { id: uid(), role: 'user', content: goal.trim() };

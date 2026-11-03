@@ -45,7 +45,17 @@ export interface BackupChoice {
   settings: string[];
 }
 
+/** When this profile last saved a backup (shown on Home). */
+export const LAST_BACKUP_KEY = 'ollama-gui.lastBackup';
+export const lastBackup = () => Number(localStorage.getItem(LAST_BACKUP_KEY)) || 0;
+
 export async function makeBackup(choice: BackupChoice, name?: string) {
+  const r = await saveBackup(choice, name);
+  if (r) localStorage.setItem(LAST_BACKUP_KEY, String(Date.now()));
+  return r;
+}
+
+async function saveBackup(choice: BackupChoice, name?: string) {
   const pick = <T extends { id: string }>(list: T[], ids: string[]) => list.filter((x) => ids.includes(x.id));
   const tasks = pick(savedTasks(), choice.tasks);
   const settings: Record<string, string> = {};

@@ -53,6 +53,9 @@ interface Step {
 const STEPS: Step[] = [
   { title: 'Welcome to Penumbra', body: 'A tour of every tab: chat with local models, interactive answers, agents, the orchestrator, scheduled tasks, images, and your options. Everything runs on this computer with Ollama.' },
 
+  // Home
+  { title: 'Home', body: 'Penumbra opens here. Ask something to start a chat, and see each tab at a glance: recent chats, agents, scheduled tasks, orchestrator runs, loaded models and downloads, images, backups, and updates. Click a card’s link to go there.', target: '.home-grid', view: 'home' },
+
   // Chat
   { title: 'Your chats', body: 'Every chat is saved here. + starts a new one (⌘/Ctrl+N). Right-click a chat to rename, duplicate, export it as Markdown, move it to another profile, or delete it.', target: '.view-host aside.sidebar', view: 'chat' },
   { title: 'Agent or orchestrator', body: 'Answer with the plain model, one of your agents, or the orchestrator, which splits a goal into tasks for several agents.', target: '.view-host .agent-picker', view: 'chat' },

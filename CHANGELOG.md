@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-11-03)
 
 ### Added
 - **Incremental and scheduled backups.** The Backup tab can make a **Full** backup or an **Incremental** one, with only what's new or changed since it was last backed up (Penumbra remembers a fingerprint of everything it saves). The Scheduler has a new **Backup** task that saves a full or incremental backup in a folder you choose, named with the date and time, without asking; an incremental run with nothing new saves no file, and the run log says what was saved. When restoring, **Use the backup's version** replaces items that are already here, so a full backup and then its incremental ones can be restored in order (it's chosen automatically for incremental backups).

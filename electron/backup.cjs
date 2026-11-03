@@ -134,11 +134,11 @@ function summary(sender) {
   return { skills, images };
 }
 
-async function save(sender, { data, skills = [], images = [] }) {
+async function save(sender, { data, skills = [], images = [], name }) {
   const win = BrowserWindow.fromWebContents(sender);
   const { canceled, filePath } = await dialog.showSaveDialog(win, {
     title: 'Save backup',
-    defaultPath: path.join(app.getPath('documents'), `Penumbra backup ${stamp()}.zip`),
+    defaultPath: path.join(app.getPath('documents'), `${String(name ?? '').replace(/[\\/:*?"<>|\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Penumbra backup'} ${stamp()}.zip`),
     buttonLabel: 'Save backup',
     filters: [{ name: 'Penumbra backup', extensions: ['zip'] }],
   });

@@ -113,8 +113,8 @@ export interface PenumbraHost {
   backup: {
     /** This profile's skills and images, to choose from. */
     summary: () => Promise<{ skills: BackupSkill[]; images: BackupImage[] }>;
-    /** Asks where to save, then writes the .zip. Null if the user cancels. */
-    save: (req: { data: Record<string, unknown>; skills: string[]; images: string[] }) => Promise<{ file: string; size: number } | null>;
+    /** Asks where to save (suggesting `name` and the date), then writes the .zip. Null if the user cancels. */
+    save: (req: { data: Record<string, unknown>; skills: string[]; images: string[]; name?: string }) => Promise<{ file: string; size: number } | null>;
     /** Asks for a backup and reads it. Null if the user cancels. */
     open: () => Promise<OpenedBackup | null>;
     /** Copies the chosen skills and images (by name in the backup) into this profile, skipping ones already here; returns old → new ids and paths. */

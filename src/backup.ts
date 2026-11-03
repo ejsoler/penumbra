@@ -45,7 +45,7 @@ export interface BackupChoice {
   settings: string[];
 }
 
-export async function makeBackup(choice: BackupChoice) {
+export async function makeBackup(choice: BackupChoice, name?: string) {
   const pick = <T extends { id: string }>(list: T[], ids: string[]) => list.filter((x) => ids.includes(x.id));
   const tasks = pick(savedTasks(), choice.tasks);
   const settings: Record<string, string> = {};
@@ -65,7 +65,17 @@ export async function makeBackup(choice: BackupChoice) {
     },
     skills: choice.skills,
     images: choice.images,
+    name,
   });
+}
+
+/** Backs up one chat, with what it needs: its agent, that agent's skills, and the images it shows. */
+export function backupChat(c: Conversation) {
+  const agent = savedAgents().find((a) => a.id === c.agentId);
+  return makeBackup(
+    { chats: [c.id], agents: agent ? [agent.id] : [], tasks: [], skills: agent?.skills ?? [], images: chatImages(c), settings: [] },
+    `${c.title || 'Chat'} backup`,
+  );
 }
 
 /** What an opened backup offers, in the shape the restore choices use. */

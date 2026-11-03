@@ -860,3 +860,8 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .backup-source { margin: 12px 0 4px; }
 .backup-confirm { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-input); }
 .backup-report { margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.topbar .topbar-backup { flex-shrink: 0; }
+.topbar-backup.saved { color: var(--green, #4ade80); }
+.topbar-backup.error { color: #ff8a8a; }
+.topbar-backup-note { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; color: var(--text-dim); }
+.topbar-backup-note.error { color: #ff8a8a; }

@@ -31,8 +31,9 @@ import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
   ArrowUp, ArrowRightLeft, Bot, Brain, Loader2, Lock, Check, ChevronDown, FileText, FolderOpen, ShieldAlert, Workflow, ChevronRight, Copy, Download, Eraser, GitBranch, PanelRight, PanelRightClose, Paperclip, Pencil,
-  Plus, RefreshCw, Sparkles, Square, Trash2, X,
+  Plus, RefreshCw, Sparkles, Square, Trash2, X, DatabaseBackup,
 } from '../components/icons';
+import { backupChat } from '../backup';
 
 const newConversation = (model = ''): Conversation => ({
   net: newChatNet(),
@@ -145,6 +146,23 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     setCurrentId(c.id);
   };
 
+  // Backing up one chat: the button shows progress, then the result for a few seconds.
+  const [backup, setBackup] = useState<{ id: string; state: 'saving' | 'saved' | 'error'; note: string } | null>(null);
+  const backUp = async (c: Conversation) => {
+    setBackup({ id: c.id, state: 'saving', note: 'Backing up…' });
+    try {
+      const r = await backupChat(c);
+      setBackup(r ? { id: c.id, state: 'saved', note: `Saved ${r.file.split(/[\\/]/).pop()}` } : null);
+    } catch (e) {
+      setBackup({ id: c.id, state: 'error', note: `Couldn't back up: ${(e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')}` });
+    }
+  };
+  useEffect(() => {
+    if (backup?.state !== 'saved' && backup?.state !== 'error') return;
+    const t = setTimeout(() => setBackup(null), 4000);
+    return () => clearTimeout(t);
+  }, [backup]);
+
   const chatMenu = (e: MouseEvent, c: Conversation) =>
     menu(e, [
       { label: 'Rename', icon: Pencil, onClick: () => setRenamingId(c.id) },
@@ -153,6 +171,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       'separator',
       { label: 'Copy as Markdown', icon: Copy, onClick: () => copyText(toMarkdown(c)), disabled: !c.messages.length },
       { label: 'Export as Markdown…', icon: Download, onClick: () => downloadFile(`${fileSlug(c.title)}.md`, toMarkdown(c)), disabled: !c.messages.length },
+      ...(host() ? [{ label: 'Back up this chat…', icon: DatabaseBackup, onClick: () => backUp(c), disabled: !c.messages.length }] : []),
       'separator',
       { label: 'Clear messages', icon: Eraser, onClick: () => updateConv(c.id, (x) => ({ ...x, messages: [] })), disabled: !c.messages.length || streamingId === c.id },
       { label: 'Delete chat', icon: Trash2, danger: true, onClick: () => deleteChat(c.id) },
@@ -610,6 +629,17 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
               />
             )}
           </div>
+          {backup?.id === current.id && backup.state !== 'saving' && <span className={`topbar-backup-note small ${backup.state}`}>{backup.note}</span>}
+          {host() && (
+            <button
+              className={`icon-btn topbar-backup ${backup?.id === current.id ? backup.state : ''}`}
+              onClick={() => backUp(current)}
+              disabled={!current.messages.length || backup?.state === 'saving'}
+              title={backup?.id === current.id ? backup.note : 'Back up this chat (with its agent, skills, and images)'}
+            >
+              {backup?.id === current.id && backup.state === 'saving' ? <Loader2 size={16} className="spin" /> : backup?.id === current.id && backup.state === 'saved' ? <Check size={16} /> : <DatabaseBackup size={16} />}
+            </button>
+          )}
           <button className="icon-btn topbar-right" onClick={() => setShowSettings(!showSettings)} title="Toggle settings panel">
             {showSettings ? <PanelRightClose size={17} /> : <PanelRight size={17} />}
           </button>

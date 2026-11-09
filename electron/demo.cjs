@@ -226,7 +226,7 @@ async function runDemo(win, model) {
       await sleep(2000);
       await waitFor(`![...document.querySelectorAll('button')].some(b => b.offsetParent && b.innerText.trim() === 'Stop')`, 600);
     } },
-    { t: 'Edit a finished run', say: 'Edit plan changes the goal or any task, adds a task, or adds a new agent (with its own model, tools, and instructions), then runs it again. Tasks you leave alone keep their results.', run: async () => {
+    { t: 'Edit a finished run', say: 'Edit plan changes the goal or any task, adds a task, or adds a new agent (with its own model, tools, and instructions), then runs it again. Tasks you leave alone keep their results, and nothing from before is deleted.', run: async () => {
       await clickText('Edit plan');
       await sleep(500);
       await clickText('Add agent');

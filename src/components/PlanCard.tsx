@@ -26,8 +26,8 @@ export interface PlanEdit {
   onSave: () => void;
 }
 
-/** A task's results are cleared when its instructions, agent, or inputs change, so it runs again. */
-const RESET: Partial<PlanTask> = { status: undefined, output: undefined, steps: undefined, error: undefined, stats: undefined, model: undefined };
+/** A task whose instructions, agent, or inputs change runs again; its results so far are kept as an earlier result. */
+const RESET: Partial<PlanTask> = { edited: true };
 const resets = (patch: Partial<PlanTask>) => ('instructions' in patch || 'agent' in patch || 'dependsOn' in patch ? RESET : {});
 
 export const PlanActionsContext = createContext<PlanActions | null>(null);
@@ -95,7 +95,7 @@ export function PlanCard({ msgId, orch, edit }: { msgId: string; orch: Orchestra
 
           {editable && actions?.changeGoal && (
             <div className="plan-section">
-              <div className="plan-label">Goal <span className="muted">· the request every agent works from; changing it runs every task again</span></div>
+              <div className="plan-label">Goal <span className="muted">· the request every agent works from; changing it runs every task again, keeping what they made before</span></div>
               <textarea className="plan-text" rows={3} value={orch.goal} onChange={(e) => actions.changeGoal!(msgId, e.target.value)} />
             </div>
           )}
@@ -195,7 +195,7 @@ export function PlanCard({ msgId, orch, edit }: { msgId: string; orch: Orchestra
           {editable && (
             <div className="plan-actions row gap">
               <span className="muted small flex">
-                {edit ? 'Tasks you leave alone keep their results; changed ones, and those that use them, run again.' : 'Tasks run one at a time, in order. Tools still ask before risky actions.'}
+                {edit ? 'Tasks you leave alone keep their results; changed ones, and those that use them, run again, and nothing from before is deleted.' : 'Tasks run one at a time, in order. Tools still ask before risky actions.'}
               </span>
               <button className="btn sm" onClick={() => (edit ? edit.onCancel() : actions!.cancel(msgId))}><X size={13} /> Cancel</button>
               {edit && <button className="btn sm" disabled={!valid} onClick={edit.onSave}>Save</button>}
@@ -248,6 +248,7 @@ function TaskRow({ index, task, editable, agentNames, model, onChange, onRemove 
         {editable && <button className="icon-btn sm" title="Remove task" onClick={onRemove}><Trash2 size={13} /></button>}
       </div>
       {task.dependsOn.length > 0 && <div className="task-deps muted small">Uses the result of {task.dependsOn.join(', ')}</div>}
+      {editable && task.edited && task.output && <div className="task-deps muted small">Edited: it runs again, and its current result is kept under Earlier results.</div>}
       {editable ? (
         <textarea className="plan-text" rows={3} value={task.instructions} placeholder="What should this agent do?" onChange={(e) => onChange({ instructions: e.target.value })} />
       ) : (

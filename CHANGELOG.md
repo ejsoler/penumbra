@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- **Edit plan.** A finished (or cancelled) orchestrator run has an **Edit plan** button: change its goal and any task's instructions or agent, remove tasks, add tasks, and add new agents (name, purpose, model, tools, instructions). Nothing changes until you press **Save** or **Save and run**. Tasks you leave alone keep their results; changed ones, and the tasks that use them, run again, and the final answer is written again. An agent the orchestrator created is updated with your edits. **Run again** runs just the tasks that didn't finish.
+- **Edit plan.** A finished (or cancelled) orchestrator run has an **Edit plan** button: change its goal and any task's instructions or agent, remove tasks, add tasks, and add new agents (name, purpose, model, tools, instructions). Nothing changes until you press **Save** or **Save and run**. Tasks you leave alone keep their results; changed ones, and the tasks that use them, run again, and the final answer is written again. Nothing from before is deleted: a task's old result stays under **Earlier results** on its card, and the old final answers under **Earlier answers**. An agent the orchestrator created is updated with your edits. **Run again** runs just the tasks that didn't finish.
 - The tutorial and the guided demo mention it.
 
 ## 0.5.2 (2026-11-03)

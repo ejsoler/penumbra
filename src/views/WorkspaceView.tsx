@@ -185,7 +185,7 @@ function RunView({ run, ollama, onOpenChat }: { run: Run; ollama: OllamaState; o
     models: ollama.models.map((m) => ({ name: m.name, size: m.details.parameter_size, capabilities: ollama.capabilities[m.name] ?? [], loaded: ollama.running.some((r) => r.name === m.name), remote: !!m.remote_host })),
     busy: !!streamingId,
     change: (_, p) => setDraft({ ...draft, plan: p }),
-    changeGoal: (_, goal) => setDraft({ goal, plan: draft.plan.tasks.length ? { ...draft.plan, tasks: draft.plan.tasks.map((t) => ({ ...t, status: undefined, output: undefined, steps: undefined, error: undefined, stats: undefined, model: undefined })) } : draft.plan }),
+    changeGoal: (_, goal) => setDraft({ goal, plan: { ...draft.plan, tasks: draft.plan.tasks.map((t) => ({ ...t, edited: true })) } }),
     run: (msgId) => {
       c?.saveEdit(run.convId, msgId, draft.goal, draft.plan);
       setDraft(null);
@@ -280,6 +280,17 @@ function RunView({ run, ollama, onOpenChat }: { run: Run; ollama: OllamaState; o
               <Markdown text={run.answer} live={run.orch.phase === 'writing'} />
             </section>
           )}
+          {!!run.orch.earlier?.length && (
+            <section className="panel earlier">
+              <h4>Earlier answers <span className="muted small">· from before the plan was edited</span></h4>
+              {[...run.orch.earlier].reverse().map((e) => (
+                <details key={e.at}>
+                  <summary>{new Date(e.at).toLocaleString()}</summary>
+                  <Markdown text={e.answer} />
+                </details>
+              ))}
+            </section>
+          )}
         </>
       ) : (
         <PlanActionsContext.Provider value={actions}>
@@ -318,6 +329,18 @@ function TaskCard({ task, index }: { task: PlanTask; index: number }) {
       {status === 'running' && !task.output && <span className="typing"><i /><i /><i /></span>}
       {task.error && <div className="msg-error">⚠ {task.error}</div>}
       {task.stats && <div className="stats mono">{task.stats.tokens} tokens · {task.stats.seconds.toFixed(1)} s</div>}
+      {!!task.earlier?.length && (
+        <details className="task-earlier">
+          <summary className="muted small">Earlier results ({task.earlier.length})</summary>
+          {[...task.earlier].reverse().map((e) => (
+            <div key={e.at} className="task-earlier-item">
+              <div className="muted small">{new Date(e.at).toLocaleString()} · {e.agent}{e.model ? ` · ${e.model}` : ''}</div>
+              <div className="plan-instr muted small">{e.instructions}</div>
+              <Markdown text={e.output} />
+            </div>
+          ))}
+        </details>
+      )}
     </div>
   );
 }

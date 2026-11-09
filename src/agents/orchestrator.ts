@@ -20,6 +20,15 @@ export interface AgentDraft {
 
 export type TaskStatus = 'pending' | 'running' | 'done' | 'error' | 'skipped';
 
+/** What a task produced before it was edited and run again. */
+export interface EarlierResult {
+  output: string;
+  agent: string;
+  instructions: string;
+  model?: string;
+  at: number;
+}
+
 export interface PlanTask {
   id: string;
   title: string;
@@ -35,6 +44,9 @@ export interface PlanTask {
   model?: string;
   stats?: RunStats;
   error?: string;
+  /** Edited since it last ran: it runs again, and its result so far goes to `earlier`. */
+  edited?: boolean;
+  earlier?: EarlierResult[];
 }
 
 export interface Plan {
@@ -52,6 +64,8 @@ export interface Orchestration {
   /** What the planner said while planning (shown if it failed to make a plan). */
   plannerNote?: string;
   error?: string;
+  /** Final answers from before the plan was edited and run again. */
+  earlier?: { answer: string; at: number }[];
 }
 
 export interface ModelInfo {

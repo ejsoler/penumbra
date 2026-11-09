@@ -315,13 +315,21 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     // Tasks that finished and weren't edited keep their results, unless one they depend on runs again.
     const redo = new Set<string>();
     const tasks: PlanTask[] = orch.plan.tasks.map((t) => {
-      if (t.status === 'done' && t.output && !t.dependsOn.some((d) => redo.has(d))) return { ...t };
+      if (t.status === 'done' && t.output && !t.edited && !t.dependsOn.some((d) => redo.has(d))) return { ...t };
       redo.add(t.id);
-      return { ...t, status: 'pending', output: '', steps: [], error: undefined, stats: undefined };
+      // What it made before is kept, not replaced.
+      const earlier = t.output ? [...(t.earlier ?? []), { output: t.output, agent: t.agent, instructions: t.instructions, model: t.model, at: Date.now() }] : t.earlier;
+      return { ...t, status: 'pending', output: '', steps: [], error: undefined, stats: undefined, edited: undefined, ...(earlier ? { earlier } : {}) };
     });
     patchOrch(conv.id, msgId, (o) => ({ ...o, phase: 'running', plan: { ...o.plan!, tasks } }));
-    // The answer is written again from the results.
-    patchMessage(conv.id, msgId, (m) => ({ ...m, content: '', thinking: undefined, stopped: undefined }));
+    // The answer is written again from the results; the last one is kept.
+    patchMessage(conv.id, msgId, (m) => ({
+      ...m,
+      content: '',
+      thinking: undefined,
+      stopped: undefined,
+      orchestration: m.orchestration && (m.content.trim() ? { ...m.orchestration, earlier: [...(m.orchestration.earlier ?? []), { answer: m.content, at: Date.now() }] } : m.orchestration),
+    }));
     try {
       for (const task of tasks) {
         if (ac.signal.aborted) break;

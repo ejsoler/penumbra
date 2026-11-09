@@ -226,7 +226,12 @@ async function runDemo(win, model) {
       await sleep(2000);
       await waitFor(`![...document.querySelectorAll('button')].some(b => b.offsetParent && b.innerText.trim() === 'Stop')`, 600);
     } },
-    { t: 'The new agent is saved', run: () => view('Agents & Skills') },
+    { t: 'Edit a finished run', say: 'Edit plan changes the goal or any task, adds a task, or adds a new agent (with its own model, tools, and instructions), then runs it again. Tasks you leave alone keep their results.', run: async () => {
+      await clickText('Edit plan');
+      await sleep(500);
+      await clickText('Add agent');
+    } },
+    { t: 'The new agent is saved', run: async () => { await clickText('Cancel'); await view('Agents & Skills'); } },
     { s: '7. Scheduler', t: 'Scheduled tasks', say: 'Tasks run prompts, agents, orchestrator goals, commands, or backups at set times. "Morning haiku" runs every day at 8:00.', run: async () => {
       await view('Scheduler');
       await js(`[...document.querySelectorAll('${page} .conv-item')].find(e => e.innerText.includes('Morning haiku'))?.click()`);

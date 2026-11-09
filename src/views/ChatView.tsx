@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type MouseEvent, type R
 import * as api from '../api';
 import { DEFAULT_PARAMS, isInteractive, uid, usePersistent, type Conversation, type GenParams, type OllamaState, type UiMessage } from '../store';
 import { INTERACTIVE_MIN_CTX } from '../widgets/prompt';
-import { createAgent, getAgent, useAgents, type Agent } from '../agents/agents';
+import { createAgent, getAgent, updateAgent, useAgents, type Agent } from '../agents/agents';
 import { AgentAvatar } from '../components/AgentAvatar';
 import { openLightbox } from '../components/Lightbox';
 import { hasImageModel, imageUrl, useImages } from '../images';
@@ -305,17 +305,27 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     abortRef.current = ac;
     setStreamingId(conv.id);
     // New agents become real agents, so they can be reused and edited later.
-    for (const draft of orch.plan.newAgents) {
-      if (!agentsRef.current.some((a) => a.name.toLowerCase() === draft.name.toLowerCase())) {
-        createAgent({ ...draft, skills: [], createdBy: 'orchestrator' });
-      }
+    for (const draft of orch.plan.newAgents.filter((d) => orch.plan!.tasks.some((t) => t.agent === d.name))) {
+      const saved = agentsRef.current.find((a) => a.name.toLowerCase() === draft.name.toLowerCase());
+      if (!saved) createAgent({ ...draft, skills: [], createdBy: 'orchestrator' });
+      // A plan edited after it ran changes the agents it made, but never one the user made.
+      else if (saved.createdBy === 'orchestrator') updateAgent(saved.id, { description: draft.description, persona: draft.persona, model: draft.model, instructions: draft.instructions, tools: draft.tools });
     }
     const approve = approver(ac, conv.id, run.preApproved); // one for the whole plan, so "for this run" covers every task
-    const tasks: PlanTask[] = orch.plan.tasks.map((t) => ({ ...t, status: 'pending', output: '', steps: [], error: undefined, stats: undefined }));
+    // Tasks that finished and weren't edited keep their results, unless one they depend on runs again.
+    const redo = new Set<string>();
+    const tasks: PlanTask[] = orch.plan.tasks.map((t) => {
+      if (t.status === 'done' && t.output && !t.dependsOn.some((d) => redo.has(d))) return { ...t };
+      redo.add(t.id);
+      return { ...t, status: 'pending', output: '', steps: [], error: undefined, stats: undefined };
+    });
     patchOrch(conv.id, msgId, (o) => ({ ...o, phase: 'running', plan: { ...o.plan!, tasks } }));
+    // The answer is written again from the results.
+    patchMessage(conv.id, msgId, (m) => ({ ...m, content: '', thinking: undefined, stopped: undefined }));
     try {
       for (const task of tasks) {
         if (ac.signal.aborted) break;
+        if (task.status === 'done') continue;
         const failedDep = task.dependsOn.find((d) => tasks.find((t) => t.id === d)?.status !== 'done');
         if (failedDep) {
           task.status = 'skipped';
@@ -604,6 +614,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     },
     cancelPlan: (convId, msgId) => patchOrch(convId, msgId, (o) => ({ ...o, phase: 'cancelled' })),
     changePlan: (convId, msgId, plan) => patchOrch(convId, msgId, (o) => ({ ...o, plan })),
+    saveEdit: (convId, msgId, goal, plan) => patchOrch(convId, msgId, (o) => ({ ...o, goal, plan })),
     stop: () => abortRef.current?.abort(),
     openChat: (convId) => setCurrentId(convId),
   };

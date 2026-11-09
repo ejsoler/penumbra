@@ -67,7 +67,7 @@ const STEPS: Step[] = [
 
   // Orchestrator
   { title: 'Orchestrator runs', body: 'Every orchestrator run is listed here. + starts a new one.', target: '.content-inner > aside.sidebar', view: 'orchestrator' },
-  { title: 'Plan, review, run', body: 'Describe a goal and pick the planner model. The orchestrator proposes tasks and the agents for them (creating new ones if needed). You edit and approve the plan, then follow it on a board with a column per agent, and get the final answer.', target: '.content-inner > main', view: 'orchestrator' },
+  { title: 'Plan, review, run', body: 'Describe a goal and pick the planner model. The orchestrator proposes tasks and the agents for them (creating new ones if needed). You edit and approve the plan, then follow it on a board with a column per agent, and get the final answer. Edit plan on a finished run changes its goal, task instructions, or agents, adds new ones, and runs it again: tasks you leave alone keep their results.', target: '.content-inner > main', view: 'orchestrator' },
 
   // Scheduler
   { title: 'Scheduled tasks', body: 'New task runs a prompt, an agent, an orchestrator goal, a terminal command, or a backup once, daily or on chosen days, or every few minutes or hours. Each task keeps its own chat and a run log.', target: 'button[title="New task"]', view: 'scheduler' },

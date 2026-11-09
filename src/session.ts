@@ -119,6 +119,8 @@ export interface ChatController {
   runInChat: (convId: string, text: string, run?: RunOptions) => Promise<void>;
   cancelPlan: (convId: string, msgId: string) => void;
   changePlan: (convId: string, msgId: string, plan: import('./agents/orchestrator').Plan) => void;
+  /** Saves an edited goal and plan on a finished run (what's unchanged keeps its results). */
+  saveEdit: (convId: string, msgId: string, goal: string, plan: import('./agents/orchestrator').Plan) => void;
   stop: () => void;
   openChat: (convId: string) => void;
 }

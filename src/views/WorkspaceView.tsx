@@ -1,16 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { OllamaState } from '../store';
 import { usePersistent } from '../store';
 import { useAgents } from '../agents/agents';
 import { TOOL_GROUPS } from '../agents/builtins';
-import type { Orchestration, PlanTask } from '../agents/orchestrator';
+import type { Orchestration, Plan, PlanTask } from '../agents/orchestrator';
 import { approval as approvalStore, chatController, getConversations, streaming, useConversations } from '../session';
 import { host } from '../host';
 import { Markdown } from '../components/Markdown';
 import { PlanActionsContext, PlanCard, type PlanActions } from '../components/PlanCard';
 import { Steps } from '../components/Steps';
 import {
-  Ban, Bot, CircleAlert, CircleCheck, FolderOpen, Loader2, MessageSquare, Plus, ShieldAlert, Square, Workflow, X,
+  Ban, Bot, CircleAlert, CircleCheck, FolderOpen, Loader2, MessageSquare, Pencil, Play, Plus, ShieldAlert, Square, Workflow, X,
 } from '../components/icons';
 
 interface Run {
@@ -176,7 +176,23 @@ function RunView({ run, ollama, onOpenChat }: { run: Run; ollama: OllamaState; o
   const live = streamingId === run.convId;
   const plan = run.orch.plan;
   const c = chatController.current;
-  const actions: PlanActions = {
+  // Editing a finished run works on a copy; nothing changes until it's saved.
+  const [draft, setDraft] = useState<{ goal: string; plan: Plan } | null>(null);
+  useEffect(() => setDraft(null), [run.msgId]);
+  const canEdit = !!plan && !live && ['done', 'cancelled', 'error'].includes(run.orch.phase);
+  const actions: PlanActions = draft ? {
+    agents,
+    models: ollama.models.map((m) => ({ name: m.name, size: m.details.parameter_size, capabilities: ollama.capabilities[m.name] ?? [], loaded: ollama.running.some((r) => r.name === m.name), remote: !!m.remote_host })),
+    busy: !!streamingId,
+    change: (_, p) => setDraft({ ...draft, plan: p }),
+    changeGoal: (_, goal) => setDraft({ goal, plan: draft.plan.tasks.length ? { ...draft.plan, tasks: draft.plan.tasks.map((t) => ({ ...t, status: undefined, output: undefined, steps: undefined, error: undefined, stats: undefined, model: undefined })) } : draft.plan }),
+    run: (msgId) => {
+      c?.saveEdit(run.convId, msgId, draft.goal, draft.plan);
+      setDraft(null);
+      c?.runPlan(msgId);
+    },
+    cancel: () => setDraft(null),
+  } : {
     agents,
     models: ollama.models.map((m) => ({ name: m.name, size: m.details.parameter_size, capabilities: ollama.capabilities[m.name] ?? [], loaded: ollama.running.some((r) => r.name === m.name), remote: !!m.remote_host })),
     busy: !!streamingId,
@@ -202,7 +218,7 @@ function RunView({ run, ollama, onOpenChat }: { run: Run; ollama: OllamaState; o
     });
   }, [plan, agents]);
 
-  const showBoard = plan && ['running', 'writing', 'done'].includes(run.orch.phase) || (run.orch.phase === 'cancelled' && plan?.tasks.some((t) => t.status));
+  const showBoard = !draft && (plan && ['running', 'writing', 'done'].includes(run.orch.phase) || (run.orch.phase === 'cancelled' && plan?.tasks.some((t) => t.status)));
 
   return (
     <div className="run">
@@ -218,6 +234,12 @@ function RunView({ run, ollama, onOpenChat }: { run: Run; ollama: OllamaState; o
         </div>
         <div className="row gap">
           {live && <button className="btn sm" onClick={() => c?.stop()}><Square size={12} fill="currentColor" /> Stop</button>}
+          {canEdit && !draft && (
+            <button className="btn sm" title="Change the goal, the tasks, or the agents, and run again" onClick={() => setDraft({ goal: run.orch.goal, plan: structuredClone(plan!) })}><Pencil size={13} /> Edit plan</button>
+          )}
+          {canEdit && !draft && plan!.tasks.some((t) => t.status !== 'done') && (
+            <button className="btn sm" title="Run the tasks that haven't finished" disabled={!!streamingId} onClick={() => c?.runPlan(run.msgId)}><Play size={13} /> Run again</button>
+          )}
           <button className="btn sm" onClick={() => onOpenChat(run.convId)}><MessageSquare size={13} /> Open in chat</button>
         </div>
       </header>
@@ -261,7 +283,11 @@ function RunView({ run, ollama, onOpenChat }: { run: Run; ollama: OllamaState; o
         </>
       ) : (
         <PlanActionsContext.Provider value={actions}>
-          <PlanCard msgId={run.msgId} orch={run.orch} />
+          <PlanCard
+            msgId={run.msgId}
+            orch={draft ? { ...run.orch, goal: draft.goal, plan: draft.plan } : run.orch}
+            edit={draft ? { onCancel: () => setDraft(null), onSave: () => { c?.saveEdit(run.convId, run.msgId, draft.goal, draft.plan); setDraft(null); } } : undefined}
+          />
         </PlanActionsContext.Provider>
       )}
     </div>

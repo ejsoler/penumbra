@@ -69,7 +69,7 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 - Skills use Claude's `SKILL.md` format: create them in the app or import folders and `.zip` files. The model loads a skill only when a task needs it
 - Tools: web search and pages, read and write files in a folder you choose, and terminal commands (each one asks you first). Every reply shows the tools it used
 - Attach text files to a message
-- The **Orchestrator** plans a goal into tasks, creates the agents it needs, lets you review and edit the plan, then runs each task on its agent and writes the final answer. Follow runs on a board with one column per agent
+- The **Orchestrator** plans a goal into tasks, creates the agents it needs, lets you review and edit the plan, then runs each task on its agent and writes the final answer. Follow runs on a board with one column per agent. **Edit plan** on a finished run changes its goal, tasks, or agents (or adds new ones) and runs it again, keeping the results of tasks you didn't touch
 - The **Scheduler** runs prompts, agents, orchestrator goals, or terminal commands at set times or on repeat, with a chat per task for the results. While tasks are on, Penumbra keeps running in the menu bar when you close the window
 
 **Images** *(new in 0.3.0)*

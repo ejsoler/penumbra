@@ -38,11 +38,11 @@ function prepareFiles() {
 }
 
 function seed(model, folder) {
-  const agent = (id, name, description, instructions, tools) => ({ id, name, description, model, instructions, skills: [], tools, createdAt: 1 });
+  const agent = (id, name, description, instructions, tools, persona) => ({ id, name, description, persona, model, instructions, skills: [], tools, createdAt: 1 });
   const agents = [
-    agent('res', 'Researcher', 'Gathers facts and explains them clearly, with sources when it has them.', 'You are a careful researcher. Search the web for current or specific facts, read the most relevant pages, and answer with well-organized findings and the addresses you used. Say clearly when you are unsure, and never invent sources or numbers.', ['skills', 'web']),
-    agent('wri', 'Writer', 'Drafts and edits text: emails, posts, summaries, documents.', 'You are a skilled writer and editor. Match the requested tone and length. Prefer clear, plain language. Return the finished text without commentary unless asked.', ['skills']),
-    agent('cod', 'Coder', 'Writes, explains, and reviews code.', "You are an expert programmer. Look at the existing files before changing anything, write correct, idiomatic code that matches the project's style, and test it when you can. Explain briefly what you changed.", ['skills', 'files', 'write', 'terminal']),
+    agent('res', 'Researcher', 'Gathers facts and explains them clearly, with sources when it has them.', 'You are a careful researcher. Search the web for current or specific facts, read the most relevant pages, and answer with well-organized findings and the addresses you used. Say clearly when you are unsure, and never invent sources or numbers.', ['skills', 'web'], 'Curious and careful. Checks facts twice, says plainly what it isn’t sure about, and keeps answers well organized.'),
+    agent('wri', 'Writer', 'Drafts and edits text: emails, posts, summaries, documents.', 'You are a skilled writer and editor. Match the requested tone and length. Prefer clear, plain language. Return the finished text without commentary unless asked.', ['skills'], 'Warm and concise. Writes in clear, friendly language and gets to the point without losing the personal touch.'),
+    agent('cod', 'Coder', 'Writes, explains, and reviews code.', "You are an expert programmer. Look at the existing files before changing anything, write correct, idiomatic code that matches the project's style, and test it when you can. Explain briefly what you changed.", ['skills', 'files', 'write', 'terminal'], 'Calm and thorough. Explains the why behind a change, flags risks early, and keeps solutions simple.'),
   ];
   const chats = [
     { title: 'Demo · Interactive', interactive: true },

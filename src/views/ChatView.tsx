@@ -298,13 +298,20 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       let said = '';
       for (let attempt = 0; attempt < 2 && !raw; attempt++) {
         let text = '';
-        for await (const chunk of api.chat(
-          { model, messages, options: genOptions(0.3, true), keep_alive: params.keep_alive, ...(toolsOk ? { tools: [PROPOSE_PLAN] } : {}), ...(caps.includes('thinking') ? { think: params.think } : {}) },
-          ac.signal,
-        )) {
-          text += chunk.message?.content ?? '';
-          const call = chunk.message?.tool_calls?.find((c) => c.function.name === 'propose_plan');
-          if (call) raw = call.function.arguments as Record<string, unknown>;
+        try {
+          for await (const chunk of api.chat(
+            { model, messages, options: genOptions(0.3, true), keep_alive: params.keep_alive, ...(toolsOk ? { tools: [PROPOSE_PLAN] } : {}), ...(caps.includes('thinking') ? { think: params.think } : {}) },
+            ac.signal,
+          )) {
+            text += chunk.message?.content ?? '';
+            const call = chunk.message?.tool_calls?.find((c) => c.function.name === 'propose_plan');
+            if (call) raw = call.function.arguments as Record<string, unknown>;
+          }
+        } catch (e) {
+          // Ollama sometimes can't read the model's tool call (a garbled one): ask again once before giving up.
+          if (ac.signal.aborted || attempt > 0) throw e;
+          raw = null;
+          continue;
         }
         raw ??= parsePlanText(text);
         said = text;

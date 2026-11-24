@@ -130,6 +130,7 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 - Pause, resume, and retry downloads, with speed and time remaining; unfinished downloads survive restarts
 
 **Everywhere**
+- A tab bar that shows just icons, or expands to show the names of the tabs
 - A **Home** dashboard, where Penumbra opens: start a chat from one box, and see recent chats, projects, agents, connections, upcoming tasks, orchestrator runs, loaded models and downloads, recent images, your last backup, and updates at a glance
 - A guided tutorial of every tab the first time you open Penumbra (and in each new profile), until you choose not to see it again; Options → Tutorial shows it any time
 - Your own name and avatar on your messages (set from the button at the bottom of the sidebar)

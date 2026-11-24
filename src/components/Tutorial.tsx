@@ -51,7 +51,8 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { title: 'Welcome to Penumbra', body: 'A tour of every tab: chat with local models, interactive answers, agents, the orchestrator, scheduled tasks, images, and your options. Everything runs on this computer with Ollama.' },
+  { title: 'Welcome to Penumbra', body: 'A tour of every tab: chat with local models, interactive answers, projects, agents, connections to other apps, the orchestrator, scheduled tasks, images, backups, and your options. Everything runs on this computer with Ollama.' },
+  { title: 'The tab bar', body: 'Every tab is an icon on the left. The arrow at the top expands the bar to show their names, and collapses it again. Penumbra remembers your choice.', target: '.rail-toggle' },
 
   // Home
   { title: 'Home', body: 'Penumbra opens here. Ask something to start a chat, and see each tab at a glance: recent chats, projects, agents, connections, scheduled tasks, orchestrator runs, loaded models and downloads, images, backups, and updates. Click a card’s link to go there.', target: '.home-grid', view: 'home' },
@@ -104,6 +105,7 @@ const STEPS: Step[] = [
   // Options
   { title: 'Server', body: 'Where Penumbra finds Ollama. Change it to use Ollama on another computer.', target: '#server', view: 'developer' },
   { title: 'Internet access', body: 'Whether new chats use approved sites or the whole internet (with a warning first), and your own sites, which every chat checks before its own list. Each chat can change its access in its settings panel.', target: '#internet-access', view: 'developer' },
+  { title: 'Memory settings', body: 'How often the notes update (every few of your messages), whether Penumbra writes a MEMORY.md in a chat’s or project’s folder, and what it remembers about you. Edit, pin, or forget anything.', target: '#memory', view: 'developer' },
   { title: 'Updates', body: 'Penumbra checks GitHub for new versions. When one is out, an arrow appears at the bottom of the sidebar and opens the Updates tab, with what’s new and the download.', target: '#updates', view: 'developer' },
   { title: 'Guided demo', body: 'A longer, step-by-step tour with real examples, in its own window with sample data, so your chats aren’t touched.', target: '#demo', view: 'developer' },
   { title: 'This tutorial', body: 'Open it again any time from here, and choose whether it shows when Penumbra starts.', target: '#tutorial', view: 'developer' },

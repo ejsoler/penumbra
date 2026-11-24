@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useOllama } from './store';
+import { useOllama, usePersistent } from './store';
 import { ChatView } from './views/ChatView';
 import { ModelsView } from './views/ModelsView';
 import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView, developerFocus } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
-import { Bot, CalendarClock, DatabaseBackup, Folder, FolderOpen, House, ImageIcon, MessageSquare, Plug, Settings, Telescope, Workflow } from './components/icons';
+import { Bot, CalendarClock, DatabaseBackup, Folder, FolderOpen, House, ImageIcon, MessageSquare, PanelLeftClose, PanelLeftOpen, Plug, Settings, Telescope, Workflow } from './components/icons';
 import { WorkspaceView } from './views/WorkspaceView';
 import { SchedulerView } from './views/SchedulerView';
 import { ImagesView } from './views/ImagesView';
@@ -98,6 +98,8 @@ function Main() {
     syncProfile();
   }, []);
   const scheduler = useScheduler();
+  // The tab bar shows just icons, or icons with their names.
+  const [railOpen, setRailOpen] = usePersistent('ollama-gui.railOpen', false);
   const openChat = (convId: string) => {
     chatController.current?.openChat(convId);
     setView('chat');
@@ -112,21 +114,30 @@ function Main() {
 
   return (
     <ContextMenuProvider>
-    <div className={`app ${isElectron && isMac ? 'mac-inset' : ''}`}>
-      <nav className="rail">
-        <div className="rail-logo" title="Penumbra"><Logo size={24} /></div>
+    <div className={`app ${isElectron && isMac ? 'mac-inset' : ''}`} style={{ '--rail-w': railOpen ? '196px' : '60px' } as React.CSSProperties}>
+      <nav className={`rail ${railOpen ? 'wide' : ''}`}>
+        <div className="rail-top">
+          <div className="rail-logo" title="Penumbra"><Logo size={24} />{railOpen && <b className="rail-name">Penumbra</b>}</div>
+          <button className="rail-toggle" onClick={() => setRailOpen(!railOpen)} title={railOpen ? 'Collapse the tab bar' : 'Show tab names'} aria-label={railOpen ? 'Collapse the tab bar' : 'Show tab names'} aria-expanded={railOpen}>
+            {railOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </button>
+        </div>
         {NAV.map(({ id, label, icon: Icon }) => (
           <button key={id} className={`rail-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)} title={label}>
             <Icon size={19} />
+            {railOpen && <span className="rail-label">{label}</span>}
             {id === 'discover' && pulling && <span className="rail-dot" />}
             {id === 'chat' && running && view !== 'chat' && <span className="rail-dot" />}
             {id === 'scheduler' && scheduler.running && view !== 'scheduler' && <span className="rail-dot" />}
           </button>
         ))}
         <span className="flex" />
-        <UpdateButton active={view === 'updates'} onOpen={() => setView('updates')} />
-        <ProfileButton />
-        <div className={`rail-status ${ollama.connected ? 'on' : ollama.connected === false ? 'off' : ''}`} title={ollama.connected ? `Ollama v${ollama.version}` : 'Ollama not reachable'} />
+        <UpdateButton active={view === 'updates'} onOpen={() => setView('updates')} wide={railOpen} />
+        <ProfileButton wide={railOpen} />
+        <div className="rail-status-row" title={ollama.connected ? `Ollama v${ollama.version}` : 'Ollama not reachable'}>
+          <div className={`rail-status ${ollama.connected ? 'on' : ollama.connected === false ? 'off' : ''}`} />
+          {railOpen && <span className="rail-label small">{ollama.connected ? `Ollama ${ollama.version}` : ollama.connected === false ? 'Ollama not reachable' : 'Connecting…'}</span>}
+        </div>
       </nav>
 
       <div className="content">

@@ -10,7 +10,7 @@ const clean = (e: unknown) => (e instanceof Error ? e.message : String(e)).repla
 
 type Form = null | { kind: 'new' } | { kind: 'password' } | { kind: 'delete'; target: ProfileInfo };
 
-export function ProfileButton() {
+export function ProfileButton({ wide }: { wide?: boolean }) {
   const profile = useProfile();
   const me = asAvatar(profile);
   const [open, setOpen] = useState(false);
@@ -43,6 +43,7 @@ export function ProfileButton() {
     <>
       <button className={`rail-btn rail-profile ${open ? 'active' : ''}`} onClick={() => setOpen(!open)} title={profile.name ? `${profile.name} (your profile)` : 'Your profile'}>
         <AgentAvatar agent={me} size={28} />
+        {wide && <span className="rail-label">{profile.name.trim() || 'Your profile'}</span>}
       </button>
       {open && (
         <div className="profile-card" ref={card} role="dialog" aria-label="Your profile">

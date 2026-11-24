@@ -13,7 +13,8 @@
   - **Manage projects:** `create_project`, `update_project`, `add_project_source`, `move_chat`.
   - **Images and the orchestrator:** `generate_image` (returns the picture) and `run_orchestrator` (plans, runs the agents, and returns the final answer).
   The window shows ready-to-copy settings for apps that take a web address, a one-line command for Claude Code, and for apps that only start programs (Claude Desktop and similar) a small stdio bridge that Penumbra puts in its folder. Long calls keep the connection alive (with progress notifications for clients that ask for them), an app that gives up stops the work, and calls that arrive together (an app asking several things at once) wait their turn instead of failing. Penumbra has to be open. Chats made by an app have memory turned off, and a message an app sends into one of your chats is marked as theirs, so memory never learns from it and never writes a MEMORY.md in a folder the app only meant to read. The server settings, which hold the token, are not part of backups.
-- The tutorial and the guided demo cover the new tabs, memory, and the server.
+- **The tab bar can show names.** A button at the top of the bar expands it to show each tab's name next to its icon (and the Update and profile buttons, and Ollama's status), and collapses it again. Penumbra remembers the choice.
+- The tutorial and the guided demo cover the new tabs, memory, the server, and the tab bar.
 
 ## 0.7.0 (2026-11-23)
 

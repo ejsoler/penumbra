@@ -1,6 +1,6 @@
-# Penumbra 0.2.0 demo script
+# Penumbra demo script
 
-A walkthrough of everything new in 0.2.0: interactive answers, internet widgets, agents, skills, tools, and the orchestrator. It takes about 25 minutes. Each section says what to click, what to type, and what to say. Times are from test runs on a Mac with `qwen3.8:27b-mlx`; a different model or computer will be faster or slower.
+A walkthrough of Penumbra: interactive answers, internet widgets, agents, skills, tools, projects, connections to other apps (MCP), the orchestrator, the scheduler, images and backups, long chats with memory, and background work. The app runs the same tour by itself: Options → **Guided demo**. This is the written version, about 40 minutes if you do everything. Each section says what to click, what to type, and what to say. Times are from test runs on a Mac with `qwen3.8:27b-mlx`; a different model or computer will be faster or slower.
 
 Lines in *italics* are things to say. Prompts in code blocks are meant to be pasted as-is; all of them have been run in the app with `qwen3.8:27b-mlx`.
 
@@ -125,7 +125,24 @@ Do this 10 minutes before you start.
    ```
    Answer: $12,400 and March 3.
 
-## 6. The orchestrator (6 min)
+## 6. Projects and connections (6 min)
+
+*"A project groups chats that share instructions, a folder, and source files. And Penumbra can talk to other apps in both directions."*
+
+1. **Projects.** In the Chat tab, the folder button makes a project. Open **Project Tide** (in the demo window it already exists): *"Instructions every chat follows, a local folder for file tools, and sources the model knows."* Open a chat in it and send:
+   ```
+   When does the launch happen and who is the lead engineer?
+   ```
+   It answers in one sentence and says which source it used.
+2. **The Projects tab** lists every project with its chats and settings; chats can be added, taken out, or started there. Home has a **Projects** card.
+3. **Connected apps.** The **Connections** tab lists the apps Penumbra uses through MCP. In the demo, a small tracker app is already connected. Open a chat with **Connected apps** on and send:
+   ```
+   How is Project Tide going, and what is the next milestone? Use your tools.
+   ```
+   It asks first: click **Allow** (or **Always allow**). *"Every use asks me, with the details."*
+4. **Penumbra as a server.** In Connections, **Penumbra as a server**: other apps (Claude Desktop, Claude Code, Cursor) can use Penumbra. *"Everything starts off; I choose what they may do, and it only listens on this computer with a secret token."* Show the three blocks to copy.
+
+## 7. The orchestrator (6 min)
 
 *"Now several agents working together. The orchestrator plans, assigns, and puts it all together."*
 
@@ -149,9 +166,34 @@ Do this 10 minutes before you start.
    ```
 3. **Make a plan**. It creates a new **Social Media Specialist** agent. *"It makes agents when it needs a role I don't have."*
 4. **Run plan**. The board shows one column per agent, with live task cards; the new agent has a **new** badge. About 45 seconds.
-5. Open the **Agents & Skills** tab: the Social Media Specialist is saved there and can be reused.
+5. **Edit plan.** On a finished run, **Edit plan** changes the goal, the tasks, or the agents (or adds new ones) and runs it again. Tasks you leave alone keep their results, and what was made before stays under **Earlier results**.
+6. Open the **Agents & Skills** tab: the Social Media Specialist is saved there and can be reused.
 
-## 7. Keeps running in the background (1 min)
+## 8. Scheduler (2 min)
+
+1. Open the **Scheduler** tab. *"Prompts, agents, orchestrator goals, commands, or backups, at set times."* Show **Morning haiku** (every day at 8:00) and click **Run now**: its chat and run log appear.
+2. *"While tasks are on, Penumbra keeps running in the menu bar when I close the window."*
+
+## 9. Images and backups (3 min)
+
+1. **Images** tab: *"Pictures made on this computer, outside Ollama."* Show the gallery and the zoomable viewer.
+2. **Backup** tab: *"Chats, projects, agents, skills, images, tasks, and settings in one file; incremental ones only what changed; and the Scheduler can do it for me."*
+3. In a chat, the backup button at the top saves just that chat.
+
+## 10. Long chats and memory (5 min)
+
+1. **Long chats.** *"When a chat outgrows the model's context, older messages are summarized and nothing is lost silently."* In the settings panel, **Compact now** summarizes the older part; a reply cut off at **Max Tokens** offers **Continue**.
+2. **Memory.** *"Chats keep short notes, so they don't forget."* In a new chat send:
+   ```
+   My name is Ana and I live in San Juan. I like answers in one or two sentences.
+   ```
+   then
+   ```
+   We are planning a small garden party for 20 people on Saturday.
+   ```
+   After the second message, the model updates the notes (a few seconds) and a line says what changed, with **Undo**. In the settings panel, **Memory** shows them under **Chat** and **You**; edit, pin, or delete any note. *"What I say about myself is remembered in every chat; my notes can also be saved as MEMORY.md in a folder."*
+
+## 11. Keeps running in the background (1 min)
 
 1. In any chat, send a longer request, for example `Write a 200-word short story about a lighthouse keeper.`
 2. While it writes, switch to another tab. *"The dot on the chat icon means it's still working."*

@@ -201,7 +201,15 @@ export function normalizePlan(raw: Record<string, unknown>, { agents, models, fa
     const name = s(a.name).slice(0, 60);
     if (!name || existing.has(name.toLowerCase()) || newAgents.some((n) => n.name.toLowerCase() === name.toLowerCase())) continue;
     const tools = asArray(a.tools).map(s).filter((t): t is ToolGroup => toolList.includes(t as ToolGroup));
-    newAgents.push({ name, description: s(a.description), persona: s(a.persona).slice(0, 300) || undefined, model: fixModel(s(a.model), tools.length > 0), instructions: s(a.instructions), tools });
+    newAgents.push({
+      name,
+      description: s(a.description),
+      persona: s(a.persona).slice(0, 300) || undefined,
+      model: fixModel(s(a.model), tools.length > 0),
+      // The planner sometimes leaves the instructions out: the purpose is enough to start from.
+      instructions: s(a.instructions) || `You are ${name}.${s(a.description) ? ` ${s(a.description)}` : ''} Do the task you are given carefully and report the result.`,
+      tools,
+    });
   }
   const agentNames = [...agents.map((a) => a.name), ...newAgents.map((a) => a.name)];
   const findAgent = (name: string) => agentNames.find((n) => n.toLowerCase() === name.toLowerCase());

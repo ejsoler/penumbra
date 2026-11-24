@@ -319,7 +319,7 @@ export function memoryTools(convId: string): Tool[] {
     {
       name: 'memory_save',
       label: 'Save a note',
-      description: 'Saves a short note for later. Use it when the user asks you to remember something, or for a lasting fact that will matter again. Notes about the user in every chat ("user") ask the user first.',
+      description: 'Saves a short note for later. Use it when the user asks you to remember something. Notes that other chats should have too ("project" or "user") are for lasting facts only, and "user" ones ask the user first. Don\'t guess the user\'s gender: write "the user" or "they".',
       parameters: {
         type: 'object',
         properties: {
@@ -336,7 +336,7 @@ export function memoryTools(convId: string): Tool[] {
         const text = String(a.text ?? '');
         if (looksSecret(text)) return 'Not saved: it looks like a key, password, or private number, which are never kept.';
         if (scope === 'user') {
-          const ok = await ctx.approve({ tool: 'memory:user', title: 'Remember this about you, in every chat?', detail: text.slice(0, MAX_TEXT), confirm: 'Remember' });
+          const ok = await ctx.approve({ tool: 'memory:user', title: 'Remember this about you, in every chat?', detail: text.slice(0, MAX_TEXT), confirm: 'Remember', forRun: 'Remember everything it asks in this reply' });
           if (!ok) throw new Declined('The user did not want this remembered. Do not save it.');
         }
         const r = applyOps(getItems(convId, scope), [{ scope, op: 'add', kind: String(a.kind ?? ''), text }], scope);

@@ -191,7 +191,7 @@ Do this 10 minutes before you start.
    ```
    We are planning a small garden party for 20 people on Saturday.
    ```
-   After the second message, the model updates the notes (a few seconds) and a line says what changed, with **Undo**. In the settings panel, **Memory** shows them under **Chat** and **You**; edit, pin, or delete any note. *"What I say about myself is remembered in every chat; my notes can also be saved as MEMORY.md in a folder."*
+   If the model asks to remember something about you, click **Remember**. After the second message, the model updates the notes (a few seconds) and a line says what changed, with **Undo**. In the settings panel, **Memory** shows them under **Chat** and **You**; edit, pin, or delete any note. *"What I say about myself is remembered in every chat; my notes can also be saved as MEMORY.md in a folder."*
 
 ## 11. Keeps running in the background (1 min)
 

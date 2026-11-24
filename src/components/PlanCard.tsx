@@ -68,7 +68,7 @@ export function PlanCard({ msgId, orch, edit }: { msgId: string; orch: Orchestra
   const chatModels = actions?.models.filter((m) => !m.capabilities.includes('embedding')) ?? [];
   const modelOf = (name: string) => plan?.newAgents.find((a) => a.name === name)?.model ?? actions?.agents.find((a) => a.name === name)?.model ?? '';
   const done = plan?.tasks.filter((t) => t.status === 'done').length ?? 0;
-  const valid = !!plan && plan.tasks.length > 0 && plan.tasks.every((t) => t.instructions.trim() && agentNames.includes(t.agent)) && plan.newAgents.every((a) => a.name.trim() && a.model && a.instructions.trim());
+  const valid = !!plan && plan.tasks.length > 0 && plan.tasks.every((t) => t.instructions.trim() && agentNames.includes(t.agent)) && plan.newAgents.every((a) => a.name.trim() && a.model);
 
   return (
     <div className={`plan phase-${orch.phase}`}>

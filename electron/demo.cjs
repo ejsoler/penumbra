@@ -125,9 +125,17 @@ async function runDemo(win, model) {
 
   // ---- acting in the app ----
   const view = (title) => js(`document.querySelector('.rail-btn[title="${title}"]').click()`).then(() => sleep(500));
+  // A chat is renamed after its first message, so the demo's chats are found by id, not by their first title.
+  const chatIds = Object.fromEntries(chats.map((c) => [c.title, c.id]));
   const openChat = async (title) => {
     await view('Chat');
-    await js(`[...document.querySelectorAll('.view-host .conv-item')].find(e => e.querySelector('.conv-title')?.textContent === ${JSON.stringify(title)}).click()`);
+    await js(`(() => {
+      const c = JSON.parse(localStorage.getItem('ollama-gui.conversations') || '[]').find((x) => x.id === ${JSON.stringify(chatIds[title] ?? '')});
+      const name = c ? c.title : ${JSON.stringify(title)};
+      const item = [...document.querySelectorAll('.view-host .conv-item')].find((e) => e.querySelector('.conv-title')?.textContent === name);
+      if (!item) throw new Error('Chat not found: ' + name);
+      item.click();
+    })()`);
     await sleep(600);
   };
   const checkModel = async () => {
@@ -302,7 +310,7 @@ async function runDemo(win, model) {
       await sleep(1500);
       await waitDone();
     } },
-    { t: 'Memory: telling it about you', say: 'Chats keep short notes so they don’t forget. Tell it a few lasting things; after your second message the same model reads them and updates the notes (a few seconds).', run: async () => {
+    { t: 'Memory: telling it about you', say: 'Chats keep short notes so they don’t forget. Tell it a few lasting things; after your second message the same model reads them and updates the notes (a few seconds). If it asks to remember something about you, click "Remember".', run: async () => {
       await openChat('Demo · Memory');
       await send('My name is Ana and I live in San Juan. I like answers in one or two sentences.');
     } },

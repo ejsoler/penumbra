@@ -81,6 +81,10 @@ export const Markdown = memo(function Markdown({ text, live = false }: { text: s
 /** Some models emit reasoning inline as <think>…</think>; split it out for display. */
 export function splitThinking(content: string): { thinking: string; answer: string } {
   const m = /^\s*<think>([\s\S]*?)(<\/think>|$)/.exec(content);
-  if (!m) return { thinking: '', answer: content };
-  return { thinking: m[1].trim(), answer: content.slice(m[0].length).trimStart() };
+  if (m) return { thinking: m[1].trim(), answer: content.slice(m[0].length).trimStart() };
+  // Some chat templates open the thinking in the prompt, so the reply has only the closing tag: what came before it is the reasoning.
+  // After a tool call the model starts another round the same way, so the last closing tag marks where the answer begins.
+  const close = content.lastIndexOf('</think>');
+  if (close >= 0) return { thinking: content.slice(0, close).replace(/<\/think>/g, '\n\n').trim(), answer: content.slice(close + '</think>'.length).trimStart() };
+  return { thinking: '', answer: content };
 }

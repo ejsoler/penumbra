@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-11-24)
 
 ### Added
 - **Projects tab.** All your projects in one place: pick one to see its chats (open one, take it out of the project, add an existing chat, or start a new one) and edit its settings (name, instructions, folder, sources) or delete it.

@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('penumbraHost', {
     list: (root, rel, depth) => ipcRenderer.invoke('tools:list', root, rel, depth),
     read: (root, rel, offset) => ipcRenderer.invoke('tools:read', root, rel, offset),
     write: (root, rel, content) => ipcRenderer.invoke('tools:write', root, rel, content),
+    writeMemory: (root, content) => ipcRenderer.invoke('memory:write', root, content),
     run: (root, command, id, timeout) => ipcRenderer.invoke('tools:run', root, command, id, timeout),
     kill: (id) => ipcRenderer.invoke('tools:kill', id),
     fetch: (url) => ipcRenderer.invoke('tools:fetch', url),

@@ -6,6 +6,7 @@ import type { Step } from './agents/engine';
 import type { ToolGroup } from './agents/builtins';
 import type { Orchestration } from './agents/orchestrator';
 import type { GeneratedRef } from './agents/tools';
+import type { MemoryItem } from './memory';
 
 export interface UiMessage {
   id: string;
@@ -54,6 +55,12 @@ export interface Conversation {
   net?: ChatNet;
   /** The older part of the chat, summarized so the chat fits the model's context (see context.ts). */
   summary?: ChatSummary;
+  /** Notes kept from this chat (see memory.ts). */
+  memory?: MemoryItem[];
+  /** The last message the memory has looked at. */
+  memoryUpTo?: string;
+  /** Memory is off for this chat. */
+  memoryOff?: boolean;
 }
 
 export const isInteractive = (c: Conversation | undefined) => c?.interactive !== false;

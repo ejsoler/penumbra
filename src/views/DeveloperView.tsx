@@ -5,6 +5,7 @@ import { Check, Copy, Loader2, Play, RefreshCw, Server } from '../components/ico
 import { host as penumbraHost } from '../host';
 import { checkForUpdates, setUpdateSettings, useUpdates } from '../updates';
 import { InternetSettings } from '../components/InternetSettings';
+import { MemorySettingsPanel } from '../components/MemoryPanel';
 import { openTutorial, setTutorialAtStart, tutorialAtStart } from '../components/Tutorial';
 
 /** Set before switching to this tab to scroll to a section. */
@@ -87,6 +88,8 @@ print(response.message.content)`,
       <TutorialPanel />
 
       <InternetSettings />
+
+      <MemorySettingsPanel />
 
       {penumbraHost() && <DemoPanel ollama={ollama} />}
 

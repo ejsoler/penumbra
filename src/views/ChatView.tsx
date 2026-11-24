@@ -36,6 +36,8 @@ import {
 import { backupChat } from '../backup';
 import { chatFolder, createProject, getProject, updateProject, useProjects } from '../projects';
 import { ProjectEditor } from '../components/ProjectEditor';
+import { MemoryPanel } from '../components/MemoryPanel';
+import { abortMemory, dismissMemoryNotice, updateMemory, useMemoryBusy, useMemoryNotice } from '../memory';
 import { chatMessages, compactChat, messagesTokens, overBudget, withFiles, type ChatSummary } from '../context';
 
 const newConversation = (model = ''): Conversation => ({
@@ -101,6 +103,8 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   // Widgets are long; make sure the model has room for them.
   // Widgets and tool results are long; make sure the model has room for them (generate() does the same).
   const projects = useProjects();
+  const memoryBusy = useMemoryBusy();
+  const memoryNotice = useMemoryNotice();
   const project = projects.find((p) => p.id === current?.projectId);
   const usesTools = caps.includes('tools') && (agent ? agent.tools : current?.tools ?? DEFAULT_CHAT_TOOLS).some((t) => (t === 'skills' ? enabledSkills().length > 0 : t === 'images' ? hasImageModel() : true));
   const numCtx = interactive || usesTools || project?.sources.length ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx;
@@ -469,6 +473,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
 
     const ac = new AbortController();
     abortRef.current = ac;
+    abortMemory(); // a notes update that's still running gives way to this reply
     setStreamingId(conv.id);
 
     const modelCaps = ollama.capabilities[model] ?? [];
@@ -482,6 +487,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       net: conv.net,
       project: getProject(conv.projectId),
       numCtx: isInteractive(conv) ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx,
+      memoryConvId: run.fresh || conv.memoryOff ? undefined : conv.id,
     });
     const options = genOptions(agent?.temperature, isInteractive(conv) || tools.length > 0);
     const sendable = run.fresh ? history.slice(-1) : history;
@@ -490,6 +496,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     const build = (): api.ChatMessage[] => chatMessages(sendable, summary, system);
 
     const patch = (fn: (m: UiMessage) => UiMessage) => patchMessage(conv.id, assistant.id, fn);
+    let completed = false;
     try {
       let messages = build();
       // Too long for the context window: summarize the older part first, so nothing is dropped silently.
@@ -538,6 +545,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         ...(result.truncated ? { truncated: true } : {}),
         ...(result.cutOff ? { error: 'Stopped after too many tool calls in a row.' } : {}),
       }));
+      completed = true;
     } catch (e) {
       if (ac.signal.aborted) patch((m) => ({ ...m, stopped: true }));
       else patch((m) => ({ ...m, error: (e as Error).message }));
@@ -546,6 +554,8 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       abortRef.current = null;
       ollama.refresh();
     }
+    // Every few messages, the same model updates the chat's notes.
+    if (completed && !run.fresh && !conv.memoryOff) void updateMemory(conv.id, { model, numCtx: options.num_ctx, think: modelCaps.includes('thinking') ? false : undefined });
   };
 
   /** `interactive` forces the setting for this send (used right after the first-use notice). */
@@ -592,13 +602,15 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       const estimate = messagesTokens(chatMessages(c.messages, s)) + estimateSystem(c);
       updateConv(c.id, (x) => ({ ...x, summary: { ...s, estimate, statsMsg } }));
       setCompacting(null);
+      // What the summary will leave out should be in the notes.
+      if (!c.memoryOff) void updateMemory(c.id, { model: activeModel, numCtx, think: caps.includes('thinking') ? false : undefined, force: true });
     } catch (e) {
       setCompacting({ id: c.id, error: `Couldn't summarize: ${(e as Error).message}` });
     }
   };
   /** The system prompt's rough size, for the meter right after summarizing. */
   const estimateSystem = (c: Conversation) => {
-    const { system } = replySetup({ agent: getAgent(c.agentId), systemPrompt: c.systemPrompt, interactive: isInteractive(c), toolsSupported: caps.includes('tools'), chatTools: c.tools, folder: chatFolder(c), net: c.net, project: getProject(c.projectId), numCtx });
+    const { system } = replySetup({ agent: getAgent(c.agentId), systemPrompt: c.systemPrompt, interactive: isInteractive(c), toolsSupported: caps.includes('tools'), chatTools: c.tools, folder: chatFolder(c), net: c.net, project: getProject(c.projectId), numCtx, memoryConvId: c.memoryOff ? undefined : c.id });
     return messagesTokens(system ? [{ role: 'system', content: system }] : []);
   };
 
@@ -853,6 +865,15 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         </WidgetActionsContext.Provider>
 
         {pendingApproval && <ApprovalBar req={pendingApproval.req} onAnswer={pendingApproval.resolve} />}
+        {memoryBusy === current.id && !isStreaming && <div className="ctx-chip memory-chip"><Loader2 size={12} className="spin" /> <span>Updating the memory…</span></div>}
+        {memoryNotice && memoryNotice.convId === current.id && !isStreaming && (
+          <div className="ctx-chip memory-chip">
+            <span>{memoryNotice.text}</span>
+            <button className="link-btn small" onClick={memoryNotice.undo}>Undo</button>
+            {!showSettings && <button className="link-btn small" onClick={() => { setShowSettings(true); dismissMemoryNotice(); }}>View</button>}
+            <button className="icon-btn sm" title="Dismiss" onClick={dismissMemoryNotice}><X size={12} /></button>
+          </div>
+        )}
         {!isStreaming && contextTokens / numCtx >= CONTEXT_WARN && (
           <div className="ctx-chip">
             <span>Context {Math.min(100, Math.round((contextTokens / numCtx) * 100))}% full. Older messages are summarized automatically when needed.</span>
@@ -892,6 +913,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
           thinkingSupported={caps.includes('thinking')}
           contextTokens={contextTokens}
           contextLimit={numCtx}
+          memory={<MemoryPanel conv={current} onUpdate={() => updateMemory(current.id, { model: activeModel, numCtx, think: caps.includes('thinking') ? false : undefined, force: true })} />}
           context={
             <ContextActions
               used={contextTokens / numCtx}
@@ -1589,10 +1611,11 @@ function Composer({ disabled, streaming, vision, onSend, onStop, onNewChat, fill
   );
 }
 
-function SettingsPanel({ tools, internet, context, params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens, contextLimit }: {
+function SettingsPanel({ tools, internet, context, memory, params, setParams, systemPrompt, setSystemPrompt, thinkingSupported, contextTokens, contextLimit }: {
   tools: ReactNode;
   internet: ReactNode;
   context: ReactNode;
+  memory: ReactNode;
   params: GenParams;
   setParams: (p: Partial<GenParams>) => void;
   systemPrompt: string;
@@ -1624,6 +1647,8 @@ function SettingsPanel({ tools, internet, context, params, setParams, systemProm
           </div>
           {context}
         </section>
+
+        {memory}
 
         {tools}
 

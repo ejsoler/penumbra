@@ -52,6 +52,12 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 - Long chats keep going: older messages are sent in short form and summarized when the context fills up, with **Compact now** and a warning before it's full
 - A reply cut off by **Max Tokens** can be continued from where it stopped
 
+**Memory** *(new)*
+- Chats keep short notes so they don't lose things when they get long: **this chat's** facts, decisions, and tasks, what a **project** shares between its chats, and lasting things about **you** (your name, language, how you like answers) for every chat
+- Every few messages the same model reads the new ones and updates the notes with a quick extra step, and tells you what changed (with **Undo**). You can edit, pin, or delete any note, and turn memory off for a chat
+- The model can search its notes (`memory_search`), save one (`memory_save`; notes about you ask first), and find the exact words of earlier messages, even summarized ones (`recall`)
+- Notes of chats and projects with a folder are also written to a `MEMORY.md` there, for other tools and models. Never what's remembered about you, and never over a `MEMORY.md` Penumbra didn't write. Options → **Memory** sets how often, and whether to write the file
+
 **Interactive answers** *(new in 0.2.0)*
 - The model can reply with small live apps right in the chat: calculators, charts, step-through diagrams, 3D views, quizzes
 - It decides on its own when an app helps more than text, and answers in plain text otherwise

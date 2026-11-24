@@ -88,6 +88,8 @@ export interface ChatRequest {
   think?: boolean;
   keep_alive?: string;
   tools?: ToolDefinition[];
+  /** 'json' makes the reply valid JSON. */
+  format?: 'json';
 }
 
 export function getHost(): string {

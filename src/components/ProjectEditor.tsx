@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { host } from '../host';
 import { uid } from '../store';
 import { deleteProject, MAX_PROJECT_SOURCES, readSourceFile, sourcesSize, updateProject, useProjects, type ProjectSource } from '../projects';
+import { MemoryList } from './MemoryPanel';
+import { setProjectNotes } from '../memory';
 import { FileText, Folder, FolderOpen, Plus, StickyNote, Trash2, X } from './icons';
 
 const kb = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${Math.round(n / 1024)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
@@ -124,6 +126,11 @@ export function ProjectForm({ projectId }: { projectId: string }) {
         </div>
       )}
       {error && <p className="lock-error small">{error}</p>}
+    </section>
+
+    <section>
+      <h4>Memory <span className="muted small">{project.memory?.length ? `· ${project.memory.length}` : ''}</span></h4>
+      <MemoryList items={project.memory ?? []} scope="project" onChange={(items) => setProjectNotes(project.id, items)} empty="Nothing yet. Notes every chat in the project sees. The model adds to them as you work, every few messages, and you can edit or pin them." />
     </section>
     </div>
   );

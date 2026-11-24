@@ -90,6 +90,28 @@ async function writeFile(root, rel, content) {
   return { path: relTo(root, p), replaced: existed, bytes: Buffer.byteLength(content) };
 }
 
+// ---- MEMORY.md --------------------------------------------------------------------------------------
+// Penumbra keeps notes for a chat or project in a MEMORY.md file in its folder. It's rewritten often, so it
+// isn't sent to the Trash like other replaced files, and a MEMORY.md that isn't Penumbra's is never touched.
+
+const MEMORY_MARK = '<!-- penumbra-memory -->';
+
+function writeMemoryFile(root, content) {
+  const dir = checkRoot(root);
+  if (typeof content !== 'string' || !content.startsWith(MEMORY_MARK)) throw new Error('Not a Penumbra memory file');
+  if (Buffer.byteLength(content) > 300 * 1024) throw new Error('The memory file is too large');
+  const file = path.join(dir, 'MEMORY.md');
+  if (fs.existsSync(file)) {
+    if (!fs.statSync(file).isFile()) return { written: false, reason: 'MEMORY.md is a folder' };
+    const head = fs.readFileSync(file, 'utf8').slice(0, MEMORY_MARK.length);
+    if (head !== MEMORY_MARK) return { written: false, reason: "There is already a MEMORY.md here that Penumbra didn't write, so it was left alone" };
+  }
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, content);
+  fs.renameSync(tmp, file);
+  return { written: true, path: file };
+}
+
 // ---- terminal -------------------------------------------------------------------------------------
 
 const running = new Map();
@@ -243,6 +265,7 @@ function registerTools() {
   handle('tools:list', (_e, root, rel, depth) => listFiles(root, rel, depth));
   handle('tools:read', (_e, root, rel, offset) => readFile(root, rel, offset));
   handle('tools:write', (_e, root, rel, content) => writeFile(root, rel, content));
+  handle('memory:write', (_e, root, content) => writeMemoryFile(root, content));
   handle('tools:run', (_e, root, command, id, timeout) => runCommand(root, String(command), String(id), Number(timeout) || 120));
   handle('tools:kill', (_e, id) => running.get(String(id))?.kill());
   handle('tools:fetch', (_e, url) => fetchUrl(String(url)));

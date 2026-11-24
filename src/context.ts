@@ -45,7 +45,7 @@ export function withFiles(m: UiMessage, old = false): string {
 
 const WIDGET_BLOCK = /```widget[^\n]*\n([\s\S]*?)(?:```|$)/g;
 /** Older replies keep a note of each widget instead of its code. */
-const shrinkWidgets = (text: string) => text.replace(WIDGET_BLOCK, (_m, code: string) => `[An interactive widget was shown here: "${widgetTitle(code)}"]`);
+export const shrinkWidgets = (text: string) => text.replace(WIDGET_BLOCK, (_m, code: string) => `[An interactive widget was shown here: "${widgetTitle(code)}"]`);
 
 /** One message as it's sent: whole if recent, shortened if older. */
 function toApi(m: UiMessage, old: boolean): api.ChatMessage {

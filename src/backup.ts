@@ -19,6 +19,7 @@ const LOG_KEY = 'ollama-gui.scheduleLog';
 export const SETTING_GROUPS: { id: string; label: string; keys: string[] }[] = [
   { id: 'chat', label: 'Chat settings (sampling and generation)', keys: ['ollama-gui.params', 'ollama-gui.showSettings'] },
   { id: 'internet', label: 'Internet access and your sites', keys: ['ollama-gui.widgetNet'] },
+  { id: 'memory', label: 'Memory settings and what Penumbra remembers about you', keys: ['ollama-gui.memorySettings', 'ollama-gui.userMemory'] },
   { id: 'mcp', label: 'Connections (MCP servers; may include API keys)', keys: ['ollama-gui.mcpServers'] },
   { id: 'profile', label: 'Your name and avatar', keys: ['ollama-gui.profile'] },
   { id: 'server', label: 'Ollama server address', keys: ['ollama-gui.host'] },
@@ -85,7 +86,7 @@ const settingPrint = (keys: string[]) => hash(keys.map((k) => localStorage.getIt
 /** Fingerprints of everything in this profile now. */
 function currentPrints(files: { skills: BackupSkill[]; images: { file: string }[] }): Fingerprints {
   const p = emptyPrints();
-  for (const c of getConversations()) if (c.messages.length) p.chats[c.id] = `${c.updatedAt}:${c.messages.length}`;
+  for (const c of getConversations()) if (c.messages.length) p.chats[c.id] = `${c.updatedAt}:${c.messages.length}:${c.memory?.length ?? 0}`;
   for (const pr of getProjects()) p.projects[pr.id] = hash(JSON.stringify({ ...pr, collapsed: 0 }));
   for (const a of savedAgents()) p.agents[a.id] = hash(JSON.stringify(a));
   for (const t of savedTasks()) p.tasks[t.id] = taskPrint(t);
@@ -259,7 +260,7 @@ export async function restoreBackup(b: OpenedBackup, choice: BackupChoice, repla
   const chatsHere = getConversations();
   const chats: { item: Conversation; replaces: boolean }[] = [];
   for (const conv of c.chats.filter((x) => choice.chats.includes(x.id))) {
-    const p = place(conv, chatsHere, (x, y) => x.updatedAt === y.updatedAt && x.messages.length === y.messages.length);
+    const p = place(conv, chatsHere, (x, y) => x.updatedAt === y.updatedAt && x.messages.length === y.messages.length && (x.memory?.length ?? 0) === (y.memory?.length ?? 0));
     if (!p) continue;
     chatIds[conv.id] = p.item.id;
     const copy = p.item.id !== conv.id;

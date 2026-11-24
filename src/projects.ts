@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react';
 import { estimateTokens } from './context';
 import type { Tool } from './agents/tools';
 import { uid, type Conversation } from './store';
+import type { MemoryItem } from './memory';
 
 /** A text file or note kept in a project. */
 export interface ProjectSource {
@@ -24,6 +25,8 @@ export interface Project {
   sources: ProjectSource[];
   /** Whether the project is closed in the chat list. */
   collapsed?: boolean;
+  /** Notes every chat in the project shares (see memory.ts). */
+  memory?: MemoryItem[];
   createdAt: number;
 }
 

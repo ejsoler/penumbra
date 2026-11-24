@@ -6,6 +6,7 @@ import { builtinTools, toolsPrompt, type ToolGroup } from './builtins';
 import { enabledSkills, skillsPrompt, skillTools } from './skills';
 import type { Tool } from './tools';
 import { projectContext, projectSourceTool, type Project } from '../projects';
+import { memoryPrompt, memoryTools } from '../memory';
 
 /** Chats without an agent: skills, and images once an image model is installed. */
 export const DEFAULT_CHAT_TOOLS: ToolGroup[] = ['skills', 'images'];
@@ -24,7 +25,7 @@ export function agentPrompt(agent: Agent): string {
   return lines.join('\n');
 }
 
-export function replySetup({ agent, systemPrompt, interactive, toolsSupported, chatTools, folder, net, project, numCtx }: {
+export function replySetup({ agent, systemPrompt, interactive, toolsSupported, chatTools, folder, net, project, numCtx, memoryConvId }: {
   agent?: Agent;
   systemPrompt: string;
   interactive: boolean;
@@ -38,6 +39,8 @@ export function replySetup({ agent, systemPrompt, interactive, toolsSupported, c
   project?: Project;
   /** The context size, which decides how much of the project's sources fit. */
   numCtx?: number;
+  /** The chat whose memory notes (and memory tools) this reply gets. Missing means no memory. */
+  memoryConvId?: string;
 }): { system: string; tools: Tool[] } {
   const parts: string[] = [];
   const tools: Tool[] = [];
@@ -45,6 +48,11 @@ export function replySetup({ agent, systemPrompt, interactive, toolsSupported, c
     const ctx = projectContext(project, numCtx ?? 8192, toolsSupported);
     parts.push(ctx.prompt);
     if (toolsSupported && ctx.shortened.length) tools.push(projectSourceTool(project));
+  }
+  if (memoryConvId) {
+    const notes = memoryPrompt(memoryConvId, numCtx ?? 8192);
+    if (notes) parts.push(notes);
+    if (toolsSupported) tools.push(...memoryTools(memoryConvId));
   }
   if (agent) parts.push(agentPrompt(agent));
   if (systemPrompt.trim()) parts.push(systemPrompt.trim());

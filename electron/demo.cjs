@@ -57,6 +57,7 @@ function seed(model, folder) {
     { title: 'Demo · Long reply' },
     { title: 'Demo · Project', projectId: 'demo-project' },
     { title: 'Demo · Connected app', tools: ['skills', 'mcp'] },
+    { title: 'Demo · Memory' },
   ].map((c, i) => ({ id: 'demo' + i, model, systemPrompt: '', messages: [], updatedAt: 100 - i, interactive: false, ...c }));
   const tomorrow8 = new Date();
   tomorrow8.setDate(tomorrow8.getDate() + 1);
@@ -117,6 +118,7 @@ async function runDemo(win, model) {
     localStorage.setItem('ollama-gui.schedule', ${str(tasks)});
     localStorage.setItem('ollama-gui.projects', ${str(projects)});
     localStorage.setItem('ollama-gui.mcpServers', ${str(mcpServers)});
+    localStorage.setItem('ollama-gui.memorySettings', JSON.stringify({ auto: true, every: 2, file: true }));
     location.reload();`);
   await new Promise((r) => wc.once('did-finish-load', r));
   await sleep(1500);
@@ -297,6 +299,17 @@ async function runDemo(win, model) {
       if (!(await clickText('Continue'))) throw new Error("This reply wasn't cut off, so there's nothing to continue.");
       await sleep(1500);
       await waitDone();
+    } },
+    { t: 'Memory: telling it about you', say: 'Chats keep short notes so they don’t forget. Tell it a few lasting things; after your second message the same model reads them and updates the notes (a few seconds).', run: async () => {
+      await openChat('Demo · Memory');
+      await send('My name is Ana and I live in San Juan. I like answers in one or two sentences.');
+    } },
+    { t: 'Memory: the notes', say: 'The second message makes the model update the notes: what you said about yourself goes to “You” and is remembered in every chat; the rest stays in this chat. You can edit, pin, or delete notes.', run: async () => {
+      await send('We are planning a small garden party for 20 people on Saturday.');
+      await waitFor(`!!document.querySelector('.memory-chip') && document.querySelector('.memory-chip').innerText.includes('Memory updated')`, 120);
+      if (!(await js(`!!document.querySelector('.memory-panel')`))) await js(`document.querySelector('.view-host .topbar-right').click()`);
+      await sleep(500);
+      await js(`document.querySelector('.memory-panel')?.scrollIntoView({ block: 'start' })`);
     } },
     { s: '10. Keeps running in the background', t: 'A longer story', say: 'Sends a story and switches tabs: the dot on the Chat icon means it’s still writing.', run: async () => { await openChat('Demo · Story'); await send('Write a 200-word short story about a lighthouse keeper.', { wait: false }); await sleep(2500); await view('My Models'); } },
     { t: 'Back to the chat', say: 'The story is complete.', run: async () => { await sleep(1000); await openChat('Demo · Story'); await waitDone(); } },

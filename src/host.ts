@@ -176,6 +176,8 @@ export interface PenumbraHost {
     list: (root: string, rel?: string, depth?: number) => Promise<string>;
     read: (root: string, rel: string, offset?: number) => Promise<string>;
     write: (root: string, rel: string, content: string) => Promise<{ path: string; replaced: boolean; bytes: number }>;
+    /** Writes MEMORY.md in a folder (never over a file Penumbra didn't write). */
+    writeMemory: (root: string, content: string) => Promise<{ written: boolean; path?: string; reason?: string }>;
     run: (root: string, command: string, id: string, timeoutSec?: number) => Promise<{ code: number | null; signal: string | null; output: string }>;
     kill: (id: string) => Promise<void>;
     fetch: (url: string) => Promise<{ url: string; status: number; type: string; title?: string; text: string }>;

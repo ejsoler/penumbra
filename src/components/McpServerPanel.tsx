@@ -22,7 +22,8 @@ export function McpServerPanel() {
   const url = `http://127.0.0.1:${port0}/mcp`;
   const token = s.token || '(turn the server on to make a token)';
   const shown = (real: string) => (show ? real : real.replace(/[0-9a-f]{12,}/g, '••••••••••••••••'));
-  const http = (t: string) => JSON.stringify({ mcpServers: { penumbra: { url, headers: { Authorization: `Bearer ${t}` } } } }, null, 2);
+  const http = (t: string) => JSON.stringify({ mcpServers: { penumbra: { type: 'http', url, headers: { Authorization: `Bearer ${t}` } } } }, null, 2);
+  const claudeCode = (t: string) => `claude mcp add --transport http penumbra ${url} --header "Authorization: Bearer ${t}"`;
   const stdio = (t: string) => JSON.stringify({ mcpServers: { penumbra: { command: st.exe || 'node', args: [st.bridge || 'penumbra-mcp-bridge.cjs'], env: { ELECTRON_RUN_AS_NODE: '1', PENUMBRA_MCP_URL: url, PENUMBRA_MCP_TOKEN: t } } } }, null, 2);
   const copy = (id: string, text: string) => {
     copyText(text);
@@ -114,10 +115,14 @@ export function McpServerPanel() {
 
       <section className="panel">
         <h4>Connect an app</h4>
-        <p className="muted small">Most apps take a block like this in their MCP settings. For an app that accepts a web address, use the first one; for one that only starts programs (Claude Desktop), use the second, which runs a small bridge included with Penumbra.</p>
+        <p className="muted small">Most apps take a block like this in their MCP settings. For an app that accepts a web address, use the first block; for Claude Code, the one-line command; for an app that only starts programs (Claude Desktop), the last, which runs a small bridge included with Penumbra.</p>
         <div className="mcps-snippet">
           <div className="codeblock-head"><span>A web address (HTTP)</span><button className="link-btn small" onClick={() => copy('http', http(s.token || '<token>'))}>{copied === 'http' ? 'Copied' : 'Copy'}</button></div>
           <pre className="step-result">{shown(http(token))}</pre>
+        </div>
+        <div className="mcps-snippet">
+          <div className="codeblock-head"><span>Claude Code (run in a terminal)</span><button className="link-btn small" onClick={() => copy('cc', claudeCode(s.token || '<token>'))}>{copied === 'cc' ? 'Copied' : 'Copy'}</button></div>
+          <pre className="step-result">{shown(claudeCode(token))}</pre>
         </div>
         <div className="mcps-snippet">
           <div className="codeblock-head"><span>A program (stdio, for Claude Desktop and similar)</span><button className="link-btn small" onClick={() => copy('stdio', stdio(s.token || '<token>'))}>{copied === 'stdio' ? 'Copied' : 'Copy'}</button></div>

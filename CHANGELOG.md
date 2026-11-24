@@ -12,7 +12,7 @@
   - **Read and search chats:** `list_chats`, `read_chat`, `search_chats`, `list_projects`, `read_project`, `read_memory`. Read only.
   - **Manage projects:** `create_project`, `update_project`, `add_project_source`, `move_chat`.
   - **Images and the orchestrator:** `generate_image` (returns the picture) and `run_orchestrator` (plans, runs the agents, and returns the final answer).
-  The window shows ready-to-copy settings for apps that take a web address, and for apps that only start programs (Claude Desktop and similar) a small stdio bridge that Penumbra puts in its folder. Long calls keep the connection alive (with progress notifications for clients that ask for them), an app that gives up stops the work, and calls that arrive together (an app asking several things at once) wait their turn instead of failing. Penumbra has to be open. The server settings, which hold the token, are not part of backups.
+  The window shows ready-to-copy settings for apps that take a web address, a one-line command for Claude Code, and for apps that only start programs (Claude Desktop and similar) a small stdio bridge that Penumbra puts in its folder. Long calls keep the connection alive (with progress notifications for clients that ask for them), an app that gives up stops the work, and calls that arrive together (an app asking several things at once) wait their turn instead of failing. Penumbra has to be open. The server settings, which hold the token, are not part of backups.
 - The tutorial and the guided demo cover the new tabs, memory, and the server.
 
 ## 0.7.0 (2026-11-23)

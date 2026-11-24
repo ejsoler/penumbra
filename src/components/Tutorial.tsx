@@ -57,7 +57,8 @@ const STEPS: Step[] = [
   { title: 'Home', body: 'Penumbra opens here. Ask something to start a chat, and see each tab at a glance: recent chats, agents, scheduled tasks, orchestrator runs, loaded models and downloads, images, backups, and updates. Click a card’s link to go there.', target: '.home-grid', view: 'home' },
 
   // Chat
-  { title: 'Your chats', body: 'Every chat is saved here. + starts a new one (⌘/Ctrl+N). Right-click a chat to rename, duplicate, export it as Markdown, move it to another profile, or delete it.', target: '.view-host aside.sidebar', view: 'chat' },
+  { title: 'Your chats', body: 'Every chat is saved here. + starts a new one (⌘/Ctrl+N). Right-click a chat to rename, duplicate, export it as Markdown, move it to a project or another profile, or delete it.', target: '.view-host aside.sidebar', view: 'chat' },
+  { title: 'Projects', body: 'The folder button makes a project: a group of chats with shared instructions, a local folder for file tools, and source files or notes the model knows in every chat. Drag chats onto a project, or right-click one to move it. A project’s settings open from its row.', target: '.view-host aside.sidebar .sidebar-head', view: 'chat' },
   { title: 'Agent or orchestrator', body: 'Answer with the plain model, one of your agents, or the orchestrator, which splits a goal into tasks for several agents.', target: '.view-host .agent-picker', view: 'chat' },
   { title: 'Pick a model', body: 'Choose which Ollama model answers (⌘/Ctrl+L). It loads into memory when you pick it. Badges show what each model can do, like vision, tools, or reasoning.', target: '.picker-btn', view: 'chat' },
   { title: 'Interactive answers', body: 'With this on, the model can reply with small live apps: calculators, charts, maps, diagrams. Turn it off for plain text, per chat.', target: '.ia-switch', view: 'chat' },

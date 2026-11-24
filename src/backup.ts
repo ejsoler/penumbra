@@ -9,6 +9,7 @@ import { host, type BackupSkill, type OpenedBackup } from './host';
 import type { RunLogEntry, ScheduledTask } from './scheduler';
 import { getConversations, updateConversations } from './session';
 import { uid, type Conversation } from './store';
+import { getProject, getProjects, PROJECTS_KEY, type Project } from './projects';
 
 const AGENTS_KEY = 'ollama-gui.agents';
 const TASKS_KEY = 'ollama-gui.schedule';
@@ -41,6 +42,7 @@ export const chatImages = (c: Conversation) => c.messages.flatMap((m) => m.gener
 
 export interface BackupChoice {
   chats: string[];
+  projects: string[];
   agents: string[];
   tasks: string[];
   skills: string[];
@@ -48,7 +50,7 @@ export interface BackupChoice {
   settings: string[];
 }
 export type BackupKind = 'full' | 'incremental';
-const KINDS = ['chats', 'agents', 'tasks', 'skills', 'images', 'settings'] as const;
+const KINDS = ['chats', 'projects', 'agents', 'tasks', 'skills', 'images', 'settings'] as const;
 export const choiceSize = (c: BackupChoice) => KINDS.reduce((n, k) => n + c[k].length, 0);
 
 /** When this profile last saved a backup (shown on Home). */
@@ -60,7 +62,7 @@ export const lastBackup = () => Number(localStorage.getItem(LAST_BACKUP_KEY)) ||
 /** Each item's fingerprint when it was last backed up, by kind and id. */
 type Fingerprints = Record<(typeof KINDS)[number], Record<string, string>>;
 const BASE_KEY = 'ollama-gui.backupBase';
-const emptyPrints = (): Fingerprints => ({ chats: {}, agents: {}, tasks: {}, skills: {}, images: {}, settings: {} });
+const emptyPrints = (): Fingerprints => ({ chats: {}, projects: {}, agents: {}, tasks: {}, skills: {}, images: {}, settings: {} });
 const readBase = (): Fingerprints => {
   try {
     return { ...emptyPrints(), ...JSON.parse(localStorage.getItem(BASE_KEY) || '{}') };
@@ -83,6 +85,7 @@ const settingPrint = (keys: string[]) => hash(keys.map((k) => localStorage.getIt
 function currentPrints(files: { skills: BackupSkill[]; images: { file: string }[] }): Fingerprints {
   const p = emptyPrints();
   for (const c of getConversations()) if (c.messages.length) p.chats[c.id] = `${c.updatedAt}:${c.messages.length}`;
+  for (const pr of getProjects()) p.projects[pr.id] = hash(JSON.stringify({ ...pr, collapsed: 0 }));
   for (const a of savedAgents()) p.agents[a.id] = hash(JSON.stringify(a));
   for (const t of savedTasks()) p.tasks[t.id] = taskPrint(t);
   for (const s of files.skills) p.skills[s.id] = s.hash ?? s.id;
@@ -129,6 +132,7 @@ export async function makeBackup(choice: BackupChoice, opts: { name?: string; ki
   const r = await host()!.backup.save({
     data: {
       chats: pick(getConversations(), choice.chats),
+      projects: pick(getProjects(), choice.projects),
       agents: pick(savedAgents(), choice.agents),
       tasks: pick(savedTasks(), choice.tasks),
       taskLog: readList<RunLogEntry>(LOG_KEY).filter((e) => choice.tasks.includes(e.taskId)),
@@ -148,7 +152,7 @@ export async function makeBackup(choice: BackupChoice, opts: { name?: string; ki
 export function backupChat(c: Conversation) {
   const agent = savedAgents().find((a) => a.id === c.agentId);
   return makeBackup(
-    { chats: [c.id], agents: agent ? [agent.id] : [], tasks: [], skills: agent?.skills ?? [], images: chatImages(c), settings: [] },
+    { chats: [c.id], projects: getProject(c.projectId) ? [c.projectId!] : [], agents: agent ? [agent.id] : [], tasks: [], skills: agent?.skills ?? [], images: chatImages(c), settings: [] },
     { name: `${c.title || 'Chat'} backup`, record: false },
   );
 }
@@ -170,6 +174,7 @@ export function backupContents(b: OpenedBackup) {
   const settings = (b.data.settings && typeof b.data.settings === 'object' ? b.data.settings : {}) as Record<string, string>;
   return {
     chats: list<Conversation>(b.data.chats),
+    projects: list<Project>(b.data.projects),
     agents: list<Agent>(b.data.agents),
     tasks: list<ScheduledTask>(b.data.tasks),
     taskLog: list<RunLogEntry>(b.data.taskLog),
@@ -179,7 +184,7 @@ export function backupContents(b: OpenedBackup) {
 }
 
 export interface RestoreReport {
-  added: Record<'chats' | 'agents' | 'tasks' | 'skills' | 'images', number>;
+  added: Record<'chats' | 'projects' | 'agents' | 'tasks' | 'skills' | 'images', number>;
   /** Items here replaced by the backup's version. */
   replaced: number;
   /** Already here, unchanged, so not added again. */
@@ -196,7 +201,7 @@ export interface RestoreReport {
 export async function restoreBackup(b: OpenedBackup, choice: BackupChoice, replace = false): Promise<RestoreReport> {
   const c = backupContents(b);
   const files = await host()!.backup.restoreFiles({ skills: choice.skills, images: choice.images, replace });
-  const report: RestoreReport = { added: { chats: 0, agents: 0, tasks: 0, skills: 0, images: 0 }, replaced: files.replaced ?? 0, skipped: files.skipped, settings: 0 };
+  const report: RestoreReport = { added: { chats: 0, projects: 0, agents: 0, tasks: 0, skills: 0, images: 0 }, replaced: files.replaced ?? 0, skipped: files.skipped, settings: 0 };
   report.added.skills = Object.keys(files.skills).length - report.replaced;
   report.added.images = Object.keys(files.images).length;
 
@@ -236,6 +241,19 @@ export async function restoreBackup(b: OpenedBackup, choice: BackupChoice, repla
   if (agents.length) writeList(AGENTS_KEY, merge(agentsHere, agents));
   report.added.agents = agents.filter((p) => !p.replaces).length;
 
+  // Projects before chats: chats point at them.
+  const projectIds: Record<string, string> = {};
+  const projectsHere = getProjects();
+  const projects: { item: Project; replaces: boolean }[] = [];
+  for (const pr of c.projects.filter((x) => choice.projects.includes(x.id))) {
+    const p = place(pr, projectsHere, (x, y) => json({ ...x, collapsed: 0 }) === json({ ...y, collapsed: 0 }));
+    if (!p) continue;
+    projectIds[pr.id] = p.item.id;
+    projects.push({ ...p, item: { ...p.item, name: p.item.id !== pr.id ? `${p.item.name} (restored)` : p.item.name } });
+  }
+  if (projects.length) writeList(PROJECTS_KEY, merge(projectsHere, projects));
+  report.added.projects = projects.filter((p) => !p.replaces).length;
+
   const chatIds: Record<string, string> = {};
   const chatsHere = getConversations();
   const chats: { item: Conversation; replaces: boolean }[] = [];
@@ -250,6 +268,7 @@ export async function restoreBackup(b: OpenedBackup, choice: BackupChoice, repla
         ...p.item,
         title: copy ? `${p.item.title} (restored)` : p.item.title,
         agentId: p.item.agentId ? agentIds[p.item.agentId] ?? p.item.agentId : undefined,
+        projectId: p.item.projectId ? projectIds[p.item.projectId] ?? p.item.projectId : undefined,
         messages: p.item.messages.map((m) => (m.generated ? { ...m, generated: m.generated.map((g) => ({ ...g, file: files.images[g.file] ?? g.file })) } : m)),
       },
     });

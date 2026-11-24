@@ -5,6 +5,7 @@ import type { Agent } from './agents';
 import { builtinTools, toolsPrompt, type ToolGroup } from './builtins';
 import { enabledSkills, skillsPrompt, skillTools } from './skills';
 import type { Tool } from './tools';
+import { projectContext, projectSourceTool, type Project } from '../projects';
 
 /** Chats without an agent: skills, and images once an image model is installed. */
 export const DEFAULT_CHAT_TOOLS: ToolGroup[] = ['skills', 'images'];
@@ -23,7 +24,7 @@ export function agentPrompt(agent: Agent): string {
   return lines.join('\n');
 }
 
-export function replySetup({ agent, systemPrompt, interactive, toolsSupported, chatTools, folder, net }: {
+export function replySetup({ agent, systemPrompt, interactive, toolsSupported, chatTools, folder, net, project, numCtx }: {
   agent?: Agent;
   systemPrompt: string;
   interactive: boolean;
@@ -33,9 +34,18 @@ export function replySetup({ agent, systemPrompt, interactive, toolsSupported, c
   chatTools?: ToolGroup[];
   folder?: string;
   net?: ChatNet;
+  /** The chat's project: its instructions and sources go first. */
+  project?: Project;
+  /** The context size, which decides how much of the project's sources fit. */
+  numCtx?: number;
 }): { system: string; tools: Tool[] } {
   const parts: string[] = [];
   const tools: Tool[] = [];
+  if (project) {
+    const ctx = projectContext(project, numCtx ?? 8192, toolsSupported);
+    parts.push(ctx.prompt);
+    if (toolsSupported && ctx.shortened.length) tools.push(projectSourceTool(project));
+  }
   if (agent) parts.push(agentPrompt(agent));
   if (systemPrompt.trim()) parts.push(systemPrompt.trim());
   if (toolsSupported) {

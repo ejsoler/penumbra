@@ -31,9 +31,11 @@ import { WidgetActionsContext, type WidgetActions } from '../components/Widget';
 import { copyText, downloadFile, useContextMenu } from '../components/ContextMenu';
 import {
   ArrowUp, ArrowRightLeft, Bot, Brain, Loader2, Lock, Check, ChevronDown, FileText, FolderOpen, ShieldAlert, Workflow, ChevronRight, Copy, Download, Eraser, GitBranch, PanelRight, PanelRightClose, Paperclip, Pencil,
-  Plus, RefreshCw, Sparkles, Square, Trash2, X, DatabaseBackup, Play, ChevronUp, TriangleAlert,
+  Plus, RefreshCw, Sparkles, Square, Trash2, X, DatabaseBackup, Play, ChevronUp, TriangleAlert, Folder, FolderPlus, FolderInput, FolderMinus,
 } from '../components/icons';
 import { backupChat } from '../backup';
+import { chatFolder, createProject, getProject, updateProject, useProjects } from '../projects';
+import { ProjectEditor } from '../components/ProjectEditor';
 import { chatMessages, compactChat, messagesTokens, overBudget, withFiles, type ChatSummary } from '../context';
 
 const newConversation = (model = ''): Conversation => ({
@@ -98,8 +100,10 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   const interactive = isInteractive(current);
   // Widgets are long; make sure the model has room for them.
   // Widgets and tool results are long; make sure the model has room for them (generate() does the same).
+  const projects = useProjects();
+  const project = projects.find((p) => p.id === current?.projectId);
   const usesTools = caps.includes('tools') && (agent ? agent.tools : current?.tools ?? DEFAULT_CHAT_TOOLS).some((t) => (t === 'skills' ? enabledSkills().length > 0 : t === 'images' ? hasImageModel() : true));
-  const numCtx = interactive || usesTools ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx;
+  const numCtx = interactive || usesTools || project?.sources.length ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx;
   // How full the context is: the last reply's measured size, or the estimate right after summarizing.
   const lastStats = current ? [...current.messages].reverse().find((m) => m.stats) : undefined;
   const contextTokens = current?.summary?.estimate && current.summary.statsMsg === lastStats?.id
@@ -120,6 +124,27 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     setConversations((cs) => [c, ...cs]);
     setCurrentId(c.id);
   };
+
+  // Projects: groups of chats with shared instructions, folder, and sources.
+  const [editingProject, setEditingProject] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const moveToProject = (chatId: string, projectId: string | undefined) =>
+    updateConv(chatId, (c) => ({ ...c, projectId }));
+  const createChatIn = (projectId: string) => {
+    const c = { ...newConversation(current?.model), projectId };
+    setConversations((cs) => [c, ...cs]);
+    setCurrentId(c.id);
+    updateProject(projectId, { collapsed: false });
+  };
+  const addProject = () => {
+    const p = createProject({ name: 'New project' });
+    setEditingProject(p.id);
+  };
+  const projectMenu = (e: MouseEvent, id: string) =>
+    menu(e, [
+      { label: 'Project settings…', icon: Pencil, onClick: () => setEditingProject(id) },
+      { label: 'New chat in this project', icon: Plus, onClick: () => createChatIn(id) },
+    ]);
 
   // Another page asked to start a chat with a specific model.
   // The ref guards against StrictMode running this effect twice for one request.
@@ -174,6 +199,8 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     menu(e, [
       { label: 'Rename', icon: Pencil, onClick: () => setRenamingId(c.id) },
       { label: 'Duplicate', icon: Copy, onClick: () => duplicateChat(c) },
+      ...projects.filter((p) => p.id !== c.projectId).map((p) => ({ label: `Move to project “${p.name}”`, icon: FolderInput, onClick: () => moveToProject(c.id, p.id) })),
+      ...(getProject(c.projectId) ? [{ label: 'Remove from project', icon: FolderMinus, onClick: () => moveToProject(c.id, undefined) }] : []),
       ...(host() ? [{ label: 'Move to profile…', icon: ArrowRightLeft, onClick: () => setMoving(c), disabled: streamingId === c.id }] : []),
       'separator',
       { label: 'Copy as Markdown', icon: Copy, onClick: () => copyText(toMarkdown(c)), disabled: !c.messages.length },
@@ -259,7 +286,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     const models = modelInfos();
     const caps = ollama.capabilities[model] ?? [];
     const toolsOk = caps.includes('tools');
-    const system = planningPrompt({ agents: agentsRef.current, models, folder: conv.folder, toolsSupported: toolsOk });
+    const system = planningPrompt({ agents: agentsRef.current, models, folder: chatFolder(conv), toolsSupported: toolsOk });
     const messages: api.ChatMessage[] = chatMessages(run.fresh ? history.slice(-1) : history, run.fresh ? undefined : conv.summary, system);
     try {
       let raw: Record<string, unknown> | null = null;
@@ -347,7 +374,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         task.status = 'running';
         patchTask(conv.id, msgId, task.id, (t) => ({ ...t, status: 'running', model }));
         const caps = ollama.capabilities[model] ?? [];
-        const { system, tools } = replySetup({ agent, systemPrompt: '', interactive: false, toolsSupported: caps.includes('tools'), folder: conv.folder, net: conv.net });
+        const { system, tools } = replySetup({ agent, systemPrompt: '', interactive: false, toolsSupported: caps.includes('tools'), folder: chatFolder(conv), net: conv.net });
         try {
           const result = await runAgent({
             model,
@@ -447,8 +474,10 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       interactive: isInteractive(conv),
       toolsSupported: modelCaps.includes('tools'),
       chatTools: conv.tools,
-      folder: conv.folder,
+      folder: chatFolder(conv),
       net: conv.net,
+      project: getProject(conv.projectId),
+      numCtx: isInteractive(conv) ? Math.max(params.num_ctx, INTERACTIVE_MIN_CTX) : params.num_ctx,
     });
     const options = genOptions(agent?.temperature, isInteractive(conv) || tools.length > 0);
     const sendable = run.fresh ? history.slice(-1) : history;
@@ -563,7 +592,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   };
   /** The system prompt's rough size, for the meter right after summarizing. */
   const estimateSystem = (c: Conversation) => {
-    const { system } = replySetup({ agent: getAgent(c.agentId), systemPrompt: c.systemPrompt, interactive: isInteractive(c), toolsSupported: caps.includes('tools'), chatTools: c.tools, folder: c.folder, net: c.net });
+    const { system } = replySetup({ agent: getAgent(c.agentId), systemPrompt: c.systemPrompt, interactive: isInteractive(c), toolsSupported: caps.includes('tools'), chatTools: c.tools, folder: chatFolder(c), net: c.net, project: getProject(c.projectId), numCtx });
     return messagesTokens(system ? [{ role: 'system', content: system }] : []);
   };
 
@@ -630,6 +659,54 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
   if (!current) return null;
   const isStreaming = streamingId === current.id;
 
+  const looseChats = sorted.filter((c) => !projects.some((p) => p.id === c.projectId));
+  const renderChat = (c: Conversation) => (
+        <div
+          key={c.id}
+        draggable
+        onDragStart={(e) => { e.dataTransfer.setData('text/penumbra-chat', c.id); e.dataTransfer.effectAllowed = 'move'; }}
+          className={`conv-item ${c.id === current.id ? 'active' : ''}`}
+          onClick={() => setCurrentId(c.id)}
+          onDoubleClick={() => setRenamingId(c.id)}
+          onContextMenu={(e) => chatMenu(e, c)}
+        >
+          <div className="conv-text">
+            {renamingId === c.id ? (
+              <input
+                className="conv-rename"
+                autoFocus
+                defaultValue={c.title}
+                onFocus={(e) => e.target.select()}
+                onClick={(e) => e.stopPropagation()}
+                onBlur={(e) => {
+                  const title = e.target.value.trim();
+                  if (title) updateConv(c.id, (x) => ({ ...x, title }));
+                  setRenamingId(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                  if (e.key === 'Escape') setRenamingId(null);
+                }}
+              />
+            ) : (
+              <span className="conv-title">{c.title}</span>
+            )}
+            <span className="conv-sub">{c.model || 'No model'}</span>
+          </div>
+          {streamingId === c.id && <span className="dot on pulse" />}
+          <button
+            className="icon-btn sm conv-del"
+            title="Delete chat"
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteChat(c.id);
+            }}
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+  );
+
   return (
     <>
       {moving && (
@@ -643,58 +720,60 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
           }}
         />
       )}
+      {editingProject && <ProjectEditor projectId={editingProject} chatCount={conversations.filter((x) => x.projectId === editingProject).length} onClose={() => setEditingProject(null)} />}
       <aside className="sidebar">
         <div className="sidebar-head">
           <span className="sidebar-title">Chats</span>
-          <button className="icon-btn" onClick={createChat} title={`New chat (${shortcut('N')})`}>
-            <Plus size={16} />
-          </button>
+          <div className="row">
+            <button className="icon-btn" onClick={addProject} title="New project"><FolderPlus size={16} /></button>
+            <button className="icon-btn" onClick={createChat} title={`New chat (${shortcut('N')})`}>
+              <Plus size={16} />
+            </button>
+          </div>
         </div>
         <div className="conv-list">
-          {sorted.map((c) => (
-            <div
-              key={c.id}
-              className={`conv-item ${c.id === current.id ? 'active' : ''}`}
-              onClick={() => setCurrentId(c.id)}
-              onDoubleClick={() => setRenamingId(c.id)}
-              onContextMenu={(e) => chatMenu(e, c)}
-            >
-              <div className="conv-text">
-                {renamingId === c.id ? (
-                  <input
-                    className="conv-rename"
-                    autoFocus
-                    defaultValue={c.title}
-                    onFocus={(e) => e.target.select()}
-                    onClick={(e) => e.stopPropagation()}
-                    onBlur={(e) => {
-                      const title = e.target.value.trim();
-                      if (title) updateConv(c.id, (x) => ({ ...x, title }));
-                      setRenamingId(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') e.currentTarget.blur();
-                      if (e.key === 'Escape') setRenamingId(null);
-                    }}
-                  />
-                ) : (
-                  <span className="conv-title">{c.title}</span>
+          {projects.length > 0 && <div className="conv-section">Projects</div>}
+          {projects.map((p) => {
+            const chats = sorted.filter((c) => c.projectId === p.id);
+            const holds = chats.some((c) => c.id === current.id);
+            return (
+              <div key={p.id} className="project-group">
+                <div
+                  className={`project-row ${dropTarget === p.id ? 'drop' : ''}`}
+                  onClick={() => updateProject(p.id, { collapsed: !p.collapsed })}
+                  onDoubleClick={() => setEditingProject(p.id)}
+                  onContextMenu={(e) => projectMenu(e, p.id)}
+                  onDragOver={(e) => { if (e.dataTransfer.types.includes('text/penumbra-chat')) { e.preventDefault(); setDropTarget(p.id); } }}
+                  onDragLeave={() => setDropTarget(null)}
+                  onDrop={(e) => { e.preventDefault(); setDropTarget(null); const id = e.dataTransfer.getData('text/penumbra-chat'); if (id) { moveToProject(id, p.id); updateProject(p.id, { collapsed: false }); } }}
+                >
+                  <ChevronRight size={13} className={`chev ${p.collapsed ? '' : 'open'}`} />
+                  <Folder size={14} className={holds ? 'accent' : 'muted'} />
+                  <span className="conv-title flex" title={p.name}>{p.name}</span>
+                  <span className="muted small">{chats.length || ''}</span>
+                  <button className="icon-btn sm conv-del" title="New chat in this project" onClick={(e) => { e.stopPropagation(); createChatIn(p.id); }}><Plus size={13} /></button>
+                  <button className="icon-btn sm conv-del" title="Project settings" onClick={(e) => { e.stopPropagation(); setEditingProject(p.id); }}><Pencil size={12} /></button>
+                </div>
+                {!p.collapsed && (
+                  <div className="project-chats">
+                    {chats.map(renderChat)}
+                    {!chats.length && <div className="muted small project-empty">No chats yet. Drag one here, or use +.</div>}
+                  </div>
                 )}
-                <span className="conv-sub">{c.model || 'No model'}</span>
               </div>
-              {streamingId === c.id && <span className="dot on pulse" />}
-              <button
-                className="icon-btn sm conv-del"
-                title="Delete chat"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteChat(c.id);
-                }}
-              >
-                <Trash2 size={13} />
-              </button>
+            );
+          })}
+          {projects.length > 0 && (
+            <div
+              className={`conv-section ${dropTarget === 'none' ? 'drop' : ''}`}
+              onDragOver={(e) => { if (e.dataTransfer.types.includes('text/penumbra-chat')) { e.preventDefault(); setDropTarget('none'); } }}
+              onDragLeave={() => setDropTarget(null)}
+              onDrop={(e) => { e.preventDefault(); setDropTarget(null); const id = e.dataTransfer.getData('text/penumbra-chat'); if (id) moveToProject(id, undefined); }}
+            >
+              Chats
             </div>
-          ))}
+          )}
+          {looseChats.map(renderChat)}
         </div>
       </aside>
 
@@ -706,6 +785,11 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
             onChange={(on) => updateConv(current.id, (c) => ({ ...c, interactive: on }))}
           />
           <div className="topbar-center">
+            {project && (
+              <button className="project-chip" title={`In the project “${project.name}”. Click for its settings.`} onClick={() => setEditingProject(project.id)}>
+                <Folder size={13} /> {project.name}
+              </button>
+            )}
             <AgentPicker
               agents={agents}
               value={agent}
@@ -789,6 +873,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
               tools={current.tools ?? DEFAULT_CHAT_TOOLS}
               setTools={(tools) => updateConv(current.id, (c) => ({ ...c, tools }))}
               folder={current.folder}
+              inheritedFolder={project?.folder}
               setFolder={(folder) => updateConv(current.id, (c) => ({ ...c, folder }))}
               toolsSupported={caps.includes('tools')}
             />
@@ -849,11 +934,13 @@ function ApprovalBar({ req, onAnswer }: { req: ApprovalRequest; onAnswer: (a: Ap
   );
 }
 
-function ChatTools({ agent, tools, setTools, folder, setFolder, toolsSupported }: {
+function ChatTools({ agent, tools, setTools, folder, inheritedFolder, setFolder, toolsSupported }: {
   agent?: Agent;
   tools: ToolGroup[];
   setTools: (t: ToolGroup[]) => void;
   folder?: string;
+  /** The project's folder, used while the chat has none of its own. */
+  inheritedFolder?: string;
   setFolder: (f: string | undefined) => void;
   toolsSupported: boolean;
 }) {
@@ -890,11 +977,17 @@ function ChatTools({ agent, tools, setTools, folder, setFolder, toolsSupported }
             <button className="icon-btn sm" title="Change folder" onClick={pick}><FolderOpen size={13} /></button>
             <button className="icon-btn sm" title="Remove folder" onClick={() => setFolder(undefined)}><X size={12} /></button>
           </>
+        ) : inheritedFolder ? (
+          <>
+            <button className="link-btn mono folder-path" title={`${inheritedFolder} (the project's folder)`} onClick={() => host()?.tools.reveal(inheritedFolder)}>{inheritedFolder.split(/[\\/]/).slice(-2).join('/')}</button>
+            <span className="muted small">project</span>
+            <button className="icon-btn sm" title="Use another folder for this chat" onClick={pick}><FolderOpen size={13} /></button>
+          </>
         ) : (
           <button className={`btn sm ${needsFolder ? 'primary' : ''}`} onClick={pick} disabled={!host()}><FolderOpen size={13} /> Choose…</button>
         )}
       </div>
-      {needsFolder && !folder && <p className="net-note warn">File and terminal tools need a folder.</p>}
+      {needsFolder && !folder && !inheritedFolder && <p className="net-note warn">File and terminal tools need a folder.</p>}
     </section>
   );
 }
@@ -952,7 +1045,7 @@ function MoveChatDialog({ conv, agents, onClose, onMoved }: { conv: Conversation
     setBusy(true);
     setError('');
     try {
-      await host()!.profiles.moveChat({ target: chosen.id, ...(chosen.hasPassword ? { password } : {}), conversation: conv, agents });
+      await host()!.profiles.moveChat({ target: chosen.id, ...(chosen.hasPassword ? { password } : {}), conversation: { ...conv, projectId: undefined }, agents });
       onMoved();
     } catch (e) {
       setError((e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));

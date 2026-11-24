@@ -2,6 +2,7 @@
 // from one. Each kind can be backed up in full or item by item.
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAgents } from '../agents/agents';
+import { useProjects } from '../projects';
 import { AgentAvatar } from '../components/AgentAvatar';
 import { Archive, ArchiveRestore, Check, ChevronDown, ChevronRight, DatabaseBackup, FolderOpen, Loader2, Search } from '../components/icons';
 import { backupChoiceFor, backupContents, chatImages, lastBackup, makeBackup, restoreBackup, savedTasks, SETTING_GROUPS, type BackupChoice, type BackupKind, type RestoreReport } from '../backup';
@@ -97,10 +98,11 @@ const imageItems = (images: BackupImage[], key: 'file' | 'name', thumbs: boolean
 const skillItems = (skills: BackupSkill[]): Item[] => skills.map((s) => ({ id: s.id, label: s.name, sub: s.description }));
 const settingItems = (groups: typeof SETTING_GROUPS): Item[] => groups.map((g) => ({ id: g.id, label: g.label }));
 
-const EMPTY: BackupChoice = { chats: [], agents: [], tasks: [], skills: [], images: [], settings: [] };
+const EMPTY: BackupChoice = { chats: [], projects: [], agents: [], tasks: [], skills: [], images: [], settings: [] };
 
 function BackUp() {
   const agents = useAgents();
+  const projects = useProjects();
   const [chats] = useState(() => getConversations().filter((c) => c.messages.length));
   const [tasks] = useState(savedTasks);
   const [files, setFiles] = useState<{ skills: BackupSkill[]; images: BackupImage[] } | null>(null);
@@ -160,6 +162,13 @@ function BackUp() {
         selected={choice.chats}
         setSelected={set('chats')}
         note="with their attachments and widgets"
+      />
+      <Category
+        title="Projects"
+        items={only(projects, 'projects').map((p) => ({ id: p.id, label: p.name, sub: `${p.sources.length} source${p.sources.length === 1 ? '' : 's'}${p.instructions.trim() ? ' · instructions' : ''}` }))}
+        selected={choice.projects}
+        setSelected={set('projects')}
+        note="with their instructions and sources"
       />
       <Category
         title="Agents"
@@ -233,7 +242,7 @@ function Restore() {
         // Incremental backups are restored in order on top of a full one, so their newer versions replace.
         setReplace(b.kind === 'incremental');
         // Settings replace the current ones, so they start unchecked.
-        setChoice({ chats: c.chats.map((x) => x.id), agents: c.agents.map((x) => x.id), tasks: c.tasks.map((x) => x.id), skills: b.skills.map((s) => s.id), images: b.images.map((i) => String(i.name)), settings: [] });
+        setChoice({ chats: c.chats.map((x) => x.id), projects: c.projects.map((x) => x.id), agents: c.agents.map((x) => x.id), tasks: c.tasks.map((x) => x.id), skills: b.skills.map((s) => s.id), images: b.images.map((i) => String(i.name)), settings: [] });
       }
       setState('idle');
     } catch (e) {
@@ -285,6 +294,7 @@ function Restore() {
             <b>{backup.file.split(/[\\/]/).pop()}</b> <span className="muted">· {backup.kind === 'incremental' ? 'incremental backup' : 'full backup'} made {date(backup.createdAt)} with Penumbra {backup.app}</span>
           </p>
           <Category title="Chats" items={contents.chats.map((c) => ({ id: c.id, label: c.title || 'Untitled chat', sub: `${c.messages.length} messages · ${date(c.updatedAt)}` }))} selected={choice.chats} setSelected={set('chats')} />
+          <Category title="Projects" items={contents.projects.map((p) => ({ id: p.id, label: p.name, sub: `${p.sources?.length ?? 0} sources` }))} selected={choice.projects} setSelected={set('projects')} />
           <Category title="Agents" items={contents.agents.map((a) => ({ id: a.id, label: a.name, sub: a.description, icon: <AgentAvatar agent={a} size={22} /> }))} selected={choice.agents} setSelected={set('agents')} />
           <Category title="Skills" items={skillItems(backup.skills)} selected={choice.skills} setSelected={set('skills')} />
           <Category title="Images" items={imageItems(backup.images, 'name', false)} selected={choice.images} setSelected={set('images')} note="saved in your images folder" />

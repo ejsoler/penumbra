@@ -46,8 +46,10 @@ export interface Conversation {
   agentId?: string;
   /** Tools for replies without an agent. Missing means skills only. */
   tools?: ToolGroup[];
-  /** The folder file and terminal tools work in. */
+  /** The folder file and terminal tools work in. Missing means the project's folder, if it has one. */
   folder?: string;
+  /** The project this chat belongs to (see projects.ts). */
+  projectId?: string;
   /** This chat's internet access, if it differs from the default for all chats. */
   net?: ChatNet;
   /** The older part of the chat, summarized so the chat fits the model's context (see context.ts). */

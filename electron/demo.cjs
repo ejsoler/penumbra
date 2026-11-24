@@ -55,6 +55,7 @@ function seed(model, folder) {
     { title: 'Demo · Orchestrator', agentId: 'orchestrator' },
     { title: 'Demo · Story' },
     { title: 'Demo · Long reply' },
+    { title: 'Demo · Project', projectId: 'demo-project' },
   ].map((c, i) => ({ id: 'demo' + i, model, systemPrompt: '', messages: [], updatedAt: 100 - i, interactive: false, ...c }));
   const tomorrow8 = new Date();
   tomorrow8.setDate(tomorrow8.getDate() + 1);
@@ -64,7 +65,12 @@ function seed(model, folder) {
     prompt: 'Write one haiku about the morning. Only the haiku.', schedule: { type: 'daily', time: '08:00', days: [0, 1, 2, 3, 4, 5, 6] },
     nextRun: tomorrow8.getTime(), createdAt: Date.now(),
   }];
-  return { agents, chats, tasks };
+  const projects = [{
+    id: 'demo-project', name: 'Project Tide', createdAt: 1, folder,
+    instructions: 'Answer in one short sentence, and say which source you used.',
+    sources: [{ id: 'demo-source', name: 'Launch facts', addedAt: 1, text: 'Project Tide launches on March 14. The budget is 48,000 dollars. The lead engineer is Marisol Vega. The first customer is Harbor Foods.' }],
+  }];
+  return { agents, chats, tasks, projects };
 }
 
 let demo = null; // the open demo window
@@ -76,7 +82,7 @@ async function runDemo(win, model) {
   const { skills, images, folder, notes } = prepareFiles();
   setSkillsFolder(wc, skills);
   setImagesFolder(wc, images);
-  const { agents, chats, tasks } = seed(model, folder);
+  const { agents, chats, tasks, projects } = seed(model, folder);
   const str = (v) => JSON.stringify(JSON.stringify(v));
 
   await new Promise((r) => wc.once('did-finish-load', r));
@@ -104,6 +110,7 @@ async function runDemo(win, model) {
     })();
     localStorage.setItem('ollama-gui.conversations', ${str(chats)});
     localStorage.setItem('ollama-gui.schedule', ${str(tasks)});
+    localStorage.setItem('ollama-gui.projects', ${str(projects)});
     location.reload();`);
   await new Promise((r) => wc.once('did-finish-load', r));
   await sleep(1500);
@@ -206,6 +213,16 @@ async function runDemo(win, model) {
       await js(`(() => { const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(notes)}], 'notes.txt', { type: 'text/plain' })); document.querySelector('.view-host .composer').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })); })()`);
       await sleep(800);
       await send('What was the approved budget and the new launch date?');
+    } },
+    { t: 'Project folders', say: 'A project groups chats with shared instructions, a local folder, and source files. Project Tide has instructions and one source, “Launch facts”. Drag chats onto a project, or right-click one to move it.', run: async () => {
+      await openChat('Demo · Project');
+      await js(`document.querySelector('.project-row button[title="Project settings"]').click()`);
+      await sleep(600);
+    } },
+    { t: 'A chat in the project', say: 'It follows the project’s instructions (one sentence, naming the source) and knows the sources: March 14 and Marisol Vega.', run: async () => {
+      await js(`[...document.querySelectorAll('.project-editor button')].find((b) => b.textContent.trim() === 'Done')?.click()`);
+      await sleep(400);
+      await send('When does the launch happen and who is the lead engineer?');
     } },
     { s: '6. The orchestrator', t: 'A plan in a chat', say: 'The orchestrator proposes a plan: the Researcher finds the forecast and the Writer drafts the email. You can edit it before it runs.', run: async () => {
       await openChat('Demo · Orchestrator');

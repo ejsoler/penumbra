@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Projects.** The folder button at the top of the chat list makes a project, like ChatGPT's project folders: a group of chats that share
+  - **instructions** every chat follows,
+  - a **local folder**, used by the file and terminal tools unless a chat has its own, and
+  - **sources**: text files or notes the model knows in every chat. They go into the prompt while they fit (up to about a third of the context); a longer one is cut to an excerpt and the model reads the rest with a new `project_source` tool.
+  Move chats into a project by dragging them onto it or from their right-click menu (**Move to project**, **Remove from project**); the **+** on a project's row starts a chat in it, and a chip at the top of the chat opens the project's settings. Deleting a project keeps its chats. Projects are part of backups (the Backup tab, incremental backups, and the single-chat backup).
+- The tutorial and the guided demo cover projects.
+
 ## 0.6.0 (2026-11-09)
 
 ### Added

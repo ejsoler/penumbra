@@ -48,6 +48,7 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 - Edit & resend, regenerate, branch a chat from any message, delete messages
 - Image attachments for vision models (drag & drop or paste)
 - Per-chat system prompt; chats are saved locally
+- **Projects**: group chats in a project with shared instructions, a local folder for file tools, and source files or notes the model knows in every chat. Drag chats into a project, or right-click to move them
 - Long chats keep going: older messages are sent in short form and summarized when the context fills up, with **Compact now** and a warning before it's full
 - A reply cut off by **Max Tokens** can be continued from where it stopped
 

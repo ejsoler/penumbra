@@ -48,7 +48,7 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 - Edit & resend, regenerate, branch a chat from any message, delete messages
 - Image attachments for vision models (drag & drop or paste)
 - Per-chat system prompt; chats are saved locally
-- **Projects**: group chats in a project with shared instructions, a local folder for file tools, and source files or notes the model knows in every chat. Drag chats into a project, or right-click to move them
+- **Projects**: group chats in a project with shared instructions, a local folder for file tools, and source files or notes the model knows in every chat. Drag chats into a project, or right-click to move them. The **Projects** tab shows each project's chats and settings, and Home has a card for them
 - Long chats keep going: older messages are sent in short form and summarized when the context fills up, with **Compact now** and a warning before it's full
 - A reply cut off by **Max Tokens** can be continued from where it stopped
 
@@ -117,7 +117,7 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 - Pause, resume, and retry downloads, with speed and time remaining; unfinished downloads survive restarts
 
 **Everywhere**
-- A **Home** dashboard, where Penumbra opens: start a chat from one box, and see recent chats, agents, upcoming tasks, orchestrator runs, loaded models and downloads, recent images, your last backup, and updates at a glance
+- A **Home** dashboard, where Penumbra opens: start a chat from one box, and see recent chats, projects, agents, upcoming tasks, orchestrator runs, loaded models and downloads, recent images, your last backup, and updates at a glance
 - A guided tutorial of every tab the first time you open Penumbra (and in each new profile), until you choose not to see it again; Options → Tutorial shows it any time
 - Your own name and avatar on your messages (set from the button at the bottom of the sidebar)
 - A quiet update check: a small icon in the sidebar when a new version is out. It opens the Updates tab with what's new, and downloads the installer for your computer

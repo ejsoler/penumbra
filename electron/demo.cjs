@@ -224,6 +224,7 @@ async function runDemo(win, model) {
       await sleep(400);
       await send('When does the launch happen and who is the lead engineer?');
     } },
+    { t: 'The Projects tab', say: 'All projects in one place: the chats in Project Tide, and its instructions, folder, and sources. You can start a chat, add or remove chats, and edit the settings here.', run: async () => { await view('Projects'); } },
     { s: '6. The orchestrator', t: 'A plan in a chat', say: 'The orchestrator proposes a plan: the Researcher finds the forecast and the Writer drafts the email. You can edit it before it runs.', run: async () => {
       await openChat('Demo · Orchestrator');
       await send('Find out what the weather will be in San Juan, Puerto Rico this weekend, then write a short, friendly email to my team suggesting an outdoor activity that fits the forecast.');

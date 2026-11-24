@@ -135,6 +135,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
     setConversations((cs) => [c, ...cs]);
     setCurrentId(c.id);
     updateProject(projectId, { collapsed: false });
+    return c.id;
   };
   const addProject = () => {
     const p = createProject({ name: 'New project' });
@@ -624,6 +625,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
 
   // Other views (the Orchestrator page) drive runs through this; the chat view stays mounted.
   chatController.current = {
+    newChat: (projectId) => createChatIn(projectId),
     startChat: (text, agentId) => {
       const model = (agentId && getAgent(agentId)?.model) || current?.model || '';
       if (streamingId || !text.trim() || !model) return null;

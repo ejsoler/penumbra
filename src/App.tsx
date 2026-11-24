@@ -6,13 +6,14 @@ import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView, developerFocus } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
-import { Bot, CalendarClock, DatabaseBackup, FolderOpen, House, ImageIcon, MessageSquare, Settings, Telescope, Workflow } from './components/icons';
+import { Bot, CalendarClock, DatabaseBackup, Folder, FolderOpen, House, ImageIcon, MessageSquare, Settings, Telescope, Workflow } from './components/icons';
 import { WorkspaceView } from './views/WorkspaceView';
 import { SchedulerView } from './views/SchedulerView';
 import { ImagesView } from './views/ImagesView';
 import { UpdatesView } from './views/UpdatesView';
 import { BackupView } from './views/BackupView';
 import { HomeView } from './views/HomeView';
+import { ProjectsView } from './views/ProjectsView';
 import { startScheduler, useScheduler } from './scheduler';
 import { start as startImages } from './images';
 import { chatController, openChatRequest, streaming } from './session';
@@ -28,11 +29,12 @@ import { host, type ProfileInfo } from './host';
 import { syncProfile } from './profile';
 import { startUpdateChecks } from './updates';
 
-type View = 'home' | 'chat' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer' | 'updates' | 'backup';
+type View = 'home' | 'chat' | 'projects' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer' | 'updates' | 'backup';
 
 const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'home', label: 'Home', icon: House },
   { id: 'chat', label: 'Chat', icon: MessageSquare },
+  { id: 'projects', label: 'Projects', icon: Folder },
   { id: 'orchestrator', label: 'Orchestrator', icon: Workflow },
   { id: 'scheduler', label: 'Scheduler', icon: CalendarClock },
   { id: 'agents', label: 'Agents & Skills', icon: Bot },
@@ -149,6 +151,7 @@ function Main() {
               }}
             />
           )}
+          {view === 'projects' && <ProjectsView onOpenChat={openChat} />}
           {view === 'scheduler' && <SchedulerView ollama={ollama} onOpenChat={openChat} />}
           {view === 'images' && <ImagesView />}
           {view === 'agents' && <AgentsView ollama={ollama} onChatWithAgent={chatWithAgent} />}

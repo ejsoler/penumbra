@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Projects tab.** All your projects in one place: pick one to see its chats (open one, take it out of the project, add an existing chat, or start a new one) and edit its settings (name, instructions, folder, sources) or delete it.
+- **Projects on Home.** A card with your projects, their chats, and when they were last used.
+- The tutorial and the guided demo cover the new tab.
+
 ## 0.7.0 (2026-11-23)
 
 ### Added

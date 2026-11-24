@@ -112,6 +112,8 @@ export interface RunOptions {
 export interface ChatController {
   /** Starts a new chat with this message (with the last chat's model, or an agent's) and returns its id; null if it can't. */
   startChat: (text: string, agentId?: string) => string | null;
+  /** Starts an empty chat in a project and shows it. Returns the chat's id. */
+  newChat: (projectId: string) => string;
   /** Starts an orchestrator run in a new chat and returns that chat's id. */
   startOrchestration: (goal: string, model: string, folder?: string) => string | null;
   runPlan: (msgId: string, run?: RunOptions) => Promise<void>;

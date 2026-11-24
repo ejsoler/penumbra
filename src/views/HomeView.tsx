@@ -9,13 +9,14 @@ import { Logo } from '../components/Logo';
 import { openTutorial } from '../components/Tutorial';
 import {
   ArrowUp, ArrowUpCircle, Bot, CalendarClock, ChevronRight, CircleAlert, CircleCheck, DatabaseBackup, Download, FolderOpen, ImageIcon, Loader2,
-  BookOpen, MessageSquare, Workflow,
+  BookOpen, Folder, MessageSquare, Workflow,
 } from '../components/icons';
 import type { Downloads } from '../downloads';
 import { host, type BackupImage } from '../host';
 import { imageUrl, readyModels, useImages } from '../images';
 import { lastBackup } from '../backup';
 import { useProfile } from '../profile';
+import { useProjects } from '../projects';
 import { describeWhen, useScheduler } from '../scheduler';
 import { chatController, streaming, useConversations } from '../session';
 import type { OllamaState } from '../store';
@@ -73,6 +74,7 @@ export function HomeView({ ollama, dl, setView, onChatWithAgent }: {
 }) {
   const profile = useProfile();
   const agents = useAgents();
+  const projects = useProjects();
   const [conversations] = useConversations(() => ({ id: 'x', title: 'New Chat', model: '', systemPrompt: '', messages: [], updatedAt: Date.now() }));
   const scheduler = useScheduler();
   const images = useImages();
@@ -109,6 +111,17 @@ export function HomeView({ ollama, dl, setView, onChatWithAgent }: {
       /* storage unavailable */
     }
     setView('orchestrator');
+  };
+  /** The Projects page shows the project it last had open. */
+  const openProject = (id?: string) => {
+    if (id) {
+      try {
+        localStorage.setItem('ollama-gui.projectSelected', JSON.stringify(id));
+      } catch {
+        /* storage unavailable */
+      }
+    }
+    setView('projects');
   };
   const start = () => {
     setStartError('');
@@ -157,6 +170,27 @@ export function HomeView({ ollama, dl, setView, onChatWithAgent }: {
               })}
             </ul>
           ) : <Empty>No chats yet. Ask something above to start one.</Empty>}
+        </Card>
+
+        <Card icon={<Folder size={16} />} title="Projects" onOpen={() => openProject()} action="Projects">
+          {projects.length ? (
+            <ul className="home-list">
+              {[...projects]
+                .map((p) => ({ p, count: conversations.filter((c) => c.projectId === p.id).length, at: Math.max(p.createdAt, ...conversations.filter((c) => c.projectId === p.id).map((c) => c.updatedAt)) }))
+                .sort((a, b) => b.at - a.at)
+                .slice(0, 5)
+                .map(({ p, count, at }) => (
+                  <li key={p.id}>
+                    <button onClick={() => openProject(p.id)}>
+                      <Folder size={14} className="muted" />
+                      <span className="home-item-title">{p.name}</span>
+                      <span className="muted small">{count} {count === 1 ? 'chat' : 'chats'} · {ago(at)}</span>
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          ) : <Empty>No projects yet. Group chats that share instructions, a folder, and source files.</Empty>}
+          <p className="muted small home-foot">{projects.length} {projects.length === 1 ? 'project' : 'projects'}{projects.length ? ` · ${projects.reduce((n, p) => n + p.sources.length, 0)} ${projects.reduce((n, p) => n + p.sources.length, 0) === 1 ? 'source' : 'sources'}` : ''}</p>
         </Card>
 
         <Card icon={<Bot size={16} />} title="Agents" onOpen={() => setView('agents')} action="Agents & Skills">

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 (2026-11-23)
 
 ### Added
 - **Projects.** The folder button at the top of the chat list makes a project, like ChatGPT's project folders: a group of chats that share

@@ -16,6 +16,7 @@ import { HomeView } from './views/HomeView';
 import { ProjectsView } from './views/ProjectsView';
 import { ConnectionsView } from './views/ConnectionsView';
 import { startMcp } from './mcp';
+import { startMcpServer } from './mcpServer';
 import { startScheduler, useScheduler } from './scheduler';
 import { start as startImages } from './images';
 import { chatController, openChatRequest, streaming } from './session';
@@ -92,6 +93,7 @@ function Main() {
   useEffect(startScheduler, []);
   useEffect(startImages, []);
   useEffect(startMcp, []);
+  useEffect(startMcpServer, []);
   useEffect(() => {
     syncProfile();
   }, []);

@@ -666,7 +666,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
       const conv = getConversations().find((c) => c.id === convId);
       if (!conv || streaming.get()) throw new Error('Another reply is running');
       const user: UiMessage = { id: uid(), role: 'user', content: text };
-      await generate(conv, [...conv.messages, user], { ...run, fresh: true });
+      await generate(conv, [...conv.messages, user], { fresh: true, ...run });
     },
     cancelPlan: (convId, msgId) => patchOrch(convId, msgId, (o) => ({ ...o, phase: 'cancelled' })),
     changePlan: (convId, msgId, plan) => patchOrch(convId, msgId, (o) => ({ ...o, plan })),

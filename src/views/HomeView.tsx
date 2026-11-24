@@ -18,6 +18,7 @@ import { lastBackup } from '../backup';
 import { useProfile } from '../profile';
 import { useProjects } from '../projects';
 import { useMcpRuntime, useMcpServers } from '../mcp';
+import { useMcpServerStatus } from '../mcpServer';
 import { describeWhen, useScheduler } from '../scheduler';
 import { chatController, streaming, useConversations } from '../session';
 import type { OllamaState } from '../store';
@@ -78,6 +79,7 @@ export function HomeView({ ollama, dl, setView, onChatWithAgent }: {
   const projects = useProjects();
   const mcpServers = useMcpServers();
   const mcpRuntime = useMcpRuntime();
+  const mcpOwn = useMcpServerStatus();
   const [conversations] = useConversations(() => ({ id: 'x', title: 'New Chat', model: '', systemPrompt: '', messages: [], updatedAt: Date.now() }));
   const scheduler = useScheduler();
   const images = useImages();
@@ -227,7 +229,9 @@ export function HomeView({ ollama, dl, setView, onChatWithAgent }: {
               })}
             </ul>
           ) : <Empty>Connect other apps through MCP, and chats and agents can use their tools.</Empty>}
-          <p className="muted small home-foot">{Object.values(mcpRuntime).filter((r) => r.status === 'on').length} of {mcpServers.length} connected</p>
+          <p className="muted small home-foot">
+            {Object.values(mcpRuntime).filter((r) => r.status === 'on').length} of {mcpServers.length} connected · {mcpOwn.running ? `apps can use Penumbra (port ${mcpOwn.port})` : 'Penumbra isn’t offered to other apps'}
+          </p>
         </Card>
 
         <Card icon={<CalendarClock size={16} />} title="Scheduled tasks" onOpen={() => setView('scheduler')} action="Scheduler">

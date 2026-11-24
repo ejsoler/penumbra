@@ -134,7 +134,38 @@ export interface McpConnectConfig {
   headers: Record<string, string>;
 }
 
+export type McpCap = 'ask' | 'read' | 'projects' | 'images';
+
+/** What the MCP server (other apps using Penumbra) needs to run. */
+export interface McpServerConfig {
+  port: number;
+  token: string;
+  caps: Record<McpCap, boolean>;
+  /** Ask the user before an app uses a tool of this kind. */
+  confirm: Record<McpCap, boolean>;
+  /** Tools the user chose "always allow" for. */
+  allowed: string[];
+  timeoutSec?: number;
+}
+
+export interface McpServerResult {
+  text: string;
+  images?: { data: string; mimeType: string }[];
+  isError?: boolean;
+}
+
 export interface PenumbraHost {
+  mcpServer: {
+    start: (cfg: McpServerConfig) => Promise<{ running: boolean; error: string; port: number }>;
+    update: (cfg: McpServerConfig) => Promise<void>;
+    stop: () => Promise<void>;
+    status: () => Promise<{ running: boolean; error: string; port: number; clients: string[]; bridge: string; exe: string }>;
+    focus: () => Promise<void>;
+    reply: (id: string, result: McpServerResult) => void;
+    onCall: (cb: (id: string, call: { tool: string; args: Record<string, unknown>; client: string }) => void) => () => void;
+    onCancel: (cb: (id: string) => void) => () => void;
+    onAllowed: (cb: (tool: string) => void) => () => void;
+  };
   mcp: {
     connect: (cfg: McpConnectConfig) => Promise<{ tools: McpToolInfo[]; info: { name?: string; version?: string; instructions?: string } | null }>;
     disconnect: (id: string) => Promise<void>;

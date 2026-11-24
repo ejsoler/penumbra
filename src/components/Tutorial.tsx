@@ -83,6 +83,7 @@ const STEPS: Step[] = [
 
   // Connections
   { title: 'Connections (MCP)', body: 'Connect Penumbra to other apps and programs that speak MCP, a program on this computer or a web address, and their tools show up in your chats. Turn on Connected apps in a chat’s tools, or on an agent, to use them. Every use asks you first, once or always.', target: '.content-inner > main', view: 'connections' },
+  { title: 'Penumbra as a server', body: 'The other way round: let apps like Claude Desktop or Cursor use Penumbra. Turn it on, choose what they may do (ask your models, read chats, manage projects, make images; everything starts off), and copy the block it shows into the app. Penumbra only listens on this computer, needs the secret token, and asks you before each tool unless you say otherwise.', target: '.content-inner > aside .conv-item', view: 'connections' },
 
   // Images
   { title: 'Find image models', body: 'Make pictures on this computer, outside Ollama. Search Hugging Face for image models: Penumbra checks each file before you download it (Z-Image and FLUX.1 work today). Models marked 18+ stay hidden unless you choose to show them.', target: '.page-head .seg button:last-child', view: 'images' },

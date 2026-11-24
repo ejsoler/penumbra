@@ -84,6 +84,8 @@
       "electron/profiles.cjs",
       "electron/backup.cjs",
       "electron/mcp.cjs",
+      "electron/mcp-server.cjs",
+      "electron/mcp-bridge.cjs",
       "electron/demo-mcp.cjs",
       "docs/demo/**",
       "build/trayTemplate.png",

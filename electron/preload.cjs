@@ -51,6 +51,29 @@ contextBridge.exposeInMainWorld('penumbraHost', {
       return () => ipcRenderer.removeListener('mcp:closed', listener);
     },
   },
+  mcpServer: {
+    start: (cfg) => ipcRenderer.invoke('mcpserver:start', cfg),
+    update: (cfg) => ipcRenderer.invoke('mcpserver:update', cfg),
+    stop: () => ipcRenderer.invoke('mcpserver:stop'),
+    status: () => ipcRenderer.invoke('mcpserver:status'),
+    focus: () => ipcRenderer.invoke('mcpserver:focus'),
+    reply: (id, result) => ipcRenderer.send('mcpserver:reply', id, result),
+    onCall: (cb) => {
+      const listener = (_e, id, call) => cb(id, call);
+      ipcRenderer.on('mcpserver:call', listener);
+      return () => ipcRenderer.removeListener('mcpserver:call', listener);
+    },
+    onCancel: (cb) => {
+      const listener = (_e, id) => cb(id);
+      ipcRenderer.on('mcpserver:cancel', listener);
+      return () => ipcRenderer.removeListener('mcpserver:cancel', listener);
+    },
+    onAllowed: (cb) => {
+      const listener = (_e, tool) => cb(tool);
+      ipcRenderer.on('mcpserver:allowed', listener);
+      return () => ipcRenderer.removeListener('mcpserver:allowed', listener);
+    },
+  },
   backup: {
     summary: () => ipcRenderer.invoke('backup:summary'),
     save: (req) => ipcRenderer.invoke('backup:save', req),

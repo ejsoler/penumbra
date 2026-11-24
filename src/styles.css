@@ -1042,3 +1042,17 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .memory-item .memory-text { flex: 1 1 100%; width: 100%; resize: none; field-sizing: content; min-height: 26px; line-height: 1.35; font-family: inherit; }
 .memory-item .flex { flex: 1; }
 .memory-tabs button { padding: 4px 10px; }
+
+/* Penumbra as an MCP server */
+.mcps-main { align-items: center; }
+.mcps-main .mcp-status { margin-left: auto; }
+.mcps-token { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 12px; }
+.mcps-caps { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.mcps-cap { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--bg); display: flex; flex-direction: column; gap: 4px; }
+.mcps-cap.on { border-color: rgba(124, 108, 255, 0.55); }
+.mcps-ask { margin: 0; }
+.mcps-tools { word-break: break-word; }
+.mcps-allowed { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.mcps-chip { display: inline-flex; align-items: center; gap: 4px; }
+.mcps-snippet { margin: 10px 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); }
+.mcps-snippet .step-result { margin: 0; padding: 10px 12px; max-height: 220px; overflow: auto; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; }

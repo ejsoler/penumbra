@@ -83,6 +83,7 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 - Connect Penumbra to other apps and programs through [MCP](https://modelcontextprotocol.io) (Model Context Protocol), either a program it starts on your computer (stdio, like `npx -y @modelcontextprotocol/server-filesystem`) or a web address (HTTP). Their tools then work in your chats and agents
 - Turn on **Connected apps** in a chat's tools, or on an agent. Every use asks you first, once or **Always allow** for that tool, and what a tool returns is treated as data, not instructions
 - Slow tools are fine (a configurable wait that restarts on progress, and stopping the reply cancels the call), long results too (the chat's **Tool Result Limit** is automatic, or yours), and pictures a tool returns show up in the chat and go to models that can see
+- **The other way round:** let other apps (Claude Desktop, Cursor, scripts) use Penumbra. Turn on **Penumbra as a server** in Connections, choose what they may do (ask your models and agents, read and search chats, manage projects, make images and run the orchestrator; all off at first, each with its own “ask me first”), and copy the block it gives you. It listens only on this computer, needs a secret token, and works over HTTP or through a small stdio bridge for apps that only start programs
 - The **Connections** tab shows each server's status and tools, and keeps your keys in this profile (they're included in backups if you choose that setting)
 
 **Images** *(new in 0.3.0)*

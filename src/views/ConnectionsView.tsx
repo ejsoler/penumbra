@@ -6,6 +6,8 @@ import {
   useMcpRuntime, useMcpServers, type McpServer, type McpStatus,
 } from '../mcp';
 import { usePersistent } from '../store';
+import { McpServerPanel } from '../components/McpServerPanel';
+import { useMcpServerSettings, useMcpServerStatus } from '../mcpServer';
 import { Check, Loader2, Plug, Plus, ShieldAlert, Trash2, TriangleAlert, X } from '../components/icons';
 
 const STATUS: Record<McpStatus, string> = { off: 'Not connected', connecting: 'Connecting…', on: 'Connected', error: "Couldn't connect" };
@@ -14,7 +16,11 @@ export function ConnectionsView({ onOpenAgents }: { onOpenAgents: () => void }) 
   const servers = useMcpServers();
   const runtime = useMcpRuntime();
   const [selected, setSelected] = usePersistent<string | null>('ollama-gui.mcpSelected', null);
-  const server = servers.find((s) => s.id === selected) ?? servers[0];
+  const own = useMcpServerSettings();
+  const ownStatus = useMcpServerStatus();
+  // "server" is Penumbra's own MCP server, the page that lets other apps in.
+  const showOwn = selected === '__server';
+  const server = showOwn ? undefined : servers.find((s) => s.id === selected) ?? servers[0];
 
   const add = (fields: Partial<McpServer> = {}) => setSelected(addServer(fields).id);
   /** An example server; the filesystem one needs a folder first. */
@@ -40,6 +46,14 @@ export function ConnectionsView({ onOpenAgents }: { onOpenAgents: () => void }) 
           <button className="icon-btn" onClick={() => add()} title="Add a server"><Plus size={16} /></button>
         </div>
         <div className="conv-list">
+          <div className={`conv-item ${showOwn ? 'active' : ''}`} onClick={() => setSelected('__server')}>
+            <span className={`mcp-dot ${ownStatus.running ? 'on' : ownStatus.error ? 'error' : 'off'}`} />
+            <div className="conv-text">
+              <span className="conv-title">Penumbra as a server</span>
+              <span className="conv-sub">{ownStatus.running ? `On · port ${ownStatus.port}` : own.enabled ? 'Starting…' : 'Lets other apps use Penumbra'}</span>
+            </div>
+          </div>
+          <div className="conv-section">Apps Penumbra uses</div>
           {servers.length === 0 && <p className="muted small pad">No connections yet. Connect an app or program that speaks MCP, and its tools show up in your chats.</p>}
           {servers.map((s) => {
             const r = runtime[s.id];
@@ -56,7 +70,9 @@ export function ConnectionsView({ onOpenAgents }: { onOpenAgents: () => void }) 
         </div>
       </aside>
       <main className="page connections-page">
-        {server ? (
+        {showOwn ? (
+          <McpServerPanel />
+        ) : server ? (
           <ServerPage key={server.id} server={server} onDeleted={() => setSelected(null)} onOpenAgents={onOpenAgents} />
         ) : (
           <div className="editor">

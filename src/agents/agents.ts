@@ -60,6 +60,7 @@ export const useAgents = () =>
   );
 
 export const getAgent = (id?: string) => agents.find((a) => a.id === id);
+export const getAgents = () => agents;
 
 export function createAgent(fields: Partial<Agent> = {}): Agent {
   const a: Agent = {

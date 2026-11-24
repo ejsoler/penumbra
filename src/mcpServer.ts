@@ -6,7 +6,7 @@ import * as api from './api';
 import { getAgents } from './agents/agents';
 import { ORCHESTRATOR_ID } from './agents/orchestrator';
 import { host, type McpCap, type McpServerConfig, type McpServerResult } from './host';
-import { generateImage, imageModelFor, imageUrl, modelLabel } from './images';
+import { generateImage, imageModelFor, modelLabel } from './images';
 import { getUserMemory, searchMessages } from './memory';
 import { createProject, getProject, getProjects, MAX_PROJECT_SOURCES, MAX_SOURCE, sourcesSize, updateProject } from './projects';
 import { approval, chatController, getConversations, openChatRequest, streaming, updateConversations } from './session';
@@ -159,13 +159,13 @@ function newChat(fields: Partial<Conversation>): Conversation {
 }
 
 /** A saved image, as a small JPEG for the answer. */
-async function pictureOf(file: string): Promise<{ data: string; mimeType: string } | null> {
+async function pictureOf(dataUrl: string): Promise<{ data: string; mimeType: string } | null> {
   try {
     const img = new Image();
     await new Promise((resolve, reject) => {
       img.onload = resolve;
       img.onerror = reject;
-      img.src = imageUrl(file);
+      img.src = dataUrl;
     });
     const scale = Math.min(1, 1024 / Math.max(img.width, img.height, 1));
     const canvas = document.createElement('canvas');
@@ -198,13 +198,26 @@ async function runTool(tool: string, a: Record<string, unknown>, client: string,
       const agent = a.agent ? getAgents().find((g) => g.name.toLowerCase() === text(a.agent).toLowerCase()) : undefined;
       if (a.agent && !agent) return fail(`No agent named "${text(a.agent)}". Agents: ${getAgents().map((g) => g.name).join(', ') || 'none'}.`);
       if (a.project_id && !getProject(text(a.project_id))) return fail(`No project with id "${text(a.project_id)}".`);
+      const wanted = Array.isArray(a.tools) ? a.tools.map(String) : [];
+      const extra = wanted.filter((t): t is 'files' | 'web' => t === 'files' || t === 'web');
+      if (wanted.length !== extra.length) return fail('Only the read-only tools "files" and "web" can be used from here.');
+      const folder = text(a.folder);
+      if (folder && !/^([/~]|[A-Za-z]:[\\/])/.test(folder)) return fail('The folder must be a full path.');
+      if (extra.includes('files') && !folder) return fail('The "files" tool needs a folder.');
       let convId = text(a.chat_id);
       if (convId) {
         if (!getConversations().some((x) => x.id === convId)) return fail(`No chat with id "${convId}".`);
       } else {
-        const model = agent?.model || (await pickModel(a.model));
+        const model = agent?.model || (await pickModel(a.model, extra.length > 0));
         if (!model) return fail('No models are installed in Ollama.');
-        convId = newChat({ title: `MCP · ${client}: ${clip(prompt, 36)}`, model, ...(agent ? { agentId: agent.id } : {}), ...(a.project_id ? { projectId: text(a.project_id) } : {}) }).id;
+        convId = newChat({
+          title: `MCP · ${client}: ${clip(prompt, 36)}`,
+          model,
+          ...(agent ? { agentId: agent.id } : {}),
+          ...(a.project_id ? { projectId: text(a.project_id) } : {}),
+          ...(folder ? { folder } : {}),
+          ...(extra.length ? { tools: ['skills', ...extra] } : {}),
+        }).id;
       }
       const stop = watchApprovals(convId);
       const onAbort = () => c.stop();
@@ -317,7 +330,7 @@ async function runTool(tool: string, a: Record<string, unknown>, client: string,
       signal.addEventListener('abort', stop, { once: true });
       try {
         const r = await generateImage({ id: model.id, prompt, width: size(a.width), height: size(a.height) });
-        const pic = await pictureOf(r.file);
+        const pic = r.image ? await pictureOf(r.image) : null;
         return ok(`Made a ${r.width}×${r.height} image with ${modelLabel(model)} (seed ${r.seed}). It is saved in Penumbra's Images.`, pic ? [pic] : undefined);
       } finally {
         signal.removeEventListener('abort', stop);

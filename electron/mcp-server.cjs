@@ -23,8 +23,16 @@ const TOOLS = [
   {
     cap: 'ask',
     name: 'ask',
-    description: 'Sends a message to a local model or agent and returns its answer. The conversation is saved as a chat in Penumbra (titled “MCP · …”). Give chat_id to continue an earlier chat, or project_id to start it inside a project.',
-    schema: obj({ prompt: str('The message'), model: str('A model name (default: the agent’s model, or the first installed)'), agent: str('An agent’s name'), chat_id: str('Continue this chat'), project_id: str('Start the chat in this project') }, ['prompt']),
+    description: 'Sends a message to a local model or agent and returns its answer. Good for heavy work: the model reads and processes the material itself, and only the answer comes back. The conversation is saved as a chat in Penumbra (titled “MCP · …”). Give chat_id to continue an earlier chat (it remembers what it read), or project_id to start it inside a project. For a new chat, folder and tools let the model read files in a folder or fetch web pages (read only).',
+    schema: obj({
+      prompt: str('The message'),
+      model: str('A model name (default: the one the user chats with most, if it can chat)'),
+      agent: str('An agent’s name'),
+      chat_id: str('Continue this chat'),
+      project_id: str('Start the chat in this project'),
+      folder: str('A full path to a folder on this computer the model may read from (new chats; needs tools: ["files"])'),
+      tools: { type: 'array', items: { type: 'string', enum: ['files', 'web'] }, description: 'Read-only tools for a new chat: "files" (read the folder) and "web" (search and fetch pages)' },
+    }, ['prompt']),
     does: 'ask a local model',
   },
   { cap: 'read', name: 'list_chats', description: 'Lists chats, newest first: id, title, model, project, and size.', schema: obj({ query: str('Only chats whose title contains this'), project_id: str('Only chats of this project'), limit: num('Default 30') }), readOnly: true, does: 'list your chats' },

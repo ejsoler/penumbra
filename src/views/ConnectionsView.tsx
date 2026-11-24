@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { host } from '../host';
 import {
-  addServer, connectServer, disconnectServer, joinCommand, MCP_EXAMPLES, parsePairs, pairsText, removeServer, splitCommand, updateServer,
+  addServer, connectServer, DEFAULT_TIMEOUT, disconnectServer, joinCommand, MCP_EXAMPLES, parsePairs, pairsText, removeServer, splitCommand, updateServer,
   useMcpRuntime, useMcpServers, type McpServer, type McpStatus,
 } from '../mcp';
 import { usePersistent } from '../store';
@@ -108,6 +108,7 @@ function ServerPage({ server, onDeleted, onOpenAgents }: { server: McpServer; on
       url: draft.url.trim(),
       headers: parsePairs(draft.headers, ':'),
       enabled: draft.enabled,
+      timeoutSec: Math.max(5, Math.min(3600, Math.round(Number(draft.timeout)) || DEFAULT_TIMEOUT)),
     };
     updateServer(server.id, next);
     setDraft(toDraft({ ...server, ...next }));
@@ -167,6 +168,10 @@ function ServerPage({ server, onDeleted, onOpenAgents }: { server: McpServer; on
             </label>
           </>
         )}
+        <label className="field slim column">
+          <span>Longest wait for a tool <small className="muted">seconds. A server that reports progress gets the full time again each time, so slow work like a render is fine. Stopping the reply cancels the call</small></span>
+          <input className="text plain" type="number" min={5} max={3600} value={draft.timeout} onChange={(e) => setDraft({ ...draft, timeout: e.target.value })} />
+        </label>
         <label className="check-row">
           <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
           <span>Connect when Penumbra starts</span>
@@ -239,4 +244,5 @@ const toDraft = (s: McpServer) => ({
   url: s.url,
   headers: pairsText(s.headers, ':'),
   enabled: s.enabled,
+  timeout: String(s.timeoutSec ?? DEFAULT_TIMEOUT),
 });

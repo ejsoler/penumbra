@@ -11,7 +11,11 @@ const PROTOCOL = '2025-06-18';
 const MAX_LINE = 8 * 1024 * 1024;
 const MAX_RESULT = 60 * 1024;
 const CONNECT_TIMEOUT = 45000;
-const CALL_TIMEOUT = 120000;
+const CALL_TIMEOUT = 300000;
+/** However much progress a server reports, a call never waits longer than this. */
+const CALL_CAP = 3600000;
+const MAX_IMAGES = 4;
+const MAX_IMAGE = 6 * 1024 * 1024;
 
 const plain = (e) => String((e && e.message) || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
 
@@ -224,6 +228,8 @@ class Connection {
     this.tools = [];
     this.info = null;
     this.closedReason = null;
+    /** Calls in flight, by the window's call id. */
+    this.calls = new Map();
     this.onClosed = onClosed;
     const onMessage = (m) => this.handle(m);
     const onClose = (reason) => this.fail(reason);
@@ -238,6 +244,8 @@ class Connection {
       clearTimeout(p.timer);
       if (m.error) p.reject(new Error(m.error.message || `Error ${m.error.code}`));
       else p.resolve(m.result);
+    } else if (m && m.method === 'notifications/progress' && m.params && m.params.progressToken !== undefined) {
+      this.pending.get(m.params.progressToken)?.touch?.();
     } else if (m && m.method && m.id !== undefined) {
       // A request from the server: answer pings, refuse the rest (sampling, roots, … aren't supported).
       const reply = m.method === 'ping' ? { jsonrpc: '2.0', id: m.id, result: {} } : { jsonrpc: '2.0', id: m.id, error: { code: -32601, message: 'Not supported by Penumbra' } };
@@ -256,22 +264,48 @@ class Connection {
     this.onClosed(this.closedReason);
   }
 
-  request(method, params, timeoutMs = CALL_TIMEOUT) {
+  /** Sends a request. `onId` gets its id (to cancel it); progress the server reports restarts the wait. */
+  request(method, params, timeoutMs = CALL_TIMEOUT, onId) {
     return new Promise((resolve, reject) => {
       if (this.closedReason) return reject(new Error(this.closedReason));
       const id = this.nextId++;
-      const timer = setTimeout(() => {
+      onId?.(id);
+      const startedAt = Date.now();
+      const arm = () => setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`No answer from the server after ${Math.round(timeoutMs / 1000)} seconds.`));
+        reject(new Error(`No answer from the server after ${Math.round(timeoutMs / 1000)} seconds${Date.now() - startedAt > timeoutMs + 1000 ? ' without progress' : ''}. You can raise the wait in the server's settings.`));
         this.transport.send({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: id, reason: 'timeout' } }).catch(() => {});
       }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, {
+        resolve,
+        reject,
+        timer: arm(),
+        /** Progress arrived: wait another full period, up to the cap. */
+        touch: () => {
+          const p = this.pending.get(id);
+          if (!p || Date.now() - startedAt > CALL_CAP) return;
+          clearTimeout(p.timer);
+          p.timer = arm();
+        },
+      });
       this.transport.send({ jsonrpc: '2.0', id, method, params }).catch((e) => {
-        if (!this.pending.delete(id)) return;
-        clearTimeout(timer);
+        const p = this.pending.get(id);
+        if (!p) return;
+        this.pending.delete(id);
+        clearTimeout(p.timer);
         reject(e);
       });
     });
+  }
+
+  /** Stops waiting for a request and tells the server to give up on it. */
+  cancel(id, reason) {
+    const p = this.pending.get(id);
+    if (!p) return;
+    this.pending.delete(id);
+    clearTimeout(p.timer);
+    p.reject(new Error(reason));
+    this.transport.send({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: id, reason } }).catch(() => {});
   }
 
   async connect() {
@@ -315,21 +349,38 @@ class Connection {
     return tools;
   }
 
-  async call(name, args, timeoutSec) {
-    const r = await this.request('tools/call', { name, arguments: args && typeof args === 'object' ? args : {} }, Math.max(5, Math.min(Number(timeoutSec) || 120, 900)) * 1000);
+  async call(name, args, timeoutSec, callId) {
+    const timeout = Math.max(5, Math.min(Number(timeoutSec) || CALL_TIMEOUT / 1000, 3600)) * 1000;
+    const track = (id) => callId && this.calls.set(callId, id);
+    let r;
+    try {
+      // The progress token is the request id, so the server's progress updates can be matched to this call.
+      r = await this.request('tools/call', { name, arguments: args && typeof args === 'object' ? args : {}, _meta: { progressToken: this.nextId } }, timeout, track);
+    } finally {
+      if (callId) this.calls.delete(callId);
+    }
     const parts = [];
+    const images = [];
     for (const c of r.content || []) {
       if (c.type === 'text') parts.push(String(c.text ?? ''));
-      else if (c.type === 'image') parts.push(`[image: ${c.mimeType || 'unknown type'}, not shown]`);
-      else if (c.type === 'audio') parts.push(`[audio: ${c.mimeType || 'unknown type'}, not played]`);
+      else if (c.type === 'image') {
+        if (typeof c.data === 'string' && c.data.length <= MAX_IMAGE && images.length < MAX_IMAGES) images.push({ data: c.data, mimeType: c.mimeType || 'image/png' });
+        else parts.push('[an image was too large to bring in]');
+      } else if (c.type === 'audio') parts.push(`[audio: ${c.mimeType || 'unknown type'}, not played]`);
       else if (c.type === 'resource' && c.resource) parts.push(typeof c.resource.text === 'string' ? c.resource.text : `[resource ${c.resource.uri || ''}]`);
       else if (c.type === 'resource_link') parts.push(`[link: ${c.uri || c.name || ''}]`);
     }
-    if (!parts.length && r.structuredContent !== undefined) parts.push(JSON.stringify(r.structuredContent, null, 2));
+    if (!parts.length && !images.length && r.structuredContent !== undefined) parts.push(JSON.stringify(r.structuredContent, null, 2));
     let text = parts.join('\n');
     const truncated = text.length > MAX_RESULT;
     if (truncated) text = `${text.slice(0, MAX_RESULT)}\n[Result cut off at ${MAX_RESULT / 1024} KB]`;
-    return { text, isError: r.isError === true };
+    return { text, images, isError: r.isError === true };
+  }
+
+  /** Cancels a call made with this `callId`. */
+  cancelCall(callId) {
+    const id = this.calls.get(callId);
+    if (id !== undefined) this.cancel(id, 'Cancelled');
   }
 
   close() {
@@ -390,10 +441,14 @@ function registerMcp() {
     connections.delete(k);
   });
 
-  ipcMain.handle('mcp:call', async (e, id, name, args, timeoutSec) => {
+  ipcMain.handle('mcp:call', async (e, id, name, args, timeoutSec, callId) => {
     const conn = connections.get(key(e, String(id)));
     if (!conn) throw new Error('This server is not connected.');
-    return conn.call(String(name), args, timeoutSec);
+    return conn.call(String(name), args, timeoutSec, callId ? String(callId) : undefined);
+  });
+
+  ipcMain.handle('mcp:cancel', (e, id, callId) => {
+    connections.get(key(e, String(id)))?.cancelCall(String(callId));
   });
 
   /** What this window is connected to, so a reloaded window doesn't start the servers again. */

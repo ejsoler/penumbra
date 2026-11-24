@@ -11,6 +11,8 @@ export interface Step {
   args: Record<string, unknown>;
   status: 'running' | 'done' | 'error' | 'declined';
   result?: string;
+  /** Pictures the tool returned (small JPEGs, base64). */
+  images?: string[];
   /** Length of the reply text when the step ran, so the timeline shows it in place. */
   at: number;
 }
@@ -40,6 +42,8 @@ export interface RunOptions {
   approve?: (req: ApprovalRequest) => Promise<Approval>;
   /** An image tool made a picture for this reply. */
   onImage?: (img: GeneratedRef) => void;
+  /** The model can see images, so pictures a tool returns go to it too. */
+  vision?: boolean;
 }
 
 export interface RunResult {
@@ -118,6 +122,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
       return { content, stats, cutOff: calls.length > 0, truncated: !calls.length && doneReason === 'length' };
     }
 
+    const seen: { tool: string; images: string[] }[] = [];
     for (const call of calls) {
       const tool = tools.find((t) => t.name === call.function.name);
       const args = (call.function.arguments ?? {}) as Record<string, unknown>;
@@ -132,6 +137,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
       };
       o.onStep?.(step);
       let result: string;
+      let images: string[] = [];
       let status: Step['status'] = 'done';
       if (!tool) {
         result = `Error: there is no tool named "${call.function.name}". Available tools: ${tools.map((t) => t.name).join(', ')}`;
@@ -139,7 +145,9 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
       } else {
         try {
           const request = [...o.messages].reverse().find((m) => m.role === 'user')?.content;
-          result = await tool.run(args, { signal: o.signal, approve: o.approve ?? (async () => false), request, onImage: o.onImage });
+          const r = await tool.run(args, { signal: o.signal, approve: o.approve ?? (async () => false), request, onImage: o.onImage });
+          result = typeof r === 'string' ? r : r.text;
+          images = typeof r === 'string' ? [] : r.images ?? [];
         } catch (e) {
           if (o.signal.aborted) throw e;
           if (e instanceof Declined) {
@@ -151,9 +159,16 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
           }
         }
       }
+      if (images.length) {
+        // A model that can see gets the pictures in the next message; one that can't is told they exist.
+        if (o.vision) seen.push({ tool: call.function.name, images });
+        else result += `${result ? '\n' : ''}(The tool also returned ${images.length === 1 ? 'a picture' : `${images.length} pictures`}, which this model can't see. The user can see ${images.length === 1 ? 'it' : 'them'} in the chat.)`;
+      }
       result = clip(result);
-      o.onStep?.({ ...step, status, result });
+      o.onStep?.({ ...step, status, result, ...(images.length ? { images } : {}) });
       history.push({ role: 'tool', content: result, tool_name: call.function.name });
     }
+    // After every tool result of this round (they have to stay together), show the model what the tools returned.
+    if (seen.length) history.push({ role: 'user', content: `Picture${seen.flatMap((s) => s.images).length === 1 ? '' : 's'} returned by ${[...new Set(seen.map((s) => s.tool))].join(', ')}:`, images: seen.flatMap((s) => s.images) });
   }
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Step } from '../agents/engine';
+import { openLightbox } from './Lightbox';
 import { Ban, ChevronRight, CircleAlert, CircleCheck, Loader2, Wrench } from './icons';
 
 /** A skill shows up only once it has actually loaded: not while the model is asking, and not if it was turned down. */
@@ -29,6 +30,13 @@ function StepRow({ step }: { step: Step }) {
         {step.status === 'declined' && <span className="step-tag">declined</span>}
         {step.status !== 'running' && <ChevronRight size={13} className="chev" />}
       </button>
+      {!!step.images?.length && (
+        <div className="step-images">
+          {step.images.map((b64, i) => (
+            <img key={i} src={`data:image/jpeg;base64,${b64}`} alt="" className="zoomable" onClick={() => openLightbox(step.images!.map((b) => ({ src: `data:image/jpeg;base64,${b}`, caption: step.label })), i)} />
+          ))}
+        </div>
+      )}
       {open && (
         <div className="step-body">
           {Object.keys(step.args).length > 0 && <pre className="step-args">{JSON.stringify(step.args, null, 2)}</pre>}

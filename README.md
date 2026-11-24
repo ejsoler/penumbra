@@ -76,6 +76,7 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 **Connections (MCP)** *(new)*
 - Connect Penumbra to other apps and programs through [MCP](https://modelcontextprotocol.io) (Model Context Protocol), either a program it starts on your computer (stdio, like `npx -y @modelcontextprotocol/server-filesystem`) or a web address (HTTP). Their tools then work in your chats and agents
 - Turn on **Connected apps** in a chat's tools, or on an agent. Every use asks you first, once or **Always allow** for that tool, and what a tool returns is treated as data, not instructions
+- Slow tools are fine (a configurable wait that restarts on progress, and stopping the reply cancels the call), and pictures a tool returns show up in the chat and go to models that can see
 - The **Connections** tab shows each server's status and tools, and keeps your keys in this profile (they're included in backups if you choose that setting)
 
 **Images** *(new in 0.3.0)*

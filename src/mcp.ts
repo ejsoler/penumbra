@@ -22,6 +22,8 @@ export interface McpServer {
   enabled: boolean;
   /** Tools the user chose "always allow" for. */
   allowed: string[];
+  /** How long to wait for one tool, in seconds (a server that reports progress gets more). Missing means 5 minutes. */
+  timeoutSec?: number;
   createdAt: number;
 }
 
@@ -34,6 +36,7 @@ export interface McpRuntime {
 }
 
 export const MCP_KEY = 'ollama-gui.mcpServers';
+export const DEFAULT_TIMEOUT = 300;
 
 let servers: McpServer[] = (() => {
   try {
@@ -162,6 +165,29 @@ export function parsePairs(text: string, sep: '=' | ':'): Record<string, string>
 }
 export const pairsText = (o: Record<string, string>, sep: '=' | ':') => Object.entries(o).map(([k, v]) => `${k}${sep === ':' ? ': ' : '='}${v}`).join('\n');
 
+/** A returned picture, at most 768 px and re-saved as a JPEG, so it fits the model and the saved chat. Null if it can't be read. */
+async function shrink(data: string, mime: string): Promise<string | null> {
+  try {
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = `data:${mime};base64,${data}`;
+    });
+    const scale = Math.min(1, 768 / Math.max(img.width, img.height, 1));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const g = canvas.getContext('2d')!;
+    g.fillStyle = '#fff'; // transparent pictures get a white background
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.82).split(',')[1] || null;
+  } catch {
+    return null;
+  }
+}
+
 // ---- the tools the model sees ----------------------------------------------------------------------
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -206,11 +232,20 @@ export function mcpTools(): Tool[] {
             if (!answer) throw new Declined(`The user did not allow ${t.name} from ${s.name}. Do not call it again; continue another way or ask the user.`);
             if (answer === 'always') updateServer(s.id, (x) => ({ allowed: [...new Set([...x.allowed, t.name])] }));
           }
+          // Stopping the reply stops the call too.
+          const callId = uid();
+          const stop = () => void h.mcp.cancel(s.id, callId).catch(() => {});
+          ctx.signal.addEventListener('abort', stop, { once: true });
           try {
-            const r = await h.mcp.call(s.id, t.name, args);
-            return r.isError ? `The tool reported an error: ${r.text || '(no details)'}` : r.text || '(the tool returned nothing)';
+            const r = await h.mcp.call(s.id, t.name, args, current?.timeoutSec ?? servers.find((x) => x.id === s.id)?.timeoutSec ?? DEFAULT_TIMEOUT, callId);
+            const images = (await Promise.all(r.images.map((i) => shrink(i.data, i.mimeType)))).filter((x): x is string => !!x);
+            const text = r.isError ? `The tool reported an error: ${r.text || '(no details)'}` : r.text || (images.length ? '' : '(the tool returned nothing)');
+            return images.length ? { text, images } : text;
           } catch (e) {
+            if (ctx.signal.aborted) throw e;
             return `Couldn't call ${t.name}: ${readable(e)}`;
+          } finally {
+            ctx.signal.removeEventListener('abort', stop);
           }
         },
       });

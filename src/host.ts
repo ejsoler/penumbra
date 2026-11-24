@@ -138,7 +138,9 @@ export interface PenumbraHost {
   mcp: {
     connect: (cfg: McpConnectConfig) => Promise<{ tools: McpToolInfo[]; info: { name?: string; version?: string; instructions?: string } | null }>;
     disconnect: (id: string) => Promise<void>;
-    call: (id: string, name: string, args: Record<string, unknown>, timeoutSec?: number) => Promise<{ text: string; isError: boolean }>;
+    /** Calls a tool and waits up to `timeoutSec` (progress from the server restarts the wait). `callId` lets `cancel` stop it. */
+    call: (id: string, name: string, args: Record<string, unknown>, timeoutSec?: number, callId?: string) => Promise<{ text: string; images: { data: string; mimeType: string }[]; isError: boolean }>;
+    cancel: (id: string, callId: string) => Promise<void>;
     /** Servers this window is connected to now (still connected after a reload). */
     state: () => Promise<Record<string, { tools: McpToolInfo[]; info: { name?: string; version?: string; instructions?: string } | null }>>;
     /** Called when a server stops on its own. Returns a function that stops listening. */

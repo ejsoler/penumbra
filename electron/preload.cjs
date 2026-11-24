@@ -41,7 +41,8 @@ contextBridge.exposeInMainWorld('penumbraHost', {
   mcp: {
     connect: (cfg) => ipcRenderer.invoke('mcp:connect', cfg),
     disconnect: (id) => ipcRenderer.invoke('mcp:disconnect', id),
-    call: (id, name, args, timeoutSec) => ipcRenderer.invoke('mcp:call', id, name, args, timeoutSec),
+    call: (id, name, args, timeoutSec, callId) => ipcRenderer.invoke('mcp:call', id, name, args, timeoutSec, callId),
+    cancel: (id, callId) => ipcRenderer.invoke('mcp:cancel', id, callId),
     state: () => ipcRenderer.invoke('mcp:state'),
     onClosed: (cb) => {
       const listener = (_e, id, reason) => cb(id, reason);

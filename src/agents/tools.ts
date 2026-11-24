@@ -41,6 +41,9 @@ export interface GeneratedRef {
   model: string;
 }
 
+/** What a tool gives back: text, and optionally pictures (base64, small enough to keep in the chat). */
+export type ToolResult = string | { text: string; images?: string[] };
+
 export interface Tool {
   name: string;
   /** Short human name for the timeline ("Load skill"). */
@@ -49,7 +52,7 @@ export interface Tool {
   parameters: Record<string, unknown>;
   /** One-line summary of a call for the timeline. */
   summary?: (args: ToolArgs) => string;
-  run: (args: ToolArgs, ctx: ToolContext) => Promise<string>;
+  run: (args: ToolArgs, ctx: ToolContext) => Promise<ToolResult>;
 }
 
 /** Thrown by a tool when the user says no; the message goes back to the model. */

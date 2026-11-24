@@ -231,7 +231,14 @@ function startServer(config, sender) {
     let ping;
     if (long) {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
-      ping = setInterval(() => alive && res.write(': keep-alive\n\n'), 10000);
+      // Clients that asked for progress get it, which restarts their own timeouts; others get a keep-alive line.
+      const token = list.find((m) => m && m.method === 'tools/call')?.params?._meta?.progressToken;
+      let n = 0;
+      ping = setInterval(() => {
+        if (!alive) return;
+        if (token === undefined) return void res.write(': keep-alive\n\n');
+        res.write(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/progress', params: { progressToken: token, progress: ++n, message: 'Penumbra is working…' } })}\n\n`);
+      }, 10000);
     }
     const replies = (await Promise.all(list.map((m) => handleMessage(m, session, onGone)))).filter(Boolean);
     clearInterval(ping);

@@ -178,6 +178,37 @@ async function pictureOf(dataUrl: string): Promise<{ data: string; mimeType: str
   }
 }
 
+// Only one reply or run at a time, so calls that arrive together wait their turn (and for the user's own reply).
+let turn: Promise<unknown> = Promise.resolve();
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Waits for `p`, or throws if the app that called gives up first. */
+const abortable = <T,>(p: Promise<T>, signal: AbortSignal) =>
+  new Promise<T>((resolve, reject) => {
+    if (signal.aborted) return reject(new Error('Cancelled'));
+    signal.addEventListener('abort', () => reject(new Error('Cancelled')), { once: true });
+    p.then(resolve, reject);
+  });
+
+async function exclusive<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
+  const before = turn;
+  let finish!: () => void;
+  const done = new Promise<void>((r) => (finish = r));
+  turn = before.then(() => done, () => done);
+  try {
+    await abortable(before.catch(() => {}), signal);
+    const until = Date.now() + 10 * 60000;
+    while (streaming.get()) {
+      if (signal.aborted) throw new Error('Cancelled');
+      if (Date.now() > until) throw new Error('Penumbra was still busy with another reply after 10 minutes.');
+      await sleep(400);
+    }
+    return await work();
+  } finally {
+    finish();
+  }
+}
+
 const text = (v: unknown) => (typeof v === 'string' ? v.trim() : v === undefined || v === null ? '' : String(v).trim());
 
 async function runTool(tool: string, a: Record<string, unknown>, client: string, signal: AbortSignal): Promise<McpServerResult> {
@@ -194,7 +225,6 @@ async function runTool(tool: string, a: Record<string, unknown>, client: string,
       const prompt = text(a.prompt);
       if (!prompt) return fail('Give a prompt.');
       if (!c) return fail("Penumbra's chat isn't ready yet.");
-      if (streaming.get()) return fail('Penumbra is writing another reply right now. Try again in a moment.');
       const agent = a.agent ? getAgents().find((g) => g.name.toLowerCase() === text(a.agent).toLowerCase()) : undefined;
       if (a.agent && !agent) return fail(`No agent named "${text(a.agent)}". Agents: ${getAgents().map((g) => g.name).join(', ') || 'none'}.`);
       if (a.project_id && !getProject(text(a.project_id))) return fail(`No project with id "${text(a.project_id)}".`);
@@ -204,10 +234,11 @@ async function runTool(tool: string, a: Record<string, unknown>, client: string,
       const folder = text(a.folder);
       if (folder && !/^([/~]|[A-Za-z]:[\\/])/.test(folder)) return fail('The folder must be a full path.');
       if (extra.includes('files') && !folder) return fail('The "files" tool needs a folder.');
-      let convId = text(a.chat_id);
-      if (convId) {
-        if (!getConversations().some((x) => x.id === convId)) return fail(`No chat with id "${convId}".`);
-      } else {
+      const existing = text(a.chat_id);
+      if (existing && !getConversations().some((x) => x.id === existing)) return fail(`No chat with id "${existing}".`);
+      return exclusive(signal, async () => {
+      let convId = existing;
+      if (!convId) {
         const model = agent?.model || (await pickModel(a.model, extra.length > 0));
         if (!model) return fail('No models are installed in Ollama.');
         convId = newChat({
@@ -231,6 +262,7 @@ async function runTool(tool: string, a: Record<string, unknown>, client: string,
       const reply = lastReply(convId);
       if (!reply || reply.error) return fail(reply?.error || 'No answer.');
       return ok(`${reply.content.trim() || '(empty answer)'}\n\n[chat id: ${convId}]`);
+      });
     }
 
     // ---- read ----
@@ -340,7 +372,7 @@ async function runTool(tool: string, a: Record<string, unknown>, client: string,
       const goal = text(a.goal);
       if (!goal) return fail('Give a goal.');
       if (!c) return fail("Penumbra's chat isn't ready yet.");
-      if (streaming.get()) return fail('Penumbra is writing another reply right now. Try again in a moment.');
+      return exclusive(signal, async () => {
       const model = await pickModel(a.model, true);
       if (!model) return fail('No models are installed in Ollama.');
       const folder = text(a.folder);
@@ -365,6 +397,7 @@ async function runTool(tool: string, a: Record<string, unknown>, client: string,
         stop();
         signal.removeEventListener('abort', onAbort);
       }
+      });
     }
   }
   return fail(`Unknown tool "${tool}".`);

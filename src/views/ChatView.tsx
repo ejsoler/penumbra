@@ -13,7 +13,7 @@ import {
   type ModelInfo, type Orchestration, type PlanTask,
 } from '../agents/orchestrator';
 import { PlanActionsContext, PlanCard, type PlanActions } from '../components/PlanCard';
-import { runAgent, type Step } from '../agents/engine';
+import { runAgent, toolResultLimit, type Step } from '../agents/engine';
 import { DEFAULT_CHAT_TOOLS, replySetup } from '../agents/setup';
 import { enabledSkills, useSkills } from '../agents/skills';
 import { TOOL_GROUPS, type ToolGroup } from '../agents/builtins';
@@ -376,12 +376,14 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         patchTask(conv.id, msgId, task.id, (t) => ({ ...t, status: 'running', model }));
         const caps = ollama.capabilities[model] ?? [];
         const { system, tools } = replySetup({ agent, systemPrompt: '', interactive: false, toolsSupported: caps.includes('tools'), folder: chatFolder(conv), net: conv.net });
+        const taskOptions = genOptions(agent?.temperature, tools.length > 0);
         try {
           const result = await runAgent({
             model,
             messages: [...(system ? [{ role: 'system' as const, content: system }] : []), { role: 'user', content: taskMessage(orch.goal, task, tasks) }],
             tools,
-            options: genOptions(agent?.temperature, tools.length > 0),
+            options: taskOptions,
+            maxResult: toolResultLimit(params.tool_result, taskOptions.num_ctx),
             keepAlive: params.keep_alive,
             ...(caps.includes('thinking') ? { think: params.think } : {}),
             vision: caps.includes('vision'),
@@ -512,6 +514,7 @@ export function ChatView({ ollama, pendingModel, pendingAgent, onPendingHandled,
         messages,
         tools,
         options,
+        maxResult: toolResultLimit(params.tool_result, options.num_ctx),
         keepAlive: params.keep_alive,
         // A continuation goes straight on with the answer, without thinking first.
         ...(modelCaps.includes('thinking') ? { think: continuing ? false : params.think } : {}),
@@ -1639,6 +1642,13 @@ function SettingsPanel({ tools, internet, context, params, setParams, systemProm
           <h4>Generation</h4>
           <NumberField label="Context Length" value={params.num_ctx} min={256} step={1024} onChange={(num_ctx) => setParams({ num_ctx })} />
           <NumberField label="Max Tokens" hint="-1 = unlimited" value={params.num_predict} min={-1} step={128} onChange={(num_predict) => setParams({ num_predict })} />
+          <NumberField label="Tool Result Limit" hint="characters, 0 = auto" value={params.tool_result} min={0} step={4000} onChange={(tool_result) => setParams({ tool_result: Math.max(0, Math.round(tool_result)) })} />
+          <p className="muted small field-note">
+            {params.tool_result > 0 && toolResultLimit(params.tool_result, contextLimit) < params.tool_result
+              ? `Kept to ${toolResultLimit(params.tool_result, contextLimit).toLocaleString()} characters, 70% of the context. Raise the context length for more. `
+              : `Up to ${toolResultLimit(params.tool_result, contextLimit).toLocaleString()} characters (about ${Math.round(toolResultLimit(params.tool_result, contextLimit) / 3.2).toLocaleString()} tokens) from one tool, like a web page, a file, or a connected app. `}
+            {params.tool_result === 0 ? 'Auto is about a third of the context.' : <button className="link-btn small" onClick={() => setParams({ tool_result: 0 })}>Back to auto</button>}
+          </p>
           <NumberField label="Seed" hint="-1 = random" value={params.seed} min={-1} step={1} onChange={(seed) => setParams({ seed })} />
           <label className="field">
             <span>Keep Alive</span>

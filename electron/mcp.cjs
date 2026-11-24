@@ -9,7 +9,7 @@ const os = require('os');
 
 const PROTOCOL = '2025-06-18';
 const MAX_LINE = 8 * 1024 * 1024;
-const MAX_RESULT = 60 * 1024;
+const MAX_RESULT = 1024 * 1024; // the chat decides how much of a result it keeps
 const CONNECT_TIMEOUT = 45000;
 const CALL_TIMEOUT = 300000;
 /** However much progress a server reports, a call never waits longer than this. */

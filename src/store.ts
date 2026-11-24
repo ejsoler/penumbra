@@ -66,6 +66,8 @@ export interface GenParams {
   repeat_penalty: number;
   num_ctx: number;
   num_predict: number;
+  /** The most characters one tool result may bring into the chat. 0 = automatic, a share of the context. */
+  tool_result: number;
   seed: number;
   think: boolean;
   keep_alive: string;
@@ -79,6 +81,7 @@ export const DEFAULT_PARAMS: GenParams = {
   repeat_penalty: 1.1,
   num_ctx: 8192,
   num_predict: -1,
+  tool_result: 0,
   seed: -1,
   think: true,
   keep_alive: '30m',

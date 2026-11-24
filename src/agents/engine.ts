@@ -44,6 +44,8 @@ export interface RunOptions {
   onImage?: (img: GeneratedRef) => void;
   /** The model can see images, so pictures a tool returns go to it too. */
   vision?: boolean;
+  /** Longest tool result to keep, in characters (see toolResultLimit). */
+  maxResult?: number;
 }
 
 export interface RunResult {
@@ -55,9 +57,21 @@ export interface RunResult {
   truncated: boolean;
 }
 
+/** Characters per token, roughly (the same estimate the chat uses elsewhere). */
+const CHARS_PER_TOKEN = 3.2;
+
+/**
+ * The most characters one tool result may bring into the model's context. Automatic (0) is a third of the context;
+ * a number the user set is kept below 70% of it, so a result can't push the system prompt and the chat out.
+ */
+export function toolResultLimit(setting: number, numCtx: number) {
+  const chars = numCtx * CHARS_PER_TOKEN;
+  const limit = setting > 0 ? Math.min(setting, chars * 0.7) : chars * 0.35;
+  return Math.round(Math.max(4000, Math.min(limit, 1_000_000)));
+}
+
 /** Tool results go back into the model's context, so keep them bounded. */
-const MAX_RESULT = 16000;
-const clip = (s: string) => (s.length > MAX_RESULT ? `${s.slice(0, MAX_RESULT)}\n\n[…truncated, ${s.length - MAX_RESULT} more characters]` : s);
+const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max)}\n\n[…truncated, ${s.length - max} more characters]` : s);
 
 let stepSeq = 0;
 
@@ -164,7 +178,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
         if (o.vision) seen.push({ tool: call.function.name, images });
         else result += `${result ? '\n' : ''}(The tool also returned ${images.length === 1 ? 'a picture' : `${images.length} pictures`}, which this model can't see. The user can see ${images.length === 1 ? 'it' : 'them'} in the chat.)`;
       }
-      result = clip(result);
+      result = clip(result, o.maxResult ?? toolResultLimit(0, o.options?.num_ctx ?? 8192));
       o.onStep?.({ ...step, status, result, ...(images.length ? { images } : {}) });
       history.push({ role: 'tool', content: result, tool_name: call.function.name });
     }

@@ -1018,3 +1018,5 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 
 .step-images { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px 8px; }
 .step-images img { max-height: 120px; max-width: 220px; border-radius: 8px; border: 1px solid var(--border); object-fit: cover; }
+
+.field-note { margin: -2px 0 8px; line-height: 1.4; }

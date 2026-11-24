@@ -397,7 +397,13 @@ function unseen(conv: Conversation) {
   const at = conv.memoryUpTo ? conv.messages.findIndex((m) => m.id === conv.memoryUpTo) : -1;
   const slice = conv.messages.slice(at + 1);
   // If the last seen message is gone (edited or branched), look only at the latest part.
-  return (at < 0 && conv.memoryUpTo ? slice.slice(-10) : slice).filter((m) => !m.error && (m.role === 'user' || m.content.trim()));
+  const part = at < 0 && conv.memoryUpTo ? slice.slice(-10) : slice;
+  // What another app sent (and the answer to it) isn't the user's: memory never learns from it.
+  let fromApp = false;
+  return part.filter((m) => {
+    if (m.role === 'user') fromApp = !!m.external;
+    return !fromApp && !m.error && (m.role === 'user' || m.content.trim());
+  });
 }
 
 /** How many of the user's messages the notes haven't seen. */

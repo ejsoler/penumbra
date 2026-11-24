@@ -32,6 +32,8 @@ export interface UiMessage {
   truncated?: boolean;
   /** Shown while the reply waits for something, like summarizing older messages. */
   notice?: string;
+  /** Sent by another app through the MCP server, not typed by the user (memory never learns from it). */
+  external?: boolean;
 }
 
 export interface Conversation {

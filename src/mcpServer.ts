@@ -153,7 +153,8 @@ async function pickModel(wanted: unknown, needsTools = false): Promise<string> {
 }
 
 function newChat(fields: Partial<Conversation>): Conversation {
-  const conv: Conversation = { id: uid(), title: 'MCP', model: '', systemPrompt: '', messages: [], updatedAt: Date.now(), interactive: false, net: newChatNet(), ...fields };
+  // Memory is off for these chats: an app's prompts aren't the user's words, and a folder it points at is only read from.
+  const conv: Conversation = { id: uid(), title: 'MCP', model: '', systemPrompt: '', messages: [], updatedAt: Date.now(), interactive: false, net: newChatNet(), memoryOff: true, ...fields };
   updateConversations((cs) => [conv, ...cs]);
   return conv;
 }
@@ -254,7 +255,7 @@ async function runTool(tool: string, a: Record<string, unknown>, client: string,
       const onAbort = () => c.stop();
       signal.addEventListener('abort', onAbort, { once: true });
       try {
-        await c.runInChat(convId, prompt, { fresh: false });
+        await c.runInChat(convId, prompt, { fresh: false, external: true });
       } finally {
         stop();
         signal.removeEventListener('abort', onAbort);
@@ -381,7 +382,7 @@ async function runTool(tool: string, a: Record<string, unknown>, client: string,
       const onAbort = () => c.stop();
       signal.addEventListener('abort', onAbort, { once: true });
       try {
-        await c.runInChat(conv.id, goal, { fresh: false });
+        await c.runInChat(conv.id, goal, { fresh: false, external: true });
         let reply = lastReply(conv.id);
         // Nobody reviews the plan here, so it runs right away; tools still ask the user.
         if (reply?.orchestration?.phase === 'review') {

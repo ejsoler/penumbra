@@ -100,6 +100,8 @@ export const openChatRequest = store<string | null>(null);
 
 /** How a run started by something other than the user's message box behaves. */
 export interface RunOptions {
+  /** The message comes from another app (the MCP server), not from the user. */
+  external?: boolean;
   /** Tools that may go ahead without asking (a scheduled task's "without asking" settings). */
   preApproved?: string[];
   /** Send only the newest message to the model, not the whole chat. */

@@ -54,7 +54,7 @@ const STEPS: Step[] = [
   { title: 'Welcome to Penumbra', body: 'A tour of every tab: chat with local models, interactive answers, agents, the orchestrator, scheduled tasks, images, and your options. Everything runs on this computer with Ollama.' },
 
   // Home
-  { title: 'Home', body: 'Penumbra opens here. Ask something to start a chat, and see each tab at a glance: recent chats, projects, agents, scheduled tasks, orchestrator runs, loaded models and downloads, images, backups, and updates. Click a card’s link to go there.', target: '.home-grid', view: 'home' },
+  { title: 'Home', body: 'Penumbra opens here. Ask something to start a chat, and see each tab at a glance: recent chats, projects, agents, connections, scheduled tasks, orchestrator runs, loaded models and downloads, images, backups, and updates. Click a card’s link to go there.', target: '.home-grid', view: 'home' },
 
   // Chat
   { title: 'Your chats', body: 'Every chat is saved here. + starts a new one (⌘/Ctrl+N). Right-click a chat to rename, duplicate, export it as Markdown, move it to a project or another profile, or delete it.', target: '.view-host aside.sidebar', view: 'chat' },
@@ -79,6 +79,9 @@ const STEPS: Step[] = [
   { title: 'Your agents', body: 'Each agent is a card: avatar, purpose, persona, model, and the tools it may use. Edit opens its page; Chat starts a conversation with it. For a picture, Adjust image lets you drag and zoom to choose what shows on the card.', target: '.tcards, .agents-empty', view: 'agents' },
   { title: 'New agent', body: 'A short wizard: a purpose, a name, a persona (personality and style), an avatar, and a model. Templates like Researcher or Coder are a quick start.', target: '.list-new', view: 'agents' },
   { title: 'Skills', body: 'Skills are packaged instructions (the SKILL.md format). Create them here or import folders and .zip files; the model loads one only when a task needs it.', target: '.content-inner > aside .sidebar-head .seg button:last-child', view: 'agents' },
+
+  // Connections
+  { title: 'Connections (MCP)', body: 'Connect Penumbra to other apps and programs that speak MCP, a program on this computer or a web address, and their tools show up in your chats. Turn on Connected apps in a chat’s tools, or on an agent, to use them. Every use asks you first, once or always.', target: '.content-inner > main', view: 'connections' },
 
   // Images
   { title: 'Find image models', body: 'Make pictures on this computer, outside Ollama. Search Hugging Face for image models: Penumbra checks each file before you download it (Z-Image and FLUX.1 work today). Models marked 18+ stay hidden unless you choose to show them.', target: '.page-head .seg button:last-child', view: 'images' },

@@ -6,7 +6,7 @@ import { DiscoverView } from './views/DiscoverView';
 import { useDownloads } from './downloads';
 import { DeveloperView, developerFocus } from './views/DeveloperView';
 import { AgentsView } from './views/AgentsView';
-import { Bot, CalendarClock, DatabaseBackup, Folder, FolderOpen, House, ImageIcon, MessageSquare, Settings, Telescope, Workflow } from './components/icons';
+import { Bot, CalendarClock, DatabaseBackup, Folder, FolderOpen, House, ImageIcon, MessageSquare, Plug, Settings, Telescope, Workflow } from './components/icons';
 import { WorkspaceView } from './views/WorkspaceView';
 import { SchedulerView } from './views/SchedulerView';
 import { ImagesView } from './views/ImagesView';
@@ -14,6 +14,8 @@ import { UpdatesView } from './views/UpdatesView';
 import { BackupView } from './views/BackupView';
 import { HomeView } from './views/HomeView';
 import { ProjectsView } from './views/ProjectsView';
+import { ConnectionsView } from './views/ConnectionsView';
+import { startMcp } from './mcp';
 import { startScheduler, useScheduler } from './scheduler';
 import { start as startImages } from './images';
 import { chatController, openChatRequest, streaming } from './session';
@@ -29,7 +31,7 @@ import { host, type ProfileInfo } from './host';
 import { syncProfile } from './profile';
 import { startUpdateChecks } from './updates';
 
-type View = 'home' | 'chat' | 'projects' | 'orchestrator' | 'scheduler' | 'agents' | 'images' | 'models' | 'discover' | 'developer' | 'updates' | 'backup';
+type View = 'home' | 'chat' | 'projects' | 'orchestrator' | 'scheduler' | 'agents' | 'connections' | 'images' | 'models' | 'discover' | 'developer' | 'updates' | 'backup';
 
 const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'home', label: 'Home', icon: House },
@@ -38,6 +40,7 @@ const NAV: { id: View; label: string; icon: typeof MessageSquare }[] = [
   { id: 'orchestrator', label: 'Orchestrator', icon: Workflow },
   { id: 'scheduler', label: 'Scheduler', icon: CalendarClock },
   { id: 'agents', label: 'Agents & Skills', icon: Bot },
+  { id: 'connections', label: 'Connections', icon: Plug },
   { id: 'images', label: 'Images', icon: ImageIcon },
   { id: 'backup', label: 'Backup', icon: DatabaseBackup },
   { id: 'developer', label: 'Options', icon: Settings },
@@ -88,6 +91,7 @@ function Main() {
   useEffect(startUpdateChecks, []);
   useEffect(startScheduler, []);
   useEffect(startImages, []);
+  useEffect(startMcp, []);
   useEffect(() => {
     syncProfile();
   }, []);
@@ -151,6 +155,7 @@ function Main() {
               }}
             />
           )}
+          {view === 'connections' && <ConnectionsView onOpenAgents={() => setView('agents')} />}
           {view === 'projects' && <ProjectsView onOpenChat={openChat} />}
           {view === 'scheduler' && <SchedulerView ollama={ollama} onOpenChat={openChat} />}
           {view === 'images' && <ImagesView />}

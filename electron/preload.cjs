@@ -38,6 +38,17 @@ contextBridge.exposeInMainWorld('penumbraHost', {
     },
   },
   /** Tells the main process whether to stay in the menu bar, and what to show there. */
+  mcp: {
+    connect: (cfg) => ipcRenderer.invoke('mcp:connect', cfg),
+    disconnect: (id) => ipcRenderer.invoke('mcp:disconnect', id),
+    call: (id, name, args, timeoutSec) => ipcRenderer.invoke('mcp:call', id, name, args, timeoutSec),
+    state: () => ipcRenderer.invoke('mcp:state'),
+    onClosed: (cb) => {
+      const listener = (_e, id, reason) => cb(id, reason);
+      ipcRenderer.on('mcp:closed', listener);
+      return () => ipcRenderer.removeListener('mcp:closed', listener);
+    },
+  },
   backup: {
     summary: () => ipcRenderer.invoke('backup:summary'),
     save: (req) => ipcRenderer.invoke('backup:save', req),

@@ -83,6 +83,8 @@
       "electron/images.cjs",
       "electron/profiles.cjs",
       "electron/backup.cjs",
+      "electron/mcp.cjs",
+      "electron/demo-mcp.cjs",
       "docs/demo/**",
       "build/trayTemplate.png",
       "build/trayTemplate@2x.png",

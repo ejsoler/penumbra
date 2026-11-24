@@ -112,7 +112,38 @@ export interface OpenedBackup {
   images: BackupImage[];
 }
 
+/** A tool a connected MCP server offers. */
+export interface McpToolInfo {
+  name: string;
+  title?: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  /** The server says the tool only reads. */
+  readOnly: boolean;
+}
+
+/** What the main process needs to start or reach an MCP server. */
+export interface McpConnectConfig {
+  id: string;
+  transport: 'stdio' | 'http';
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  cwd?: string;
+  url: string;
+  headers: Record<string, string>;
+}
+
 export interface PenumbraHost {
+  mcp: {
+    connect: (cfg: McpConnectConfig) => Promise<{ tools: McpToolInfo[]; info: { name?: string; version?: string; instructions?: string } | null }>;
+    disconnect: (id: string) => Promise<void>;
+    call: (id: string, name: string, args: Record<string, unknown>, timeoutSec?: number) => Promise<{ text: string; isError: boolean }>;
+    /** Servers this window is connected to now (still connected after a reload). */
+    state: () => Promise<Record<string, { tools: McpToolInfo[]; info: { name?: string; version?: string; instructions?: string } | null }>>;
+    /** Called when a server stops on its own. Returns a function that stops listening. */
+    onClosed: (cb: (id: string, reason: string) => void) => () => void;
+  };
   backup: {
     /** This profile's skills and images, to choose from. */
     summary: () => Promise<{ skills: BackupSkill[]; images: BackupImage[] }>;

@@ -9,7 +9,7 @@ import { Logo } from '../components/Logo';
 import { openTutorial } from '../components/Tutorial';
 import {
   ArrowUp, ArrowUpCircle, Bot, CalendarClock, ChevronRight, CircleAlert, CircleCheck, DatabaseBackup, Download, FolderOpen, ImageIcon, Loader2,
-  BookOpen, Folder, MessageSquare, Workflow,
+  BookOpen, Folder, MessageSquare, Plug, Workflow,
 } from '../components/icons';
 import type { Downloads } from '../downloads';
 import { host, type BackupImage } from '../host';
@@ -17,6 +17,7 @@ import { imageUrl, readyModels, useImages } from '../images';
 import { lastBackup } from '../backup';
 import { useProfile } from '../profile';
 import { useProjects } from '../projects';
+import { useMcpRuntime, useMcpServers } from '../mcp';
 import { describeWhen, useScheduler } from '../scheduler';
 import { chatController, streaming, useConversations } from '../session';
 import type { OllamaState } from '../store';
@@ -75,6 +76,8 @@ export function HomeView({ ollama, dl, setView, onChatWithAgent }: {
   const profile = useProfile();
   const agents = useAgents();
   const projects = useProjects();
+  const mcpServers = useMcpServers();
+  const mcpRuntime = useMcpRuntime();
   const [conversations] = useConversations(() => ({ id: 'x', title: 'New Chat', model: '', systemPrompt: '', messages: [], updatedAt: Date.now() }));
   const scheduler = useScheduler();
   const images = useImages();
@@ -205,6 +208,26 @@ export function HomeView({ ollama, dl, setView, onChatWithAgent }: {
             </div>
           ) : <Empty>No agents yet. Make one with a purpose and a persona.</Empty>}
           <p className="muted small home-foot">{agents.length} {agents.length === 1 ? 'agent' : 'agents'}{files ? ` · ${files.skills} ${files.skills === 1 ? 'skill' : 'skills'}` : ''}</p>
+        </Card>
+
+        <Card icon={<Plug size={16} />} title="Connections" onOpen={() => setView('connections')} action="Connections">
+          {mcpServers.length ? (
+            <ul className="home-list">
+              {mcpServers.slice(0, 5).map((s) => {
+                const r = mcpRuntime[s.id];
+                return (
+                  <li key={s.id}>
+                    <button onClick={() => setView('connections')}>
+                      <span className={`mcp-dot ${r?.status ?? 'off'}`} />
+                      <span className="home-item-title">{s.name}</span>
+                      <span className="muted small">{r?.status === 'on' ? `${r.tools.length} ${r.tools.length === 1 ? 'tool' : 'tools'}` : r?.status === 'error' ? "couldn't connect" : r?.status === 'connecting' ? 'connecting…' : 'off'}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : <Empty>Connect other apps through MCP, and chats and agents can use their tools.</Empty>}
+          <p className="muted small home-foot">{Object.values(mcpRuntime).filter((r) => r.status === 'on').length} of {mcpServers.length} connected</p>
         </Card>
 
         <Card icon={<CalendarClock size={16} />} title="Scheduled tasks" onOpen={() => setView('scheduler')} action="Scheduler">

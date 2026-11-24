@@ -19,6 +19,7 @@ const LOG_KEY = 'ollama-gui.scheduleLog';
 export const SETTING_GROUPS: { id: string; label: string; keys: string[] }[] = [
   { id: 'chat', label: 'Chat settings (sampling and generation)', keys: ['ollama-gui.params', 'ollama-gui.showSettings'] },
   { id: 'internet', label: 'Internet access and your sites', keys: ['ollama-gui.widgetNet'] },
+  { id: 'mcp', label: 'Connections (MCP servers; may include API keys)', keys: ['ollama-gui.mcpServers'] },
   { id: 'profile', label: 'Your name and avatar', keys: ['ollama-gui.profile'] },
   { id: 'server', label: 'Ollama server address', keys: ['ollama-gui.host'] },
   { id: 'other', label: 'Images, scheduler, skills, and update settings', keys: ['ollama-gui.imageModel', 'ollama-gui.imageSize', 'ollama-gui.imagesShowAdult', 'ollama-gui.scheduleSettings', 'ollama-gui.skillsDisabled', 'ollama-gui.updates', 'ollama-gui.tutorial'] },

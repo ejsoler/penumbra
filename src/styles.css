@@ -995,3 +995,23 @@ h4 .normal { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .project-danger { align-items: center; }
 .project-form { display: flex; flex-direction: column; gap: 14px; }
 .projects-page .project-form h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
+
+/* Connections (MCP) */
+.mcp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; display: inline-block; }
+.mcp-dot.on { background: var(--green, #4ade80); }
+.mcp-dot.connecting { background: var(--amber, #f0b44c); }
+.mcp-dot.error { background: var(--red, #f26d6d); }
+.mcp-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-dim); }
+.mcp-error { margin: 0; padding: 10px 12px; border: 1px solid rgba(242, 109, 109, 0.4); background: rgba(242, 109, 109, 0.1); border-radius: 8px; color: #ffb3b3; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+.mcp-examples { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.mcp-example { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); cursor: pointer; color: var(--text); }
+.mcp-example:hover { border-color: var(--accent); }
+.mcp-tools { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.mcp-tool { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--bg); display: flex; flex-direction: column; gap: 4px; }
+.mcp-allow { margin: 0; }
+.connections-page .editor { display: flex; flex-direction: column; gap: 16px; }
+
+.connections-page .net-note { display: flex; align-items: flex-start; gap: 6px; }
+.connections-page .net-note svg { flex-shrink: 0; margin-top: 3px; }
+.connections-page .panel .row { margin-top: 10px; }
+.connections-page .panel .row.project-danger { margin-top: 0; }

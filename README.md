@@ -73,6 +73,11 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 - The **Orchestrator** plans a goal into tasks, creates the agents it needs, lets you review and edit the plan, then runs each task on its agent and writes the final answer. Follow runs on a board with one column per agent. **Edit plan** on a finished run changes its goal, tasks, or agents (or adds new ones) and runs it again, keeping the results of tasks you didn't touch, and the earlier results and answers of the ones that run again
 - The **Scheduler** runs prompts, agents, orchestrator goals, or terminal commands at set times or on repeat, with a chat per task for the results. While tasks are on, Penumbra keeps running in the menu bar when you close the window
 
+**Connections (MCP)** *(new)*
+- Connect Penumbra to other apps and programs through [MCP](https://modelcontextprotocol.io) (Model Context Protocol), either a program it starts on your computer (stdio, like `npx -y @modelcontextprotocol/server-filesystem`) or a web address (HTTP). Their tools then work in your chats and agents
+- Turn on **Connected apps** in a chat's tools, or on an agent. Every use asks you first, once or **Always allow** for that tool, and what a tool returns is treated as data, not instructions
+- The **Connections** tab shows each server's status and tools, and keeps your keys in this profile (they're included in backups if you choose that setting)
+
 **Images** *(new in 0.3.0)*
 - An **Images** tab to make pictures on your computer, outside Ollama: search Hugging Face for image models (Z-Image and FLUX.1 today), download one, and generate with [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp)
 - Ask for a picture in any chat, or give an agent the **Images** tool; images appear in the reply and are saved in Pictures/Penumbra (or the chat's folder)
@@ -117,7 +122,7 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 - Pause, resume, and retry downloads, with speed and time remaining; unfinished downloads survive restarts
 
 **Everywhere**
-- A **Home** dashboard, where Penumbra opens: start a chat from one box, and see recent chats, projects, agents, upcoming tasks, orchestrator runs, loaded models and downloads, recent images, your last backup, and updates at a glance
+- A **Home** dashboard, where Penumbra opens: start a chat from one box, and see recent chats, projects, agents, connections, upcoming tasks, orchestrator runs, loaded models and downloads, recent images, your last backup, and updates at a glance
 - A guided tutorial of every tab the first time you open Penumbra (and in each new profile), until you choose not to see it again; Options → Tutorial shows it any time
 - Your own name and avatar on your messages (set from the button at the bottom of the sidebar)
 - A quiet update check: a small icon in the sidebar when a new version is out. It opens the Updates tab with what's new, and downloads the installer for your computer

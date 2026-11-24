@@ -5,7 +5,8 @@
 ### Added
 - **Projects tab.** All your projects in one place: pick one to see its chats (open one, take it out of the project, add an existing chat, or start a new one) and edit its settings (name, instructions, folder, sources) or delete it.
 - **Projects on Home.** A card with your projects, their chats, and when they were last used.
-- The tutorial and the guided demo cover the new tab.
+- **Connections (MCP).** Penumbra can now connect to other apps and programs that speak MCP (Model Context Protocol) and use their tools. Add a server in the new **Connections** tab: a program on this computer (stdio, for example `npx -y @modelcontextprotocol/server-filesystem /path`) or a web address (Streamable HTTP, with headers for a key). Penumbra lists the server's tools; turn on **Connected apps** in a chat's tools, or on an agent, and the model can call them. Every call asks first, with **Always allow** per tool, and shows what will be sent. Servers can connect when Penumbra starts, and the examples (Files, Memory, Fetch) get you going. Only tools are supported for now. The connections are part of backups (a setting, since they may hold API keys). Connections also appear on Home.
+- The tutorial and the guided demo cover the new tabs.
 
 ## 0.7.0 (2026-11-23)
 

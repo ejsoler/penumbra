@@ -9,6 +9,7 @@ const { registerTray, attachWindow, showWindow, mainWindow } = require('./tray.c
 const { registerDemo } = require('./demo.cjs');
 const { registerImages } = require('./images.cjs');
 const { registerBackup } = require('./backup.cjs');
+const { registerMcp } = require('./mcp.cjs');
 const { registerProfiles, openProfile, activeProfile } = require('./profiles.cjs');
 const { isLocalName, resolvesToPrivate } = require('./netsafe.cjs');
 
@@ -208,6 +209,7 @@ app.whenReady().then(() => {
   registerTray();
   registerImages();
   registerBackup();
+  registerMcp();
   registerProfiles({ createWindow, protectSession });
   registerDemo({ createWindow, protectSession });
   // macOS Dock icon while running unpackaged (a packaged build uses build/icon.icns).

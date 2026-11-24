@@ -56,6 +56,7 @@ function seed(model, folder) {
     { title: 'Demo · Story' },
     { title: 'Demo · Long reply' },
     { title: 'Demo · Project', projectId: 'demo-project' },
+    { title: 'Demo · Connected app', tools: ['skills', 'mcp'] },
   ].map((c, i) => ({ id: 'demo' + i, model, systemPrompt: '', messages: [], updatedAt: 100 - i, interactive: false, ...c }));
   const tomorrow8 = new Date();
   tomorrow8.setDate(tomorrow8.getDate() + 1);
@@ -70,7 +71,11 @@ function seed(model, folder) {
     instructions: 'Answer in one short sentence, and say which source you used.',
     sources: [{ id: 'demo-source', name: 'Launch facts', addedAt: 1, text: 'Project Tide launches on March 14. The budget is 48,000 dollars. The lead engineer is Marisol Vega. The first customer is Harbor Foods.' }],
   }];
-  return { agents, chats, tasks, projects };
+  const mcpServers = [{
+    id: 'demo-mcp', name: 'Project Tide tracker', transport: 'stdio', command: process.execPath, args: [path.join(__dirname, 'demo-mcp.cjs')],
+    env: { ELECTRON_RUN_AS_NODE: '1' }, url: '', headers: {}, enabled: true, allowed: [], createdAt: 1,
+  }];
+  return { agents, chats, tasks, projects, mcpServers };
 }
 
 let demo = null; // the open demo window
@@ -82,7 +87,7 @@ async function runDemo(win, model) {
   const { skills, images, folder, notes } = prepareFiles();
   setSkillsFolder(wc, skills);
   setImagesFolder(wc, images);
-  const { agents, chats, tasks, projects } = seed(model, folder);
+  const { agents, chats, tasks, projects, mcpServers } = seed(model, folder);
   const str = (v) => JSON.stringify(JSON.stringify(v));
 
   await new Promise((r) => wc.once('did-finish-load', r));
@@ -111,6 +116,7 @@ async function runDemo(win, model) {
     localStorage.setItem('ollama-gui.conversations', ${str(chats)});
     localStorage.setItem('ollama-gui.schedule', ${str(tasks)});
     localStorage.setItem('ollama-gui.projects', ${str(projects)});
+    localStorage.setItem('ollama-gui.mcpServers', ${str(mcpServers)});
     location.reload();`);
   await new Promise((r) => wc.once('did-finish-load', r));
   await sleep(1500);
@@ -225,6 +231,8 @@ async function runDemo(win, model) {
       await send('When does the launch happen and who is the lead engineer?');
     } },
     { t: 'The Projects tab', say: 'All projects in one place: the chats in Project Tide, and its instructions, folder, and sources. You can start a chat, add or remove chats, and edit the settings here.', run: async () => { await view('Projects'); } },
+    { t: 'Connected apps', say: 'The Connections tab lists the apps Penumbra talks to through MCP. “Project Tide tracker” is connected and offers two tools. Any MCP server works the same way: files, databases, other apps.', run: async () => { await view('Connections'); await waitFor(`!!document.querySelector('.mcp-tool')`, 20); } },
+    { t: 'A chat uses the app', say: 'With Connected apps on, the model calls the tracker. It asks first: click "Allow". The answer: 12 of 15 tasks, beta on March 3, owner Marisol Vega.', run: async () => { await openChat('Demo · Connected app'); await send('How is Project Tide going, and what is the next milestone? Use your tools.'); } },
     { s: '6. The orchestrator', t: 'A plan in a chat', say: 'The orchestrator proposes a plan: the Researcher finds the forecast and the Writer drafts the email. You can edit it before it runs.', run: async () => {
       await openChat('Demo · Orchestrator');
       await send('Find out what the weather will be in San Juan, Puerto Rico this weekend, then write a short, friendly email to my team suggesting an outdoor activity that fits the forecast.');

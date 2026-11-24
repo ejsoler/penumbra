@@ -9,7 +9,7 @@ import { host, type SkillInfo } from '../host';
 import { useContextMenu } from '../components/ContextMenu';
 import { AgentAvatar, AvatarPicker, colorFor, DEFAULT_FRAME, frameStyle, initials, isImageAvatar, type AvatarFrame } from '../components/AgentAvatar';
 import {
-  BookOpen, Bot, Copy, FileText, FolderOpen, Globe, ImageIcon, MessageSquarePlus, Move, Pencil, Plus, Sparkles, Terminal, Trash2, Upload, X, ZoomIn, ZoomOut,
+  BookOpen, Bot, Copy, FileText, FolderOpen, Globe, ImageIcon, MessageSquarePlus, Move, Pencil, Plug, Plus, Sparkles, Terminal, Trash2, Upload, X, ZoomIn, ZoomOut,
 } from '../components/icons';
 
 type Tab = 'agents' | 'skills';
@@ -116,7 +116,7 @@ function AgentList({ agents, current, onSelect, onNew }: { agents: Agent[]; curr
   );
 }
 
-const TOOL_ICONS: Record<ToolGroup, typeof Globe> = { skills: BookOpen, web: Globe, files: FileText, write: Pencil, terminal: Terminal, images: ImageIcon };
+const TOOL_ICONS: Record<ToolGroup, typeof Globe> = { skills: BookOpen, web: Globe, files: FileText, write: Pencil, terminal: Terminal, images: ImageIcon, mcp: Plug };
 
 /** The Agents page's overview: one trading card per agent. */
 function AgentCards({ agents, ollama, onOpen, onChat, onNew }: { agents: Agent[]; ollama: OllamaState; onOpen: (id: string) => void; onChat: (id: string) => void; onNew: () => void }) {

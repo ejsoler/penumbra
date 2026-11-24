@@ -106,18 +106,24 @@ The builds aren't code-signed yet, so your OS will warn you the first time:
 
 | | |
 |---|---|
-| ![The Home dashboard](docs/screenshots/home.webp) | ![A long chat with its older part summarized](docs/screenshots/long-chat.webp) |
-| Home | A long chat, summarized to fit |
-| ![Agents as trading cards](docs/screenshots/agents.webp) | ![An agent's purpose, persona, and avatar](docs/screenshots/agent-editor.webp) |
+| ![The Home dashboard](docs/screenshots/home.webp) | ![The tab bar, expanded to show names](docs/screenshots/tab-bar.webp) |
+| The Home dashboard | The tab bar, expanded to show names |
+| ![A project: its chats, instructions, folder, and sources](docs/screenshots/projects.webp) | ![Memory notes, updated by the model every few messages](docs/screenshots/memory.webp) |
+| A project: its chats, instructions, folder, and sources | Memory notes, updated by the model every few messages |
+| ![An app Penumbra uses through MCP](docs/screenshots/connections.webp) | ![Penumbra as a server, with Claude Code connected](docs/screenshots/mcp-server.webp) |
+| An app Penumbra uses through MCP | Penumbra as a server, with Claude Code connected |
+| ![The chat Claude Code made when it delegated a job to Penumbra](docs/screenshots/claude-code-chat.webp) | ![An interactive answer](docs/screenshots/chat-widget.webp) |
+| The chat Claude Code made when it delegated a job to Penumbra | An interactive answer |
+| ![Agents as trading cards](docs/screenshots/agents.webp) | ![Purpose, persona, and avatar](docs/screenshots/agent-editor.webp) |
 | Agents as trading cards | Purpose, persona, and avatar |
-| ![A chat with an agent](docs/screenshots/agent-chat.webp) | ![An orchestrator run with two agents](docs/screenshots/orchestrator.webp) |
-| A chat with an agent | An orchestrator run |
-| ![A scheduled task with its run log](docs/screenshots/scheduler.webp) | ![An incremental backup](docs/screenshots/backup.webp) |
-| A scheduled task and its run log | An incremental backup |
-| ![Finding image models on Hugging Face](docs/screenshots/images.webp) | ![An image in the zoomable viewer](docs/screenshots/lightbox.webp) |
-| Finding image models | The image viewer |
-| ![A locked profile](docs/screenshots/profile-lock.webp) | |
-| A locked profile | |
+| ![A chat with an agent that loads a skill](docs/screenshots/agent-chat.webp) | ![An orchestrator run](docs/screenshots/orchestrator.webp) |
+| A chat with an agent that loads a skill | An orchestrator run |
+| ![A scheduled task and its run log](docs/screenshots/scheduler.webp) | ![A full or incremental backup](docs/screenshots/backup.webp) |
+| A scheduled task and its run log | A full or incremental backup |
+| ![Finding and making images](docs/screenshots/images.webp) | ![The image viewer](docs/screenshots/lightbox.webp) |
+| Finding and making images | The image viewer |
+| ![A long chat, summarized to fit](docs/screenshots/long-chat.webp) | ![A locked profile](docs/screenshots/profile-lock.webp) |
+| A long chat, summarized to fit | A locked profile |
 
 **Models**
 - Model picker (<kbd>⌘L</kbd>) that loads the model into memory, with capability badges (vision, tools, reasoning)

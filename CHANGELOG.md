@@ -16,6 +16,13 @@
 - **The tab bar can show names.** A button at the top of the bar expands it to show each tab's name next to its icon (and the Update and profile buttons, and Ollama's status), and collapses it again. Penumbra remembers the choice.
 - The tutorial and the guided demo cover the new tabs, memory, the server, and the tab bar.
 
+### Fixed
+- A reply whose reasoning comes with only the closing `</think>` tag (some Qwen templates open the tag in the prompt) shows the reasoning in its own block, not as stray text in the answer.
+- When Ollama can't read the model's plan (a garbled tool call), the orchestrator asks the model once more before giving up. A new agent in a plan can run without instructions: its purpose is used.
+- Models are told not to use the image tool for maps, charts, widgets, or placeholders.
+- One permission covers everything the model asks to remember about you in a reply.
+- The guided demo finds its chats by id (they are renamed after their first message), and its agents have personas. The README's screenshots are new.
+
 ## 0.7.0 (2026-11-23)
 
 ### Added
